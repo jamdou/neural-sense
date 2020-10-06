@@ -11,7 +11,7 @@ from simulationManager import *
 from experimentResults import *
 from reconstruction import *
 
-# Making the terminal all colourfull because that's what I live for
+# Making the terminal all colourful because that's what I live for
 import colorama
 colorama.init()
 
