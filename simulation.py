@@ -45,6 +45,7 @@ sqrt2 = math.sqrt(2)
 sqrt3 = math.sqrt(3)
 expPrecision = 5                                # Where to cut off the exp Taylor series
 machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
+# trotterCutoff = 52
 
 class SourceProperties:
     """
@@ -175,11 +176,12 @@ class Simulation:
     """
     The data needed and algorithms to control an individual simulation
     """
-    def __init__(self, signal, dressingRabiFrequency = 1e3, stateProperties = StateProperties()):
+    def __init__(self, signal, dressingRabiFrequency = 1e3, stateProperties = StateProperties(), trotterCutoff = 52):
         self.signal = signal
         self.sourceProperties = SourceProperties(self.signal, dressingRabiFrequency)
         self.stateProperties = stateProperties
         self.simulationResults = SimulationResults(self.signal)
+        self.trotterCutoff = trotterCutoff
 
         self.evaluate()
 
@@ -193,7 +195,7 @@ class Simulation:
 
         # Run stepwise solver
         getTimeEvolutionCommutatorFree4[blocksPerGrid, threadsPerBlock](
-            self.signal.timeProperties.timeCoarse, self.signal.timeProperties.timeEndPoints, self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, self.sourceProperties.sourceAmplitude, self.sourceProperties.sourceFrequency, self.sourceProperties.sourcePhase, self.sourceProperties.sourceTimeEndPoints, self.simulationResults.timeEvolution)
+            self.signal.timeProperties.timeCoarse, self.signal.timeProperties.timeEndPoints, self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, self.sourceProperties.sourceAmplitude, self.sourceProperties.sourceFrequency, self.sourceProperties.sourcePhase, self.sourceProperties.sourceTimeEndPoints, self.simulationResults.timeEvolution, self.trotterCutoff)
 
         # Combine results of the stepwise solver to evaluate the timeseries for the state
         getState(self.stateProperties.stateInit, self.simulationResults.state, self.simulationResults.timeEvolution)
@@ -217,6 +219,7 @@ class Simulation:
         # timeCoarse = 1*self.signal.timeProperties.timeCoarse
         # plt.figure()
         # plt.plot(timeCoarse, spin)
+        # plt.plot(self.simulationResults.spin[:, :])
         # plt.plot(self.signal.timeProperties.timeCoarse, self.simulationResults.spin[:, :])
 
         # Decide GPU block and grid sizes
@@ -247,7 +250,7 @@ class Simulation:
 @cuda.jit(debug = cudaDebug,  max_registers = 95)
 def getTimeEvolutionCommutatorFree4(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
     sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints,
-    timeEvolutionCoarse):
+    timeEvolutionCoarse, trotterCutoff):
     """
     Find the stepwise time evolution opperator using a 2 exponential commutator free order 4 Magnus integrator.
     """
@@ -296,7 +299,7 @@ def getTimeEvolutionCommutatorFree4(timeCoarse, timeEndPoints, timeStepFine, tim
                 hamiltonian[2, 2] = -hamiltonian[0, 0]
 
                 # Calculate the exponential from the expansion
-                matrixExponentialCrossProduct(hamiltonian, timeEvolutionFine)
+                matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
 
                 # Premultiply to the exitsing time evolution operator
                 setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
@@ -350,14 +353,14 @@ def getTimeEvolutionHalfStep(timeCoarse, timeEndPoints, timeStepFine, timeStepCo
                     hamiltonian[2, 1] = (-1j*timeStepFine/2)*(magneticField[0] + 1j*magneticField[1])/sqrt2
                     hamiltonian[2, 2] = (-1j*timeStepFine/2)*(-magneticField[2])
 
-                    matrixExponentialCrossProduct(hamiltonian, timeEvolutionFine)
+                    matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine)
 
                     setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
                     matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
 
             timeFine += timeStepFine
 
-@cuda.jit(debug = cudaDebug,  max_registers = 95)
+@cuda.jit(debug = cudaDebug,  max_registers = 31)
 def getTimeEvolutionMidpointSample(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
     sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints,
     timeEvolutionCoarse):
@@ -566,6 +569,45 @@ def matrixExponentialCrossProduct(exponent, result):
             result[yIndex, xIndex] = 0
             for zIndex in range(3):
                 result[yIndex, xIndex] += rotation[yIndex, zIndex]*winding[zIndex]*conj(rotation[xIndex, zIndex])
+
+@cuda.jit(device = True, debug = cudaDebug)
+def matrixExponentialLieTrotter(exponent, result, trotterCutoff = 52):
+    x = (1j*exponent[1, 0]).real*sqrt2
+    y = (1j*exponent[1, 0]).imag*sqrt2
+    z = (1j*(exponent[0, 0] + 0.5*exponent[1, 1])).real
+    q = (-1.5*1j*exponent[1, 1]).real
+
+    hyperCubeAmount = 2*math.ceil(trotterCutoff/4 + math.log(math.fabs(x) + math.fabs(y) + math.fabs(z) + math.fabs(q))/(4*math.log(2.0)))
+    precision = 4**hyperCubeAmount
+
+    x /= precision
+    y /= precision
+    z /= precision
+    q /= precision
+
+    cx = math.cos(x)
+    sx = math.sin(x)
+    cy = math.cos(y)
+    sy = math.sin(y)
+
+    cisz = math.cos(z + q/3) - 1j*math.sin(z + q/3)
+    result[0, 0] = 0.5*cisz*(cx + cy - 1j*sx*sy)
+    result[1, 0] = cisz*(-1j*sx + cx*sy)/sqrt2
+    result[2, 0] = 0.5*cisz*(cx - cy - 1j*sx*sy)
+
+    cisz = math.cos(2*q/3) + 1j*math.sin(2*q/3)
+    result[0, 1] = cisz*(-sy - 1j*cy*sx)/sqrt2
+    result[1, 1] = cisz*cx*cy
+    result[2, 1] = cisz*(sy - 1j*cy*sx)/sqrt2
+
+    cisz = math.cos(z - q/3) + 1j*math.sin(z - q/3)
+    result[0, 2] = 0.5*cisz*(cx - cy + 1j*sx*sy)
+    result[1, 2] = cisz*(-1j*sx - cx*sy)/sqrt2
+    result[2, 2] = 0.5*cisz*(cx + cy + 1j*sx*sy)
+
+    for powerIndex in range(hyperCubeAmount):
+        matrixMultiply(result, result, exponent)
+        matrixMultiply(exponent, exponent, result)
 
 @cuda.jit(device = True, debug = cudaDebug)
 def matrixExponentialTaylor(exponent, result):
@@ -799,8 +841,8 @@ def getState(stateInit, state, timeEvolution):
             norm += (state[timeIndex, xIndex]*np.conj(state[timeIndex, xIndex])).real
 
         # Normalise the state in case of errors in the unitarity of the time evolution operator
-        for xIndex in nb.prange(3):
-            state[timeIndex, xIndex] /=np.sqrt(norm)
+        # for xIndex in nb.prange(3):
+        #     state[timeIndex, xIndex] /=np.sqrt(norm)
 
 @cuda.jit(debug = cudaDebug)
 def getSpin(state, spin):

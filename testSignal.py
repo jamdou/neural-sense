@@ -10,7 +10,7 @@ class TimeProperties:
     """
     Grouped details about time needed for simulations and reconstructions
     """
-    def __init__(self, timeStepCoarse = 1e-5, timeStepFine = 1e-7, timeEndPoints = np.asarray([0, 1e-1])):
+    def __init__(self, timeStepCoarse = 1e-5, timeStepFine = 2e-7, timeEndPoints = np.asarray([0, 1e-1])):
         self.timeStepCoarse = timeStepCoarse            # Sampled timestep (s)
         self.timeStepFine = timeStepFine                # Simulated timestep (s)
         self.timeEndPoints = timeEndPoints              # When the signal starts and ends (s) [start time / end time]

@@ -16,7 +16,7 @@ import colorama
 colorama.init()
 
 # This will be recorded in the HDF5 file to give context for what was being tested
-descriptionOfTest = "Making readable for others"
+descriptionOfTest = "Testing accuracy / drift of using different time steps for the commutator free integrator."
 
 #===============================================================#
 
@@ -141,6 +141,14 @@ if __name__ == "__main__":
             TimeProperties(1e-6)
         )
         signal.writeToFile(archive.archiveFile)
+
+        # # Drift testing
+        # # [1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7]
+        # SimulationManager.newFineStepComparison(archive, signal, 1e-5/np.floor(np.logspace(np.log10(20), np.log10(3000), 100)))
+
+        # # Trotter Test
+        # frequency = np.arange(50, 3051, 30)
+        # SimulationManager.newTrotterCutoffComparison(signal, frequency, archive, np.arange(80, 0, -4))
 
         # Run simulations
         frequency = np.arange(50, 3051, 3)
