@@ -10,7 +10,7 @@ class SimulationManager:
     """
     Controls a set of simulations running, for different dressing parameters
     """
-    def __init__(self, signal, frequency, archive, stateOutput = None, trotterCutoff = [36]):
+    def __init__(self, signal, frequency, archive, stateOutput = None, trotterCutoff = [28]):
         self.signal = signal
         if not isinstance(self.signal, list):
             self.signal = [self.signal]
