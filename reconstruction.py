@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-from testSignal import *
 from numba import cuda
 import numba as nb
 import time as tm
+
+from testSignal import *
 
 class Reconstruction():
     """
@@ -43,7 +44,7 @@ class Reconstruction():
         """
         Save the reconstruction results to a hdf5 file
         """
-        archiveGroupReconstruction = archive.create_group("reconstruction")
+        archiveGroupReconstruction = archive.require_group("reconstruction")
         self.timeProperties.writeToFile(archiveGroupReconstruction)
         archiveGroupReconstruction["frequency"] = self.frequency
         archiveGroupReconstruction["frequencyAmplitude"] = self.frequencyAmplitude

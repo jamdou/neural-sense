@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 
-from simulationManager import *
+# from simulationManager import *
 
 class ExperimentResults:
     def __init__(self, frequency = None, frequencyAmplitude = None):
@@ -29,6 +29,6 @@ class ExperimentResults:
         plt.show()
 
     def writeToArchive(self, archive):
-        archiveGroupExperimentResults = archive.archiveFile.create_group("experimentResults")
+        archiveGroupExperimentResults = archive.archiveFile.require_group("experimentResults")
         archiveGroupExperimentResults["frequency"] = self.frequency
         archiveGroupExperimentResults["frequencyAmplitude"] = self.frequencyAmplitude

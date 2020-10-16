@@ -31,10 +31,12 @@ class Archive:
             self.archiveFile = h5py.File(self.archivePath + self.executionTimeString + "archive.hdf5", "a")
             self.writeProfiles()
         else:
-            os.makedirs(self.plotPath)
+            if not os.path.exists(self.plotPath):
+                os.makedirs(self.plotPath)
             if profileState == "TimeLine":
-                os.makedirs(self.profilePath)
-    
+                if not os.path.exists(self.profilePath):
+                    os.makedirs(self.profilePath)
+
     def newArchiveFile(self):
         """
         Make a new hdf5 file at the archive path.
@@ -42,14 +44,15 @@ class Archive:
         self.archiveFile = h5py.File(self.archivePath + "archive.hdf5", "w")
 
     def openArchiveFile(self, oldExecutionTimeString):
-        self.archiveFile = h5py.File(self.archivePath + oldExecutionTimeString + "archive.hdf5", "r")
+        self.archiveFile = h5py.File(self.archivePath[:-25] + oldExecutionTimeString[:8] + "\\" + oldExecutionTimeString + "\\archive.hdf5", "r")
 
-    def closeArchiveFile(self):
+    def closeArchiveFile(self, doSaveSource = True):
         """
         Archive source code and profile files.
         """
         if self.archiveFile:
-            self.writeCodeSource()
+            if doSaveSource:
+                self.writeCodeSource()
             self.archiveFile.close()
             if self.profileState == "TimeLine":
                 profileFlagFile = open(self.profileLocalPath + "profileFlag", "w")
@@ -62,7 +65,7 @@ class Archive:
         """
         Save source code to the hdf5 file.
         """
-        archiveGroupCodeSource = self.archiveFile.create_group("codeSource" + self.executionTimeString)
+        archiveGroupCodeSource = self.archiveFile.require_group("codeSource" + self.executionTimeString)
         archiveGroupCodeSource["descriptionOfTest"] = np.asarray([self.descriptionOfTest], dtype = "|S512")
         for codeSourceName in glob.glob(self.sourcePath + "*.py") + glob.glob(self.sourcePath + "*.bat"):
             codeSource = open(codeSourceName, "r")

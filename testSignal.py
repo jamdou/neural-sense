@@ -10,7 +10,7 @@ class TimeProperties:
     """
     Grouped details about time needed for simulations and reconstructions
     """
-    def __init__(self, timeStepCoarse = 1e-5, timeStepFine = 2e-7, timeEndPoints = np.asarray([0, 1e-1])):
+    def __init__(self, timeStepCoarse = 1e-5, timeStepFine = 2.5e-7, timeEndPoints = np.asarray([0, 1e-1])):
         self.timeStepCoarse = timeStepCoarse            # Sampled timestep (s)
         self.timeStepFine = timeStepFine                # Simulated timestep (s)
         self.timeEndPoints = timeEndPoints              # When the signal starts and ends (s) [start time / end time]
@@ -59,14 +59,15 @@ class TestSignal:
     """
     Details for a simulated neural pulse sequence ONLY (no noise or control signals)
     """
-    def __init__(self, neuralPulses = [NeuralPulse()], timeProperties = TimeProperties()):
+    def __init__(self, neuralPulses = [NeuralPulse()], timeProperties = TimeProperties(), doEvaluate = True):
         self.timeProperties = timeProperties                        # Details about time for the signal (time properties object)
         self.neuralPulses = neuralPulses                            # List of individual neural pulses that make up the signal (neural pulse object) [pulse index]
         self.amplitude = np.empty_like(timeProperties.timeCoarse)   # Time series of the signal (Hz) [time index]
-        self.getAmplitude()
         self.frequency = np.empty_like(timeProperties.timeCoarse)   # List of frequencies corresponding to the Fourier transform of the pulse sequence (Hz) [frequency index]
         self.frequencyAmplitude = np.empty_like(self.frequency)     # The sine Fourier transform of the pulse sequence (Hz) [frequency index]
-        self.getFrequencyAmplitude()
+        if doEvaluate:
+            self.getAmplitude()
+            self.getFrequencyAmplitude()
 
     def getAmplitude(self):
         """
@@ -119,14 +120,14 @@ class TestSignal:
         """
         Writes the pulse sequence description to a hdf5 file
         """
-        archiveGroup = archive.create_group("testSignal")
+        archiveGroup = archive.require_group("testSignal")
         archiveGroup["amplitude"] = self.amplitude
         archiveGroup["frequency"] = self.frequency
         archiveGroup["frequencyAmplitude"] = self.frequencyAmplitude
 
         self.timeProperties.writeToFile(archiveGroup)
         
-        archiveGroupNeuralPulsesGroup = archiveGroup.create_group("neuralPulses")
+        archiveGroupNeuralPulsesGroup = archiveGroup.require_group("neuralPulses")
         for neuralPulseIndex, neuralPulse in enumerate(self.neuralPulses):
             neuralPulse.writeToFile(archiveGroupNeuralPulsesGroup, neuralPulseIndex)
 

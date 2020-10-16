@@ -4,19 +4,25 @@ import sys, getopt      # Command line arguments
 from numba import cuda  # GPU code
 
 # The different pieces that make up this sensing code
-from archive import *
-from testSignal import *
-from simulation import *
-from simulationManager import *
-from experimentResults import *
-from reconstruction import *
+from archive import *                   # Saving results and configurations
+from testSignal import *                # The properties of the magnetic signal, used for simulations and reconstructions
+
+from simulation import *                # Simulates an 3 state atom interacting with a magnetic signal
+from simulationUtilities import *       # Tools used in the simulation
+from simulationManager import *         # Controls the running of multiple simulations
+from experimentResults import *         # A list of frequency coefficients from a simulation or actual experiment
+
+from reconstruction import *            # Uses compressive sensing to reconstruct the a magnetic signal
+
+from benchmarkManager import *          # Runs benchmarks to test accuracy of code in different configurations
+from benchmarkResults import *          # Stores the results of, and plots benchmarks
 
 # Making the terminal all colourful because that's what I live for
 import colorama
 colorama.init()
 
 # This will be recorded in the HDF5 file to give context for what was being tested
-descriptionOfTest = "Testing accuracy / drift of using different time steps for the commutator free integrator."
+descriptionOfTest = "Various benchmarks"
 
 #===============================================================#
 
@@ -135,26 +141,34 @@ if __name__ == "__main__":
         archive.newArchiveFile()
 
         # Make signal
+        timeProperties = TimeProperties(1e-6, 1e-7)
         signal = TestSignal(
             [NeuralPulse(0.02333333, 10.0, 1000), NeuralPulse(0.0444444444, 10.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
-            TimeProperties(1e-6)
+            timeProperties
         )
         signal.writeToFile(archive.archiveFile)
 
-        # # Drift testing
-        # # [1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7]
-        # SimulationManager.newFineStepComparison(archive, signal, 1e-5/np.floor(np.logspace(np.log10(20), np.log10(3000), 100)))
+        # # Time step test
+        # # timeStepFine = [5e-9, 1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7, 1e-6, 2e-6, 2.5e-6, 5e-6]
+        # timeStepFine = timeProperties.timeStepCoarse/np.floor(np.logspace(np.log10(200), np.log10(1), 50))
+        # frequency = np.arange(50, 3051, 300)
+        # # frequency = np.arange(1000, 1003, 5)
+        # newBenchmarkTimeStepFine(archive, signal, frequency, timeStepFine)
 
-        # # Trotter Test
+        # plotBenchmarkComparison(archive, ["20201016T120914", "20201016T121113", "20201016T120556", "20201016T121414", "20201016T113809", "20201016T121721", "20201016T122146"], ["tc = 12", "tc = 16", "tc = 20", "tc = 24", "tc = 28", "tc = 32", "tc = 36"], "Effect of trotter cutoff on timestep benchmark")
+
+        # Trotter Test
+        # newBenchmarkTrotterCutoffMatrix(archive, np.arange(80, 0, -4), 1e1)
+        # frequency = np.arange(50, 3051, 300)
         # frequency = np.arange(50, 3051, 30)
-        # SimulationManager.newTrotterCutoffComparison(signal, frequency, archive, np.arange(80, 0, -4))
+        # newBenchmarkTrotterCutoff(archive, signal, frequency, np.arange(60, 0, -4))
 
         # Run simulations
-        frequency = np.arange(50, 3051, 3)
-        # frequency = np.arange(1000, 1003, 1)
+        # frequency = np.arange(50, 3051, 3)
+        frequency = np.arange(1000, 1003, 1)
         simulationManager = SimulationManager(signal, frequency, archive)
-        simulationManager.evaluate()
+        simulationManager.evaluate(False)
         experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
         experimentResults.writeToArchive(archive)
         experimentResults.plot(archive, signal)
