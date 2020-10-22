@@ -68,6 +68,31 @@ class Reconstruction():
         plt.savefig(archive.plotPath + "reconstruction.png")
         plt.show()
 
+    def evaluateISTAComplete(self):
+        """
+        Run compressive sensing based on the Iterative Shrinkage Thresholding Algorithm (ISTA)
+        """
+        print("\033[33mStarting reconstruction...\033[0m")
+
+        # Start timing reconstruction
+        executionTimeEndPoints = np.empty(2)
+        executionTimeEndPoints[0] = tm.time()
+        executionTimeEndPoints[1] = executionTimeEndPoints[0]
+
+        self.amplitude = np.empty_like(self.timeProperties.timeCoarse)                          # Reconstructed signal
+        frequencyAmplitudePrediction = np.empty_like(self.frequencyAmplitude)                   # Partial sine Fourier transform of reconstructed signal
+        fourierTransform = np.empty((self.frequency.size, self.timeProperties.timeCoarse.size)) # Storage for sine Fourier transform operator
+
+        # Setup GPU block and grid sizes
+        threadsPerBlock = 128
+        blocksPerGridTime = (self.timeProperties.timeCoarse.size + (threadsPerBlock - 1)) // threadsPerBlock
+
+        reconstructISTAComplete[blocksPerGridTime, threadsPerBlock](self.timeProperties.timeCoarse, self.amplitude, self.frequency, self.frequencyAmplitude, frequencyAmplitudePrediction, fourierTransform, self.timeProperties.timeStepCoarse, 0, 100.0, 10.0)
+
+        print(str(tm.time() - executionTimeEndPoints[1]) + "s")
+        print("\033[32mDone!\033[0m")
+        executionTimeEndPoints[1] = tm.time()
+
     def evaluateFISTA(self):
         """
         Run compressive sensing based on the Fast Iterative Shrinkage Thresholding Algorithm (FISTA)
@@ -171,6 +196,52 @@ class Reconstruction():
         # plt.show()
 
 @cuda.jit()
+def reconstructISTAComplete(
+    timeCoarse, amplitude,                                          # Time
+    frequency, frequencyAmplitude, frequencyAmplitudePrediction,    # Frequency
+    fourierTransform, timeStepCoarse,                               # Parameters
+    sparsePenalty, minAccuracy, expectedAmplitude                   # Parameters
+):
+    # Initialise
+    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if timeIndex < timeCoarse.size:
+        amplitude[timeIndex] = 0.0
+        for frequencyIndex in range(frequency.size):
+            # Find the Fourier transform coefficient
+            fourierTransform[frequencyIndex, timeIndex] = math.sin(2*math.pi*frequency[frequencyIndex]*timeCoarse[timeIndex])*timeStepCoarse/(timeCoarse[timeCoarse.size - 1] - timeCoarse[0])
+            # # Apply the Moore–Penrose inverse of the Fourier transform, based off its SVD
+            # amplitude[timeIndex] += fourierTransform[frequencyIndex, timeIndex]*(2.0*(timeCoarse[timeCoarse.size - 1] - timeCoarse[0])/(timeStepCoarse))*frequencyAmplitude[frequencyIndex]
+
+    stepSize = (timeCoarse[timeCoarse.size - 1] - timeCoarse[0])/timeStepCoarse
+    maxIterationIndex = math.ceil((((expectedAmplitude/(1e3*timeStepCoarse))**2)/minAccuracy)/stepSize)
+    for iterationIndex in range(maxIterationIndex):
+        # Prediction
+        cuda.syncthreads()
+        frequencyIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+        if frequencyIndex < frequencyAmplitudePrediction.size:
+            frequencyAmplitudePrediction[frequencyIndex] = -frequencyAmplitude[frequencyIndex]
+            for timeIndex in range(timeCoarse.size):
+                frequencyAmplitudePrediction[frequencyIndex] += fourierTransform[frequencyIndex, timeIndex]*0.0#amplitude[timeIndex]
+
+        if cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x == 0:
+            print(frequencyAmplitudePrediction[frequencyIndex], frequencyAmplitude[frequencyIndex], amplitude[timeCoarse.size - 1])
+
+        # Linear inverse
+        cuda.syncthreads()
+        timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+        if timeIndex < timeCoarse.size:
+            for frequencyIndex in range(frequencyAmplitudePrediction.size):
+                amplitude[timeIndex] -= 2*fourierTransform[frequencyIndex, timeIndex]*(frequencyAmplitudePrediction[frequencyIndex])*stepSize
+
+        # Shrinkage
+        amplitudeTemporary = math.fabs(amplitude[timeIndex]) - stepSize*sparsePenalty
+        if amplitudeTemporary > 0:
+            amplitude[timeIndex] = math.copysign(amplitudeTemporary, amplitude[timeIndex])  # Apparently normal "sign" doesn't exist, but this weird thing does :P
+        else:
+            amplitude[timeIndex] = 0
+
+
+@cuda.jit()
 def reconstructISTAInitialisationStep(frequency, frequencyAmplitude, timeStepCoarse, timeCoarse, amplitude, fourierTransform):
     """
     Generate the Fourier transform matrix, and use the Moore–Penrose inverse to initialise the
@@ -183,7 +254,7 @@ def reconstructISTAInitialisationStep(frequency, frequencyAmplitude, timeStepCoa
             # Find the Fourier transform coefficient
             fourierTransform[frequencyIndex, timeIndex] = math.sin(2*math.pi*frequency[frequencyIndex]*timeCoarse[timeIndex])*timeStepCoarse/timeCoarse[timeCoarse.size - 1]
             # Apply the Moore–Penrose inverse of the Fourier transform, based off its SVD
-            amplitude[timeIndex] += 0.5*fourierTransform[frequencyIndex, timeIndex]*(timeCoarse[timeCoarse.size - 1]/(timeStepCoarse))*frequencyAmplitude[frequencyIndex]
+            amplitude[timeIndex] += 2*fourierTransform[frequencyIndex, timeIndex]*(timeCoarse[timeCoarse.size - 1]/(timeStepCoarse))*frequencyAmplitude[frequencyIndex]
 
 @cuda.jit()
 def reconstructISTASparseStep(stepSize, amplitude):

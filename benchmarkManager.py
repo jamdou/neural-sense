@@ -116,7 +116,7 @@ def newBenchmarkTimeStepFine(archive, signalTemplate, frequency, timeStepFine):
     signal = []
     for timeStepFineInstance in timeStepFine:
         timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, timeStepFineInstance)
-        signalInstance = TestSignal(signalTemplate.neuralPulses, timeProperties, False)
+        signalInstance = TestSignal(signalTemplate.neuralPulses, signalTemplate.sinusoidalNoises, timeProperties, False)
         signal += [signalInstance]
 
     simulationManager = SimulationManager(signal, frequency, archive, stateOutput)
@@ -148,7 +148,7 @@ def newBenchmarkFineStepFrequencyDrift(archive, signalTemplate, timeStepFines, d
     signals = []
     for timeStepFine in timeStepFines:
         timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, timeStepFine)
-        signal = TestSignal(signalTemplate.neuralPulses, timeProperties)
+        signal = TestSignal(signalTemplate.neuralPulses, signalTemplate.sinusoidalNoises, timeProperties)
         signals += [signal]
 
     simulationManager = SimulationManager(signals, dressingFrequency, archive)

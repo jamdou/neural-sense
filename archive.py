@@ -28,7 +28,7 @@ class Archive:
         self.archiveFile = None
 
         if profileState == "Archive":
-            self.archiveFile = h5py.File(self.archivePath + self.executionTimeString + "archive.hdf5", "a")
+            self.archiveFile = h5py.File(self.archivePath + "archive.hdf5", "a")
             self.writeProfiles()
         else:
             if not os.path.exists(self.plotPath):

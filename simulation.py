@@ -1,3 +1,32 @@
+"""
+.. _overviewOfSimulationMethod:
+
+*********************************
+Overview of the simulation method
+*********************************
+
+The goal here is to evaluate the value of the spin, and thus the quantum state of a 3 level atom in a coarse grained time series with step :math:`\\mathrm{D}t`. The time evolution between time indices is
+
+.. math::
+   \\begin{align*}
+   \\psi(t + \\mathrm{D}t) &= U(t \\rightarrow t + \\mathrm{D}t) \\psi(t)\\\\
+   \\psi(t + \\mathrm{D}t) &= U(t) \\psi(t)
+   \\end{align*}
+
+Each :math:`U(t)` is completely independent of :math:`\\psi(t_0)` or :math:`U(t_0)` for any other time value :math:`t_0`. Therefore each :math:`U(t)` can be calculated independently of each other. This is done in parallel using a GPU kernel in the function :func:`getTimeEvolutionCommutatorFree4RotatingWave()` (the highest performing variant of this solver). Afterwards, the final result of
+
+.. math::
+   \\psi(t + \\mathrm{D}t) = U(t) \\psi(t)
+
+is calculated sequentially for each :math:`t` in the function :func:`getState()`. Afterwards, the spin at each time step is calculated in parallel in the function :func:`getSpin()`.
+
+All magnetic signals fed into the integrator in the form of sine waves, with varying amplitude, frequency, phase, and start and end times. This can be used to simulate anything from the bias and dressing fields, to the fake neural pulses, to AC line and DC detuning noise. These sinusoids are superposed and sampled at any time step needed to for the solver. The magnetic signals are written in high level as :class:`testSignal.TestSignal` objects, and are converted to a parametrisation readable to the integrator in the form of :class:`SourceProperties` objects.
+
+*********************
+Classes and functions
+*********************
+"""
+
 import numpy as np
 import scipy.linalg as spla
 import matplotlib.pyplot as plt
@@ -7,36 +36,6 @@ import numba as nb
 import time as tm
 from testSignal import *
 from simulationUtilities import *
-
-#===============================================================#
-
-"""
-=== Overview of the simulation method ===
-
-The goal here is to evaluate the value of the spin, and thus
-the quantum state of a 3 level atom in a coarse grained time
-series with step Dt. The time evolution between time indices is
-
-y(t + Dt) = U(t -> t + Dt) y(t)
-y(t + Dt) = U(t) y(t)
-
-Each U(t) is completely independent of y(t0) or U(t0) for any
-other time value t0. Therefore each U(t) can be calculated
-independently of each other. This is done in parallel using a GPU
-kernel. Afterwards, the final result of
-
-y(t + Dt) = U(t) y(t)
-
-is calculated sequentially for each t. Afterwards, the spin at
-each timestep is calculated in parallel.
-
-(So far) all magnetic signals fed into the integrator in the form
-of sine waves, with varying amplitude, frequency, phase, and
-start and end times. This can be used to simulate anything from
-the bias and dressing fields, to the fake neural pulses, to
-AC line and DC detuning noise. These sinusoids are superposed
-and sampled at any time step needed to for the solver.
-"""
 
 #===============================================================#
 
@@ -51,26 +50,67 @@ machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors ar
 class SourceProperties:
     """
     A list of sine wave parameters fed into the simulation code.
+
+    The source parametrised as
+    
+    :math:`b_{i,x}(t) = 2 \\pi` :attr:`sourceAmplitude` :math:`_{i,x}\\sin(2 \\pi` :attr:`sourceFrequency` :math:`_{i,x}(t -` :attr:`sourceTimeEndPoints` :math:`_{i,0}) +` :attr:`sourcePhase` :math:`_{i,x})`
+    
+    Attributes
+    ----------
+    dressingRabiFrequency : `float`
+        The amplitude of the dressing in units of Hz.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    sourceQuadraticShift :  `float`
+        The constant quadratic shift of the spin 1 system, in Hz.
+    sourceType : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex)
+        A string description of what source sourceIndex physically represents. Mainly for archive purposes.
     """
-    def __init__(self, signal, dressingRabiFrequency = 1000, quadraticShift = 0.0):
+    def __init__(self, signal, dressingRabiFrequency = 1000.0, quadraticShift = 0.0):
+        """
+        Parameters
+        ----------
+        signal : :class:`testSignal.TestSignal`
+            An object that contains high level descriptions of the signal to be measured, as well as noise.
+        dressingRabiFrequency : `float`, optional
+            The amplitude of the dressing in units of Hz.
+        quadraticShift :  `float`, optional
+            The constant quadratic shift of the spin 1 system, in Hz.
+        """
         self.dressingRabiFrequency = dressingRabiFrequency
-        self.sourceIndexMax = 0                             # The number of sources
-        self.sourceAmplitude = np.empty([0, 3])             # Sine wave amplitude (Hz) [source index, xyz direction]
-        self.sourcePhase = np.empty([0, 3])                 # Sine wave phase offset, starts from 0 (rad) [source index, xyz direction]
-        self.sourceFrequency = np.empty([0, 3])             # Sine wave frequency, separate for each direction (Hz) [source index, xyz direction]
-        self.sourceTimeEndPoints = np.empty([0, 2])         # Sine wave start and end times (s) [source index, start time / end time]
-        self.sourceType = np.empty([0], dtype = object)     # Description of what the source physically represents, for archive (string) [source index]
-        self.sourceQuadraticShift = quadraticShift          # 3 state quadratic shift (Hz)
+        self.sourceIndexMax = 0
+        self.sourceAmplitude = np.empty([0, 3], np.double)
+        self.sourcePhase = np.empty([0, 3], np.double)
+        self.sourceFrequency = np.empty([0, 3], np.double)
+        self.sourceTimeEndPoints = np.empty([0, 2], np.double)
+        self.sourceType = np.empty([0], object)
+        self.sourceQuadraticShift = quadraticShift
 
         # Construct the signal from the dressing information and pulse description.
         if signal:
-            self.addDressing(signal, dressingRabiFrequency)
+            self.addDressing(signal)
             for neuralPulse in signal.neuralPulses:
-                self.addNeuralPulse(neuralPulse.timeStart, neuralPulse.amplitude, neuralPulse.frequency)
+                self.addNeuralPulse(neuralPulse)
+                # self.addNeuralPulse(neuralPulse.timeStart, neuralPulse.amplitude, neuralPulse.frequency)
+            for sinusoidalNoise in signal.sinusoidalNoises:
+                self.addSinusoidalNoise(sinusoidalNoise)
         
     def writeToFile(self, archive):
         """
-        Saves source information to archive file
+        Saves source information to archive file.
+
+        Parameters
+        ----------
+        archive : :class:`h5py.Group`
+            The HDF5 archive to write to.
         """
         archiveGroup = archive.require_group("sourceProperties")
         archiveGroup["sourceAmplitude"] = self.sourceAmplitude
@@ -81,9 +121,17 @@ class SourceProperties:
         archiveGroup["sourceIndexMax"] = np.asarray([self.sourceIndexMax])
         archiveGroup["sourceQuadraticShift"] = np.asarray([self.sourceQuadraticShift])
 
-    def addDressing(self, signal, dressingRabiFrequency = 1e3, dressingFrequency = 700e3, biasAmplitude = 700e3):
+    def addDressing(self, signal, biasAmplitude = 700e3):
         """
-        Adds bias and dressing to list of sources
+        Adds a specified bias field and dressing field to the list of sources.
+
+        Parameters
+        ----------
+        signal : :class:`testSignal.TestSignal`
+            The signal object. Needed to specify how long the dressing and bias should be on for.
+        biasAmplitude : `float`, optional
+            The strength of the dc bias field in Hz. Also the frequency of the dressing.
+            If one wants to add detuning, one can do that via detuning noise in :class:`testSignal.SinusoidalNoise.newDetuningNoise()`.
         """
         # Initialise
         sourceAmplitude = np.zeros([1, 3])
@@ -100,8 +148,8 @@ class SourceProperties:
         sourcePhase[0, 2] = math.pi/2
 
         #Dressing
-        sourceAmplitude[0, 0] = 2*dressingRabiFrequency
-        sourceFrequency[0, 0] = dressingFrequency
+        sourceAmplitude[0, 0] = 2*self.dressingRabiFrequency
+        sourceFrequency[0, 0] = biasAmplitude #self.dressingFrequency
         sourceTimeEndPoints[0, :] = 1*signal.timeProperties.timeEndPoints
         sourcePhase[0, 0] = math.pi/2
 
@@ -113,9 +161,14 @@ class SourceProperties:
         self.sourceType = np.concatenate((self.sourceType, sourceType))
         self.sourceIndexMax += 1
 
-    def addNeuralPulse(self, neuralPulseTimeStart, neuralPulseAmplitude = 100.0, neuralPulseFrequency = 1e3):
+    def addNeuralPulse(self, neuralPulse):
         """
-        Adds a neural pulse signal to the list of sources
+        Adds a neural pulse signal to the list of sources from a :class:`testSignal.NeuralPulse` object.
+
+        Parameters
+        ----------
+        neuralPulse : :class:`testSignal.NeuralPulse`
+            An object parameterising the neural pulse signal to be added to the list of sources.
         """
         # Initialise
         sourceAmplitude = np.zeros([1, 3])
@@ -128,10 +181,43 @@ class SourceProperties:
         sourceType[0] = "NeuralPulse"
 
         # Pulse
-        sourceAmplitude[0, 2] = neuralPulseAmplitude
-        sourceFrequency[0, 2] = neuralPulseFrequency
+        sourceAmplitude[0, 2] = neuralPulse.amplitude
+        sourceFrequency[0, 2] = neuralPulse.frequency
         # sourcePhase[0, 2] = math.pi/2
-        sourceTimeEndPoints[0, :] = np.asarray([neuralPulseTimeStart, neuralPulseTimeStart + 1/neuralPulseFrequency])
+        sourceTimeEndPoints[0, :] = np.asarray([neuralPulse.timeStart, neuralPulse.timeStart + 1/neuralPulse.frequency])
+
+        # Add
+        self.sourceAmplitude = np.concatenate((self.sourceAmplitude, sourceAmplitude))
+        self.sourcePhase = np.concatenate((self.sourcePhase, sourcePhase))
+        self.sourceFrequency = np.concatenate((self.sourceFrequency, sourceFrequency))
+        self.sourceTimeEndPoints = np.concatenate((self.sourceTimeEndPoints, sourceTimeEndPoints))
+        self.sourceType = np.concatenate((self.sourceType, sourceType))
+        self.sourceIndexMax += 1
+
+    def addSinusoidalNoise(self, sinusoidalNoise):
+        """
+        Adds sinusoidal noise from a :class:`testSignal.SinusidalNoise` object to the list of sources.
+
+        Parameters
+        ----------
+        sinusoidalNoise : :class:`testSignal.SinusidalNoise`
+            The sinusoidal noise object to add to the list of sources.
+        """
+        # Initialise
+        sourceAmplitude = np.zeros([1, 3])
+        sourcePhase = np.zeros([1, 3])
+        sourceFrequency = np.zeros([1, 3])
+        sourceTimeEndPoints = np.zeros([1, 2])
+        sourceType = np.empty([1], dtype = object)
+
+        # Label
+        sourceType[0] = "Noise"
+
+        # Pulse
+        sourceAmplitude[0, :] = sinusoidalNoise.amplitude
+        sourceFrequency[0, :] = sinusoidalNoise.frequency
+        sourcePhase[0, :] = sinusoidalNoise.phase
+        sourceTimeEndPoints[0, :] = np.asarray([0.0, 1800.0])
 
         # Add
         self.sourceAmplitude = np.concatenate((self.sourceAmplitude, sourceAmplitude))
@@ -143,29 +229,66 @@ class SourceProperties:
 
 class StateProperties:
     """
-    The initial state fed into the simulation code
+    The initial state fed into the simulation code.
+
+    Attributes
+    ----------
+    stateInit : :class:`numpy.ndarray` of :class:`numpy.cdouble` (stateIndex)
+        The state (spin wavefunction) of the system at the start of the simulation.
     """
-    def __init__(self, stateInit = np.asarray([1, 0, 0])):
+    def __init__(self, stateInit = np.asarray([1.0, 0.0, 0.0], np.cdouble)):
+        """
+        Parameters
+        ----------
+        stateInit : :class:`numpy.ndarray` of :class:`numpy.cdouble`
+            The state (spin wavefunction) of the system at the start of the simulation.
+        """
         self.stateInit = stateInit
 
     def writeToFile(self, archive):
+        """
+        Parameters
+        ----------
+        archive : :class:`h5py.Group`
+            The HDF5 archive to write to.
+        """
         archiveGroup = archive.require_group("stateProperties")
         archiveGroup["stateInit"] = self.stateInit
 
 class SimulationResults:
     """
-    The output of the simulation code
+    The output of the simulation code.
+
+    Attributes
+    ----------
+    timeEvolution : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`.
+    state : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, stateIndex)
+        The state (wavefunction) of the spin system in the lab frame, for each time sampled. See :math:`\\psi(t)` in :ref:`overviewOfSimulationMethod`.
+    spin : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`.
+    sensedFrequencyAmplitude : `float`
+        The measured Fourier coefficient from the simulation.
+    sensedFrequencyAmplitudeMethod : `string`
+        The method used to find the measured Fourier coefficient (for archival purposes).
     """
     def __init__(self, signal):
-        self.timeEvolution = np.empty([signal.timeProperties.timeIndexMax, 3, 3], np.cdouble)   # Time evolution operator between the current and next timesteps (SU3) [time index, matrix [y, x]]
-        self.state = np.empty([signal.timeProperties.timeIndexMax, 3], np.cdouble)              # Lab frame quantum state (C3 unit vector) [time index, spin projection index]
-        self.spin = np.empty([signal.timeProperties.timeIndexMax, 3], np.double)                # Expected hyperfine spin (hbar) [time index, xyz direction]
-        self.sensedFrequencyAmplitude = 0.0                                                     # Measured sine coefficient (Hz)
-        self.sensedFrequencyAmplitudeMethod = "none"                                            # Whether demodulation or demapping was used (string)
+        self.timeEvolution = np.empty([signal.timeProperties.timeIndexMax, 3, 3], np.cdouble)
+        self.state = np.empty([signal.timeProperties.timeIndexMax, 3], np.cdouble)
+        self.spin = np.empty([signal.timeProperties.timeIndexMax, 3], np.double)
+        self.sensedFrequencyAmplitude = 0.0
+        self.sensedFrequencyAmplitudeMethod = "none"
 
     def writeToFile(self, archive, doEverything = False):
         """
-        Saves results to the hdf5 file
+        Saves results to the hdf5 file.
+
+        Parameters
+        ----------
+        archive : :class:`h5py.Group`
+            The HDF5 archive to write to.
+        doEverything : `boolean`, optional
+            If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         """
         archiveGroup = archive.require_group("simulationResults")
         if doEverything:
@@ -177,9 +300,34 @@ class SimulationResults:
 
 class Simulation:
     """
-    The data needed and algorithms to control an individual simulation
+    The data needed and algorithms to control an individual simulation.
+
+    Attributes
+    ----------
+    signal : :class:`testSignal.TestSignal`
+        The :class:`testSignal.TestSignal` object source signal to be measured.
+    sourceProperties : :class:`SourceProperties`
+        The :class:`SourceProperties` parametrised sinusoidal source object to evolve the state with.
+    stateProperties : :class:`StateProperties`
+        The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
+    simulationResults : :class:`SimulationResults`
+        A record of the results of the simulation.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
     """
     def __init__(self, signal, dressingRabiFrequency = 1e3, stateProperties = StateProperties(), trotterCutoff = 52):
+        """
+        Parameters
+        ----------
+        signal : :class:`testSignal.TestSignal`
+            The :class:`testSignal.TestSignal` object source signal to be measured.
+        dressingRabiFrequency : `float`, optional
+            The amplitude of the dressing radiation to be applied to the system. Units of Hz.
+        stateProperties : :class:`StateProperties`, optional
+            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
+        trotterCutoff : `int`, optional
+            The number of squares made by the spin 1 matrix exponentiator.
+        """
         self.signal = signal
         self.sourceProperties = SourceProperties(self.signal, dressingRabiFrequency)
         self.stateProperties = stateProperties
@@ -190,25 +338,41 @@ class Simulation:
 
     def evaluate(self):
         """
-        Time evolve the system, and find the spin at each coarse time step
+        Time evolves the system, and finds the spin at each coarse time step.
         """
         # Decide GPU block and grid sizes
         threadsPerBlock = 64
         blocksPerGrid = (self.signal.timeProperties.timeIndexMax + (threadsPerBlock - 1)) // threadsPerBlock
 
         # Run stepwise solver
-        # getTimeEvolutionMidpointSample[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, self.signal.timeProperties.timeEndPoints, self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, self.sourceProperties.sourceAmplitude, self.sourceProperties.sourceFrequency, self.sourceProperties.sourcePhase, self.sourceProperties.sourceTimeEndPoints, self.simulationResults.timeEvolution, self.trotterCutoff)
-        getTimeEvolutionCommutatorFree4RotatingWave[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, self.signal.timeProperties.timeEndPoints, self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, self.sourceProperties.sourceAmplitude, self.sourceProperties.sourceFrequency, self.sourceProperties.sourcePhase, self.sourceProperties.sourceTimeEndPoints, self.sourceProperties.sourceQuadraticShift, self.simulationResults.timeEvolution, self.trotterCutoff)
+        self.simulationResults.timeEvolution = cuda.device_array_like(self.simulationResults.timeEvolution)
+        self.signal.timeProperties.timeCoarse = cuda.device_array_like(self.signal.timeProperties.timeCoarse)
+
+        getTimeEvolutionCommutatorFree4RotatingWave[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, cuda.to_device(self.sourceProperties.sourceAmplitude), cuda.to_device(self.sourceProperties.sourceFrequency), cuda.to_device(self.sourceProperties.sourcePhase), cuda.to_device(self.sourceProperties.sourceTimeEndPoints), self.sourceProperties.sourceQuadraticShift, self.simulationResults.timeEvolution, self.trotterCutoff)
+
+        self.simulationResults.timeEvolution = self.simulationResults.timeEvolution.copy_to_host()
+        self.signal.timeProperties.timeCoarse = self.signal.timeProperties.timeCoarse.copy_to_host()
 
         # Combine results of the stepwise solver to evaluate the timeseries for the state
         getState(self.stateProperties.stateInit, self.simulationResults.state, self.simulationResults.timeEvolution)
 
         # Evaluate the time series for the expected spin value
-        getSpin[blocksPerGrid, threadsPerBlock](self.simulationResults.state, self.simulationResults.spin)
+        self.simulationResults.spin = cuda.device_array_like(self.simulationResults.spin)
+
+        getSpin[blocksPerGrid, threadsPerBlock](cuda.to_device(self.simulationResults.state), self.simulationResults.spin)
+
+        self.simulationResults.spin = self.simulationResults.spin.copy_to_host()
 
     def getFrequencyAmplitudeFromDemodulation(self, demodulationTimeEndPoints = [0.09, 0.1], doPlotSpin = False):
         """
-        Use demodulation of the Faraday signal to find the measured Fourier coefficient
+        Uses demodulation of the Faraday signal to find the measured Fourier coefficient.
+
+        Parameters
+        ----------
+        demodulationTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1)), optional
+            The bounds of the interval where Faraday demodulation is used to acquire the measured frequency amplitude (Fourier coefficient) required for reconstruction
+        doPlotSpin : `boolean`, optional
+            If `True`, plot the full time series for the expected spin of the system.
         """
 
         # Look at the end of the signal only to find the displacement
@@ -248,7 +412,12 @@ class Simulation:
 
     def writeToFile(self, archive):
         """
-        Save the simulation record to hdf5
+        Saves the simulation record to hdf5.
+
+        Parameters
+        ----------
+        archive : :class:`h5py.Group`
+            The HDF5 archive to write to.
         """
         self.sourceProperties.writeToFile(archive)
         self.stateProperties.writeToFile(archive)
@@ -259,7 +428,34 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
     sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints, sourceQuadraticShift,
     timeEvolutionCoarse, trotterCutoff):
     """
-    Find the stepwise time evolution opperator using a 2 exponential commutator free order 4 Magnus integrator, in a rotating frame.
+    Find the stepwise time evolution opperator using a 2 exponential, commutator free, order 4 Magnus integrator, in a rotating frame. This method compared to the others here has the highest accuracy for a given fine time step (increasing accuracy), or equivalently, can obtain the same accuracy using larger fine time steps (reducing execution time).
+
+    Parameters
+    ----------
+    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The time values for when the experiment is to start and finishes.
+    timeStepFine : `float`
+        The time step used within the integration algorithm.
+    timeStepCoarse : `float`
+        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    sourceQuadraticShift :  `float`
+        The constant quadratic shift of the spin 1 system, in Hz.
+    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
     """
 
     # Declare variables
@@ -317,6 +513,7 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
 
             timeFine += timeStepFine
 
+        # Take out of rotating frame
         rotatingWaveWinding[0] = math.cos(rotatingWave*timeStepCoarse) + 1j*math.sin(rotatingWave*timeStepCoarse)
         timeEvolutionCoarse[timeIndex, 0, 0] /= rotatingWaveWinding[0]
         timeEvolutionCoarse[timeIndex, 0, 1] /= rotatingWaveWinding[0]
@@ -331,7 +528,32 @@ def getTimeEvolutionCommutatorFree4(timeCoarse, timeEndPoints, timeStepFine, tim
     sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints,
     timeEvolutionCoarse, trotterCutoff):
     """
-    Find the stepwise time evolution opperator using a 2 exponential commutator free order 4 Magnus integrator.
+    Find the stepwise time evolution opperator using a 2 exponential, commutator free, order 4 Magnus integrator.
+    
+    Parameters
+    ----------
+    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The time values for when the experiment is to start and finishes.
+    timeStepFine : `float`
+        The time step used within the integration algorithm.
+    timeStepCoarse : `float`
+        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
     """
 
     # Declare variables
@@ -391,7 +613,32 @@ def getTimeEvolutionHalfStep(timeCoarse, timeEndPoints, timeStepFine, timeStepCo
     sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints,
     timeEvolutionCoarse, trotterCutoff):
     """
-    The same sampling as used in the cython code. Uses two exponentials per fine timestep
+    The same sampling as used in the cython code. Uses two exponentials per fine timestep.
+
+    Parameters
+    ----------
+    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The time values for when the experiment is to start and finishes.
+    timeStepFine : `float`
+        The time step used within the integration algorithm.
+    timeStepCoarse : `float`
+        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
     """
 
     # Declare variables
@@ -443,7 +690,32 @@ def getTimeEvolutionMidpointSample(timeCoarse, timeEndPoints, timeStepFine, time
     sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints,
     timeEvolutionCoarse, trotterCutoff):
     """
-    The most basic form of integrator, uses one exponential per time step
+    The most basic form of integrator, uses one exponential per time step.
+
+    Parameters
+    ----------
+    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The time values for when the experiment is to start and finishes.
+    timeStepFine : `float`
+        The time step used within the integration algorithm.
+    timeStepCoarse : `float`
+        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
     """
 
     # Declare variables
@@ -493,7 +765,16 @@ def getTimeEvolutionMidpointSample(timeCoarse, timeEndPoints, timeStepFine, time
 @nb.jit(nopython = True)
 def getState(stateInit, state, timeEvolution):
     """
-    Use the stepwise time evolution operators in succession to find the quantum state timeseries of the 3 level atom
+    Use the stepwise time evolution operators in succession to find the quantum state timeseries of the 3 level atom.
+
+    Parameters
+    ----------
+    stateInit : :class:`numpy.ndarray` of :class:`numpy.cdouble`
+        The state (spin wavefunction) of the system at the start of the simulation.
+    state : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, stateIndex)
+        The state (wavefunction) of the spin system in the lab frame, for each time sampled. See :math:`\\psi(t)` in :ref:`overviewOfSimulationMethod`. This is an output.
+    timeEvolution : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`.
     """
     for timeIndex in range(state.shape[0]):
         # State = time evolution * previous state
@@ -514,7 +795,14 @@ def getState(stateInit, state, timeEvolution):
 @cuda.jit(debug = cudaDebug)
 def getSpin(state, spin):
     """
-    Calculate each expected spin value in parallel
+    Calculate each expected spin value in parallel.
+
+    Parameters
+    ----------
+    state : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, stateIndex)
+        The state (wavefunction) of the spin system in the lab frame, for each time sampled. See :math:`\\psi(t)` in :ref:`overviewOfSimulationMethod`.
+    spin : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
     """
     timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if timeIndex < spin.shape[0]:
@@ -525,7 +813,18 @@ def getSpin(state, spin):
 @cuda.jit(debug = cudaDebug)
 def getFrequencyAmplitudeFromDemodulationMultiply(time, spin, spinDemodulated, biasAmplitude):
     """
-    Multiply each spin value by -2cos(wt) as part of a demodulation
+    Multiply each spin value by :math:`-2\\cos(2\\pi f_\\mathrm{bias, amp} t)` as part of a demodulation.
+
+    Parameters
+    ----------
+    time : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        The time at which each spin sample is taken.
+    spin : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`.
+    spinDemodulated : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, multiplied by :math:`-2\\cos(2\\pi f_\\mathrm{bias, amp} t)` for each time sampled. Units of :math:`\\hbar`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    biasAmplitude : `float`
+        The carrier frequency :math:`f_\\mathrm{bias, amp}` for which to demodulate by.
     """
     timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if timeIndex < spin.shape[0]:
@@ -534,7 +833,16 @@ def getFrequencyAmplitudeFromDemodulationMultiply(time, spin, spinDemodulated, b
 @nb.jit(nopython = True)
 def getFrequencyAmplitudeFromDemodulationLowPass(timeEndPoints, spin, sensedFrequencyAmplitude):
     """
-    Average the multiplied spin to find the DC value (ie apply a low pass filter)
+    Average the multiplied spin to find the DC value (ie apply a low pass filter).
+
+    Parameters
+    ----------
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The bounds of the interval where Faraday demodulation is used to acquire the measured frequency amplitude (Fourier coefficient) required for reconstruction
+    spin : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, multiplied by :math:`-2\\cos(2\\pi f_\\mathrm{bias, amp} t)` for each time sampled. Units of :math:`\\hbar`. The output `spinDemodulated` from :func:`getFrequencyAmplitudeFromDemodulationMultiply()`.
+    sensedFrequencyAmplitude : `float`
+        The measured Fourier coefficient from the simulation. This is an output.
     """
     sensedFrequencyAmplitude = 0.0
     # spin = 1/2 g T coefficient
@@ -546,7 +854,18 @@ def getFrequencyAmplitudeFromDemodulationLowPass(timeEndPoints, spin, sensedFreq
 @cuda.jit(debug = cudaDebug)
 def getFrequencyAmplitudeFromDemodulation(time, spin, spinDemodulated, biasAmplitude):
     """
-    Demodulate a spin timeseries with a basic block low pass filter
+    Demodulate a spin timeseries with a basic block low pass filter.
+
+    Parameters
+    ----------
+    time : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        The time at which each spin sample is taken.
+    spin : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`.
+    spinDemodulated : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex, spatialIndex)
+        The expected value for hyperfine spin of the spin system in the lab frame, demodulated by `biasAmplitude` for each time sampled. Units of :math:`\\hbar`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    biasAmplitude : `float`
+        The carrier frequency :math:`f_\\mathrm{bias, amp}` for which to demodulate by.
     """
     timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if timeIndex < spin.shape[0]:

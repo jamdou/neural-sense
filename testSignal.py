@@ -55,13 +55,39 @@ class NeuralPulse:
         archive[str(index)].attrs["amplitude"] = self.amplitude
         archive[str(index)].attrs["frequency"] = self.frequency
 
+class SinusoidalNoise:
+    """
+    For describing 50Hz and detuning noise.
+    Arguments are all 3 components.
+    """
+    def __init__(self, amplitude = [0, 0, 0], frequency = [50, 50, 50], phase = [math.pi/2, math.pi/2, math.pi/2]):
+        self.amplitude = np.asarray(amplitude, dtype=np.float64)
+        self.frequency = np.asarray(frequency, dtype=np.float64)
+        self.phase = np.asarray(phase, dtype=np.float64)
+
+    @staticmethod
+    def newDetuningNoise(zAmplitude = 1):
+        """
+        A shorthand constructor for plain detuning noise.
+        Inverts the sign of the amplitude to obey the regular convention of fDressing = fBias + detuning.
+        """
+        return SinusoidalNoise([0, 0, -zAmplitude], [0, 0, 0], [math.pi/2, math.pi/2, math.pi/2])
+
+    @staticmethod
+    def newLineNoise(amplitude = [100, 0, 0], phase = [0, 0, 0]):
+        """
+        A shorthand constructor for plain line noise.
+        """
+        return SinusoidalNoise(amplitude, [50, 50, 50], phase)
+        
 class TestSignal:
     """
-    Details for a simulated neural pulse sequence ONLY (no noise or control signals)
+    Details for a simulated neural pulse sequence and noise (no control signals)
     """
-    def __init__(self, neuralPulses = [NeuralPulse()], timeProperties = TimeProperties(), doEvaluate = True):
+    def __init__(self, neuralPulses = [NeuralPulse()], sinusoidalNoises = [], timeProperties = TimeProperties(), doEvaluate = True):
         self.timeProperties = timeProperties                        # Details about time for the signal (time properties object)
         self.neuralPulses = neuralPulses                            # List of individual neural pulses that make up the signal (neural pulse object) [pulse index]
+        self.sinusoidalNoises = sinusoidalNoises                    # List of individual noise sources that add to (sinusoidal noise object) [noise index]
         self.amplitude = np.empty_like(timeProperties.timeCoarse)   # Time series of the signal (Hz) [time index]
         self.frequency = np.empty_like(timeProperties.timeCoarse)   # List of frequencies corresponding to the Fourier transform of the pulse sequence (Hz) [frequency index]
         self.frequencyAmplitude = np.empty_like(self.frequency)     # The sine Fourier transform of the pulse sequence (Hz) [frequency index]

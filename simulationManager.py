@@ -8,7 +8,7 @@ from benchmarkResults import *
 
 class SimulationManager:
     """
-    Controls a set of simulations running, for different dressing parameters
+    Controls a set of simulations running, for different dressing parameters.
     """
     def __init__(self, signal, frequency, archive, stateOutput = None, trotterCutoff = [28]):
         self.signal = signal
