@@ -21,7 +21,7 @@ Introduction to numba cuda for beginners
 
 This package is written for the possible use and modification by those who have not encountered GPU based code before, so here is a brief introduction.
 
-GPU functions that are called from a CPU, are called *kernels*. *Numba* is a Just In Time (JIT) compiler that can compile python code into kernels. GPUs as a whole are also known as *streaming multiprocessors* (SMs). Also, the CPU is sometimes called the *host*, with the GPU it controls called the *device*.
+GPU functions that are called from a CPU, are called *kernels*. *Numba* is a *Just In Time* (JIT) compiler that can compile python code into kernels. GPUs as a whole are also known as *streaming multiprocessors* (SMs). Also, the CPU is sometimes called the *host*, with the GPU it controls called the *device*.
 
 An instance of a kernel program running on a GPU is called a *thread*. There can be thousands of threads of the same kernel running on a SM at once, each running the same code. Each thread is given a unique index, which lets it know which part of a larger array it should work on (you decide what that array is). Groups of 32 SM hardware *core* run threads in sync with each other. These groups are called *warps*. All threads in a warp are finished executing before they are switched out for more threads. In software, threads with similar indices are organised into groups called *blocks*. Warps are filled with threads of the same block. The array of all blocks to be executed is called a *grid*.
  

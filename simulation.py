@@ -51,9 +51,13 @@ class SourceProperties:
     """
     A list of sine wave parameters fed into the simulation code.
 
-    The source parametrised as
+    The source is parametrised as
     
-    :math:`b_{i,x}(t) = 2 \\pi` :attr:`sourceAmplitude` :math:`_{i,x}\\sin(2 \\pi` :attr:`sourceFrequency` :math:`_{i,x}(t -` :attr:`sourceTimeEndPoints` :math:`_{i,0}) +` :attr:`sourcePhase` :math:`_{i,x})`
+    .. math::
+        \\begin{align*}
+            b_{i,x}(t) &= 2 \\pi f_{\\textrm{amp},i,x}\\sin(2 \\pi f_{i,x}(t -\\tau_{i,0}) + \\phi_{i,x})\\\\
+            r_x(t) &= \\sum_i b_{i,x}(t)
+        \\end{align*}
     
     Attributes
     ----------
@@ -62,13 +66,13 @@ class SourceProperties:
     sourceIndexMax : `int`
         The number of sources in the simulation.
     sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
-        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. See :math:`f_\\textrm{amp}` above. In units of Hz.
     sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
-        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. See :math:`\\phi` above. In units of radians.
     sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
-        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. See :math:`f` above. In units of Hz.
     sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
-        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+        The times that the sine wave of source `sourceIndex` turns on and off. See :math:`\\tau` above. In units of s.
     sourceQuadraticShift :  `float`
         The constant quadratic shift of the spin 1 system, in Hz.
     sourceType : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex)
@@ -211,7 +215,7 @@ class SourceProperties:
         sourceType = np.empty([1], dtype = object)
 
         # Label
-        sourceType[0] = "Noise"
+        sourceType[0] = sinusoidalNoise.type
 
         # Pulse
         sourceAmplitude[0, :] = sinusoidalNoise.amplitude
@@ -433,13 +437,13 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
     Parameters
     ----------
     timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
     timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes.
+        The time values for when the experiment is to start and finishes. In units of s.
     timeStepFine : `float`
-        The time step used within the integration algorithm.
+        The time step used within the integration algorithm. In units of s.
     timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
     sourceIndexMax : `int`
         The number of sources in the simulation.
     sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
@@ -533,13 +537,13 @@ def getTimeEvolutionCommutatorFree4(timeCoarse, timeEndPoints, timeStepFine, tim
     Parameters
     ----------
     timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
     timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes.
+        The time values for when the experiment is to start and finishes. In units of s.
     timeStepFine : `float`
-        The time step used within the integration algorithm.
+        The time step used within the integration algorithm. In units of s.
     timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
     sourceIndexMax : `int`
         The number of sources in the simulation.
     sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
@@ -618,13 +622,13 @@ def getTimeEvolutionHalfStep(timeCoarse, timeEndPoints, timeStepFine, timeStepCo
     Parameters
     ----------
     timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
     timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes.
+        The time values for when the experiment is to start and finishes. In units of s.
     timeStepFine : `float`
-        The time step used within the integration algorithm.
+        The time step used within the integration algorithm. In units of s.
     timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
     sourceIndexMax : `int`
         The number of sources in the simulation.
     sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
@@ -695,13 +699,13 @@ def getTimeEvolutionMidpointSample(timeCoarse, timeEndPoints, timeStepFine, time
     Parameters
     ----------
     timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
     timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes.
+        The time values for when the experiment is to start and finishes. In units of s.
     timeStepFine : `float`
-        The time step used within the integration algorithm.
+        The time step used within the integration algorithm. In units of s.
     timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
     sourceIndexMax : `int`
         The number of sources in the simulation.
     sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)

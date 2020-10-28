@@ -1,3 +1,7 @@
+"""
+Some device functions for doing maths with :mod:`numba.cuda`.
+"""
+
 import math
 import numpy as np
 import numba as nb
@@ -7,14 +11,166 @@ from numba import cuda
 cudaDebug = False
 sqrt2 = math.sqrt(2)
 sqrt3 = math.sqrt(3)
-expPrecision = 5                                # Where to cut off the exp Taylor series
 machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
 # trotterCutoff = 52
 
 @cuda.jit(device = True, debug = cudaDebug)
+def matrixExponentialLieTrotter(exponent, result, trotterCutoff):
+    """
+    Calculates a matrix exponential based on the Lie Product Formula,
+
+    .. math::
+        \\exp(A + B) = \\lim_{c \\to \\infty} \\left(\\exp\\left(\\frac{1}{c}A\\right) \\exp\\left(\\frac{1}{c}B\\right)\\right)^c.
+
+    Assumes the exponent is an imaginary  linear combination of a subspace of :math:`su(3)`, being,
+
+    .. math::
+        A = -i(x F_x + y F_y + z F_z + q F_q).
+
+    Then the exponential can be approximated as, for large :math:`\\tau`,
+
+    .. math::
+        \\begin{align*}
+            \\exp(A) &= \\exp(-ix F_x - iy F_y - iz F_z - iq F_q)\\\\
+            &= \\exp(2^{-\\tau}(-ix F_x - iy F_y - iz F_z - iq F_q))^{2^\\tau}\\\\
+            &\\approx (\\exp(-i(2^{-\\tau} x) F_x) \\exp(-i(2^{-\\tau} y) F_y) \\exp(-i(2^{-\\tau} z F_z + (2^{-\\tau} q) F_q)))^{2^\\tau}\\\\
+            &= \\begin{pmatrix}
+                \\frac{e^{-i\\left(Z + \\frac{Q}{3}\\right)}(c_X + c_Y - i s_Xs_Y)}{2} & \\frac{e^{i\\frac{2Q}{3}} (-s_Y -i c_Y s_X)}{\\sqrt{2}} & \\frac{e^{-i\\left(-Z + \\frac{Q}{3}\\right)}(c_X - c_Y + i s_Xs_Y)}{2} \\\\
+                \\frac{e^{-i\\left(Z + \\frac{Q}{3}\\right)} (-i s_X + c_X s_Y)}{\\sqrt{2}} & e^{i\\frac{2Q}{3}} c_X c_Y & \\frac{e^{-i(Z - \\frac{Q}{3})} (-i s_X - c_X s_Y)}{\\sqrt{2}} \\\\
+                \\frac{e^{-i\\left(Z + \\frac{Q}{3}\\right)}(c_X - c_Y - i s_Xs_Y)}{2} & \\frac{e^{i\\frac{2Q}{3}} (s_Y -i c_Y s_X)}{\\sqrt{2}} & \\frac{e^{-i\\left(-Z + \\frac{Q}{3}\\right)}(c_X + c_Y + i s_Xs_Y)}{2}
+            \\end{pmatrix}^{2^\\tau}\\\\
+            &= T^{2^\\tau},\\textrm{ with} \\\\
+            X &= 2^{-\\tau}x,\\\\
+            Y &= 2^{-\\tau}y,\\\\
+            Z &= 2^{-\\tau}z,\\\\
+            Q &= 2^{-\\tau}q,\\\\
+            c_{\\theta} &= \\cos(\\theta),\\\\
+            s_{\\theta} &= \\sin(\\theta).
+        \\end{align*}
+    
+    Once :math:`T` is calculated, it is then recursively squared :math:`\\tau` times to obtain :math:`\\exp(A)`.
+
+    Parameters
+    ----------
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to take the exponential of.
+
+        .. warning::
+            Will overwrite the original contents of this as part of the algorithm.
+        
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix which the result of the exponentiation is to be written to.
+    trotterCutoff : `int`
+        The number of squares to make to the approximate matrix (:math:`\\tau` above).
+    """
+
+    x = (1j*exponent[1, 0]).real*sqrt2
+    y = (1j*exponent[1, 0]).imag*sqrt2
+    z = (1j*(exponent[0, 0] + 0.5*exponent[1, 1])).real
+    q = (-1.5*1j*exponent[1, 1]).real
+
+    # hyperCubeAmount = 2*math.ceil(trotterCutoff/4 + math.log(math.fabs(x) + math.fabs(y) + math.fabs(z) + math.fabs(q))/(4*math.log(2.0)))
+    hyperCubeAmount = math.ceil(trotterCutoff/2)
+    if hyperCubeAmount < 0:
+        hyperCubeAmount = 0
+    precision = 4**hyperCubeAmount
+
+    x /= precision
+    y /= precision
+    z /= precision
+    q /= precision
+
+    cx = math.cos(x)
+    sx = math.sin(x)
+    cy = math.cos(y)
+    sy = math.sin(y)
+
+    cisz = math.cos(z + q/3) - 1j*math.sin(z + q/3)
+    result[0, 0] = 0.5*cisz*(cx + cy - 1j*sx*sy)
+    result[1, 0] = cisz*(-1j*sx + cx*sy)/sqrt2
+    result[2, 0] = 0.5*cisz*(cx - cy - 1j*sx*sy)
+
+    cisz = math.cos(2*q/3) + 1j*math.sin(2*q/3)
+    result[0, 1] = cisz*(-sy - 1j*cy*sx)/sqrt2
+    result[1, 1] = cisz*cx*cy
+    result[2, 1] = cisz*(sy - 1j*cy*sx)/sqrt2
+
+    cisz = math.cos(z - q/3) + 1j*math.sin(z - q/3)
+    result[0, 2] = 0.5*cisz*(cx - cy + 1j*sx*sy)
+    result[1, 2] = cisz*(-1j*sx - cx*sy)/sqrt2
+    result[2, 2] = 0.5*cisz*(cx + cy + 1j*sx*sy)
+
+    for powerIndex in range(hyperCubeAmount):
+        matrixMultiply(result, result, exponent)
+        matrixMultiply(exponent, exponent, result)
+
+@cuda.jit(device = True, debug = cudaDebug)
+def matrixExponentialRotatingWaveHybrid(exponent, result, trotterCutoff):
+    """
+    An experimental matrix exponential based off :func:`matrixExponentialLieTrotter()` and the rotating wave approximation. Not as accurate as :func:`matrixExponentialLieTrotter()`.
+
+    Parameters
+    ----------
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to take the exponential of.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix which the result of the exponentiation is to be written to.
+    trotterCutoff : `int`
+        The number of squares to make to the approximate matrix.
+    """
+    cisz = (1j*(exponent[0, 0] + 0.5*exponent[1, 1]))
+    cisz = math.cos(cisz.real) + 1j*math.sin(cisz.real)
+
+    q = (-1.5*1j*exponent[1, 1]).real
+    A = complexAbs(exponent[1, 0])*sqrt2
+    cisa = 1j*exponent[1, 0]*sqrt2/(A*cisz)
+    
+    hyperCubeAmount = 0
+    if q != 0.0:
+        hyperCubeAmount = 2*math.ceil(trotterCutoff/4 + math.log(A + math.fabs(q))/(4*math.log(2.0)))
+        if hyperCubeAmount < 0:
+            hyperCubeAmount = 0
+    precision = 4**hyperCubeAmount
+
+    q /= precision
+    A /= precision
+
+    cisq = math.cos(q/6) + 1j*math.sin(q/6)
+
+    result[0, 0] = 0.5*(math.cos(A) + 1)*(cisq*cisq)
+    result[1, 0] = -1j*math.sin(A)/(cisa*cisq*sqrt2)
+    result[2, 0] = 0.5*(math.cos(A) - 1)*((cisq/cisa)*(cisq/cisa))
+
+    result[0, 1] = result[1, 0]*(cisa*cisa)
+    result[1, 1] = math.cos(A)/(cisq*cisq*cisq*cisq)
+    result[2, 1] = result[1, 0]
+
+    result[0, 2] = result[2, 0]*(cisa*cisa*cisa*cisa)
+    result[1, 2] = result[0, 1]
+    result[2, 2] = result[0, 0]
+
+    for powerIndex in range(hyperCubeAmount):
+        matrixMultiply(result, result, exponent)
+        matrixMultiply(exponent, exponent, result)
+
+    result[0, 0] /= cisz
+    result[1, 0] /= cisz
+    result[2, 0] /= cisz
+
+    result[0, 2] *= cisz
+    result[1, 2] *= cisz
+    result[2, 2] *= cisz
+@cuda.jit(device = True, debug = cudaDebug)
 def matrixExponentialCrossProduct(exponent, result):
     """
-    Calculate a matrix exponential by diagonalising using the cross product
+    Calculate a matrix exponential by diagonalisation using the cross product. This is the main method used in the old cython code.
+
+    Parameters
+    ----------
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to take the exponential of.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix which the result of the exponentiation is to be written to.
     """
     diagonal = cuda.local.array(3, dtype = nb.float64)          # Eigenvalues
     winding = cuda.local.array(3, dtype = nb.complex128)        # e^i eigenvalues
@@ -170,96 +326,29 @@ def matrixExponentialCrossProduct(exponent, result):
                 result[yIndex, xIndex] += rotation[yIndex, zIndex]*winding[zIndex]*conj(rotation[xIndex, zIndex])
 
 @cuda.jit(device = True, debug = cudaDebug)
-def matrixExponentialRotatingWaveHybrid(exponent, result, trotterCutoff):
-    cisz = (1j*(exponent[0, 0] + 0.5*exponent[1, 1]))
-    cisz = math.cos(cisz.real) + 1j*math.sin(cisz.real)
-
-    q = (-1.5*1j*exponent[1, 1]).real
-    A = complexAbs(exponent[1, 0])*sqrt2
-    cisa = 1j*exponent[1, 0]*sqrt2/(A*cisz)
-    
-    hyperCubeAmount = 0
-    if q != 0.0:
-        hyperCubeAmount = 2*math.ceil(trotterCutoff/4 + math.log(A + math.fabs(q))/(4*math.log(2.0)))
-        if hyperCubeAmount < 0:
-            hyperCubeAmount = 0
-    precision = 4**hyperCubeAmount
-
-    q /= precision
-    A /= precision
-
-    cisq = math.cos(q/6) + 1j*math.sin(q/6)
-
-    result[0, 0] = 0.5*(math.cos(A) + 1)*(cisq*cisq)
-    result[1, 0] = -1j*math.sin(A)/(cisa*cisq*sqrt2)
-    result[2, 0] = 0.5*(math.cos(A) - 1)*((cisq/cisa)*(cisq/cisa))
-
-    result[0, 1] = result[1, 0]*(cisa*cisa)
-    result[1, 1] = math.cos(A)/(cisq*cisq*cisq*cisq)
-    result[2, 1] = result[1, 0]
-
-    result[0, 2] = result[2, 0]*(cisa*cisa*cisa*cisa)
-    result[1, 2] = result[0, 1]
-    result[2, 2] = result[0, 0]
-
-    for powerIndex in range(hyperCubeAmount):
-        matrixMultiply(result, result, exponent)
-        matrixMultiply(exponent, exponent, result)
-
-    result[0, 0] /= cisz
-    result[1, 0] /= cisz
-    result[2, 0] /= cisz
-
-    result[0, 2] *= cisz
-    result[1, 2] *= cisz
-    result[2, 2] *= cisz
-
-@cuda.jit(device = True, debug = cudaDebug)
-def matrixExponentialLieTrotter(exponent, result, trotterCutoff):
-    x = (1j*exponent[1, 0]).real*sqrt2
-    y = (1j*exponent[1, 0]).imag*sqrt2
-    z = (1j*(exponent[0, 0] + 0.5*exponent[1, 1])).real
-    q = (-1.5*1j*exponent[1, 1]).real
-
-    hyperCubeAmount = 2*math.ceil(trotterCutoff/4 + math.log(math.fabs(x) + math.fabs(y) + math.fabs(z) + math.fabs(q))/(4*math.log(2.0)))
-    # hyperCubeAmount = math.ceil(trotterCutoff/2)
-    if hyperCubeAmount < 0:
-        hyperCubeAmount = 0
-    precision = 4**hyperCubeAmount
-
-    x /= precision
-    y /= precision
-    z /= precision
-    q /= precision
-
-    cx = math.cos(x)
-    sx = math.sin(x)
-    cy = math.cos(y)
-    sy = math.sin(y)
-
-    cisz = math.cos(z + q/3) - 1j*math.sin(z + q/3)
-    result[0, 0] = 0.5*cisz*(cx + cy - 1j*sx*sy)
-    result[1, 0] = cisz*(-1j*sx + cx*sy)/sqrt2
-    result[2, 0] = 0.5*cisz*(cx - cy - 1j*sx*sy)
-
-    cisz = math.cos(2*q/3) + 1j*math.sin(2*q/3)
-    result[0, 1] = cisz*(-sy - 1j*cy*sx)/sqrt2
-    result[1, 1] = cisz*cx*cy
-    result[2, 1] = cisz*(sy - 1j*cy*sx)/sqrt2
-
-    cisz = math.cos(z - q/3) + 1j*math.sin(z - q/3)
-    result[0, 2] = 0.5*cisz*(cx - cy + 1j*sx*sy)
-    result[1, 2] = cisz*(-1j*sx - cx*sy)/sqrt2
-    result[2, 2] = 0.5*cisz*(cx + cy + 1j*sx*sy)
-
-    for powerIndex in range(hyperCubeAmount):
-        matrixMultiply(result, result, exponent)
-        matrixMultiply(exponent, exponent, result)
-
-@cuda.jit(device = True, debug = cudaDebug)
-def matrixExponentialTaylor(exponent, result):
+def matrixExponentialTaylor(exponent, result, cutoff):
     """
-    Calculate a matrix exponential using a Taylor series
+    Calculate a matrix exponential using a Taylor series. The matrix being exponentiated is complex, and of any dimension.
+
+    The exponential is approximated as
+
+    .. math::
+        \\begin{align*}
+        \\exp(A) &= \\sum_{k = 0}^\\infty \\frac{1}{k!} A^k\\\\
+        &\\approx \\sum_{k = 0}^{c - 1} \\frac{1}{k!} A^k\\\\
+        &= \\sum_{k = 0}^{c - 1} T_k, \\textrm{ with}\\\\
+        T_0 &= 1,\\\\
+        T_k &= \\frac{1}{k} T_{k - 1} A.
+        \\end{align*}
+
+    Parameters
+    ----------
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to take the exponential of.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix which the result of the exponentiation is to be written to.
+    cutoff : `int`
+        The number of terms in the Taylor expansion (:math:`c` above).
     """
     T = cuda.local.array((3, 3), dtype = nb.complex128)
     TOld = cuda.local.array((3, 3), dtype = nb.complex128)
@@ -267,7 +356,7 @@ def matrixExponentialTaylor(exponent, result):
     setToOne(result)
 
     # exp(A) = 1 + A + A^2/2 + ...
-    for taylorIndex in range(expPrecision):
+    for taylorIndex in range(cutoff):
         # TOld = T
         for xIndex in nb.prange(3):
             for yIndex in nb.prange(3):
@@ -286,7 +375,19 @@ def matrixExponentialTaylor(exponent, result):
 @cuda.jit(device = True, debug = cudaDebug)
 def matrixExponentialQL(exponent, result):
     """
-    This is based on a method in the cython - I couldn't get it to work in either this or cython, but it isn't necessary.
+    This is based on a method in the old cython code - I couldn't get it to work either here or in the cython. Assumes the exponent is an imaginary  linear combination of a subspace of :math:`su(3)`, being,
+
+    .. math::
+        A = i(x F_x + y F_y + z F_z + q Q_{zz})
+    
+    Parameters
+    ----------
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to take the exponential of.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix which the result of the exponentiation is to be written to.
+    cutoff : `int`
+        The number of terms in the Taylor expansion (:math:`c` above).
     """
     diagonal = cuda.local.array(3, dtype = nb.float64)
     offDiagonal = cuda.local.array(2, dtype = nb.float64)
@@ -387,29 +488,92 @@ def matrixExponentialQL(exponent, result):
 @cuda.jit(device = True, debug = cudaDebug)
 def conj(z):
     """
-    Conjugate of a complex number in cuda. For some reason doesn't support a built in one so I had to write this.
+    Conjugate of a complex number.
+
+    .. math::
+        \\begin{align*}
+        (a + ib)^* &= a - ib\\\\
+         a, b &\\in \\mathbb{R}
+        \\end{align*}
+
+    Parameters
+    ----------
+    z : :class:`numpy.cdouble`
+        The complex number to take the conjugate of.
+    
+    Returns
+    -------
+    cz : :class:`numpy.cdouble`
+        The conjugate of z.
     """
     return (z.real - 1j*z.imag)
 
 @cuda.jit(device = True, debug = cudaDebug)
 def complexAbs(z):
     """
-    The absolute value of a complex number
+    The absolute value of a complex number.
+
+    .. math::
+        \\begin{align*}
+        |a + ib| &= \\sqrt{a^2 + b^2}\\\\
+         a, b &\\in \\mathbb{R}
+        \\end{align*}
+    
+    Parameters
+    ----------
+    z : :class:`numpy.cdouble`
+        The complex number to take the absolute value of.
+    
+    Returns
+    -------
+    az : :class:`numpy.double`
+        The absolute value of z.
     """
     return math.sqrt(z.real**2 + z.imag**2)
 
 @cuda.jit(device = True, debug = cudaDebug)
 def norm2(z):
     """
-    The 2 norm of a vector in C3
+    The 2 norm of a complex vector.
+
+    .. math::
+        \|a + ib\|_2 = \\sqrt {\\left(\\sum_i a_i^2 + b_i^2\\right)}
+
+    Parameters
+    ----------
+    z : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (index)
+        The vector to take the 2 norm of.
+    Returns
+    -------
+    nz : :class:`numpy.double`
+        The 2 norm of z.
     """
     return math.sqrt(z[0].real**2 + z[0].imag**2 + z[1].real**2 + z[1].imag**2 + z[2].real**2 + z[2].imag**2)
 
 @cuda.jit(device = True, debug = cudaDebug)
 def cross(left, right, result):
     """
-    The cross product of two vectors in C3. Note: I'm using the maths convection here, taking the
-    conjugate of the real cross product, since I want this to produce an orthogonal vector.
+    The cross product of two vectors in :math:`\\mathbb{C}^3`.
+    
+    .. note::
+        The mathematics definition is used here rather than the physics definition. This is the conjugate of the real cross product, since this produces a vector orthogonal to the two inputs.
+
+    .. math::
+        \\begin{align*}
+        (l \\times r)_1 &= (l_2 r_3 - l_3 r_2)^*,\\\\
+        (l \\times r)_2 &= (l_3 r_1 - l_1 r_3)^*,\\\\
+        (l \\times r)_3 &= (l_1 r_2 - l_2 r_1)^*,\\\\
+        l, r &\\in \\mathbb{C}^3
+        \\end{align*}
+
+    Parameters
+    ----------
+    left : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (index)
+        The vector to left multiply in the cross product.
+    right : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (index)
+        The vector to right multiply in the cross product.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (index)
+        An array for the resultant vector to be written to.
     """
     for xIndex in range(3):
         result[xIndex] = conj(left[(xIndex + 1)%3]*right[(xIndex + 2)%3] - left[(xIndex + 2)%3]*right[(xIndex + 1)%3])
@@ -417,15 +581,45 @@ def cross(left, right, result):
 @cuda.jit(device = True, debug = cudaDebug)
 def inner(left, right):
     """
-    The inner (maths convention dot) product between two vectors in C3. Note the left vector is conjugated.
-    Thus the inner product of two orthogonal vectors is 0.
+    The inner (maths convention dot) product between two complex vectors. 
+    
+    .. note::
+        The mathematics definition is used here rather than the physics definition, so the left vector is conjugated. Thus the inner product of two orthogonal vectors is 0.
+
+    .. math::
+        \\begin{align*}
+        l \\cdot r &\\equiv \\langle l, r \\rangle\\\\
+        l \\cdot r &= \\sum_i (l_i)^* r_i
+        \\end{align*}
+
+    Parameters
+    ----------
+    left : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (index)
+        The vector to left multiply in the inner product.
+    right : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (index)
+        The vector to right multiply in the inner product.
+    
+    Returns
+    -------
+    d : :class:`numpy.cdouble`
+        The inner product of l and r.
     """
     return conj(left[0])*right[0] + conj(left[1])*right[1] + conj(left[2])*right[2]
 
 @cuda.jit(device = True, debug = cudaDebug)
 def setTo(operator, result):
     """
-    result = operator, for two matrices in C3x3.
+    Copy the contents of one matrix into another.
+
+    .. math::
+        (A)_{i, j} = (B)_{i, j}
+
+    Parameters
+    ----------
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to copy from.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to copy to.
     """
     for xIndex in range(3):
         for yIndex in range(3):
@@ -434,7 +628,21 @@ def setTo(operator, result):
 @cuda.jit(device = True, debug = cudaDebug)
 def setToOne(operator):
     """
-    Make operator the C3x3 identity matrix (ie, 1)
+    Make a matrix the multiplicative identity, ie, :math:`1`.
+
+    .. math::
+        \\begin{align*}
+        (A)_{i, j} &= \\delta_{i, j}\\\\
+        &= \\begin{cases}
+            1,&i = j\\\\
+            0,&i\\neq j
+        \\end{cases}
+        \\end{align*}
+
+    Parameters
+    ----------
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to set to :math:`1`.
     """
     for xIndex in nb.prange(3):
         for yIndex in nb.prange(3):
@@ -446,7 +654,17 @@ def setToOne(operator):
 @cuda.jit(device = True, debug = cudaDebug)
 def setToZero(operator):
     """
-    Make operator the C3x3 zero matrix
+    Make a matrix the additive identity, ie, :math:`0`.
+
+    .. math::
+        \\begin{align*}
+        (A)_{i, j} = 0
+        \\end{align*}
+
+    Parameters
+    ----------
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to set to :math:`0`.
     """
     for xIndex in nb.prange(3):
         for yIndex in nb.prange(3):
@@ -455,7 +673,21 @@ def setToZero(operator):
 @cuda.jit(device = True, debug = cudaDebug)
 def matrixMultiply(left, right, result):
     """
-    Multiply C3x3 matrices left and right together, to be returned in result.
+    Multiply matrices left and right together, to be returned in result.
+
+    .. math::
+        \\begin{align*}
+        (LR)_{i,k} = \\sum_j (L)_{i,j} (R)_{j,k}
+        \\end{align*}
+
+    Parameters
+    ----------
+    left : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to left multiply by.
+    right : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The matrix to right multiply by.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        A matrix to be filled with the result of the product.
     """
     for xIndex in range(3):
         for yIndex in range(3):
@@ -464,7 +696,22 @@ def matrixMultiply(left, right, result):
 @cuda.jit(device = True, debug = cudaDebug)
 def adjoint(operator, result):
     """
-    Take the hermitian adjoint (ie dagger, ie dual, ie conjugate transpose) of a C3x3 matrix
+    Takes the hermitian adjoint of a matrix.
+
+    .. math::
+        \\begin{align*}
+        A^\\dagger &\\equiv A^H\\\\
+        (A^\\dagger)_{y,x} &= ((A)_{x,y})^*
+        \\end{align*}
+    
+    Matrix can be in :math:`\\mathbb{C}^{2\\times2}` or :math:`\\mathbb{C}^{3\\times3}`.
+
+    Parameters
+    ----------
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        The operator to take the adjoint of.
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+        An array to write the resultant adjoint to.
     """
     for xIndex in range(3):
         for yIndex in range(3):

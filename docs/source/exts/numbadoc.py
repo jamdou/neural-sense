@@ -37,6 +37,7 @@ from sphinx.ext.autodoc import FunctionDocumenter
 from numba.core.dispatcher import Dispatcher
 from numba.np.ufunc.dufunc import DUFunc
 from numba.cuda.compiler import AutoJitCUDAKernel
+from numba.cuda.compiler import DeviceFunctionTemplate
 
 class NumbaFunctionDocumenter(FunctionDocumenter):
     """Document numba decorated functions."""
@@ -112,8 +113,17 @@ class CUDAJitDocumenter(NumbaFunctionDocumenter):
 
     @classmethod
     def can_document_member(cls, member, membername, isattr, parent):
-        return isinstance(member, AutoJitCUDAKernel)\
-               and hasattr(member, 'py_func')
+        return isinstance(member, AutoJitCUDAKernel) and \
+            hasattr(member, 'py_func')
+
+class CUDAJitDeviceDocumenter(NumbaFunctionDocumenter):
+    """Document jit/njit decorated functions."""
+
+    objtype = 'cudajitdevicefun'
+
+    @classmethod
+    def can_document_member(cls, member, membername, isattr, parent):
+        return isinstance(member, DeviceFunctionTemplate)
 
 
 class JitDirective(PyFunction):
@@ -136,6 +146,12 @@ class CUDAJitDirective(PyFunction):
     def get_signature_prefix(self, sig):
         return self.env.config.numba_cuda_jit_prefix
 
+class CUDAJitDeviceDirective(PyFunction):
+    """Sphinx jitfun directive."""
+
+    def get_signature_prefix(self, sig):
+        return self.env.config.numba_cuda_jit_device_prefix
+
 
 def setup(app):
     """Setup Sphinx extension."""
@@ -144,13 +160,16 @@ def setup(app):
     app.setup_extension('sphinx.ext.autodoc')
     app.add_autodocumenter(JitDocumenter)
     app.add_directive_to_domain('py', 'jitfun', JitDirective)
-    app.add_config_value('numba_jit_prefix', '@numba.jit', True)
+    app.add_config_value('numba_jit_prefix', 'jit', True)
     app.add_autodocumenter(VectorizeDocumenter)
     app.add_directive_to_domain('py', 'vecfun', VectorizeDirective)
-    app.add_config_value('numba_vectorize_prefix', '@numba.vectorize', True)
+    app.add_config_value('numba_vectorize_prefix', 'vectorize', True)
     app.add_autodocumenter(CUDAJitDocumenter)
     app.add_directive_to_domain('py', 'cudajitfun', CUDAJitDirective)
-    app.add_config_value('numba_cuda_jit_prefix', '@numba.cuda.jit', True)
+    app.add_config_value('numba_cuda_jit_prefix', 'cuda kernel', True)
+    app.add_autodocumenter(CUDAJitDeviceDocumenter)
+    app.add_directive_to_domain('py', 'cudajitdevicefun', CUDAJitDeviceDirective)
+    app.add_config_value('numba_cuda_jit_device_prefix', 'cuda device', True)
 
     return {
         'parallel_read_safe': True

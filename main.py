@@ -21,6 +21,7 @@ from benchmarkResults import *          # Stores the results of, and plots bench
 import colorama
 
 if __name__ == "__main__":
+    print(type(inner))
     colorama.init()
 
     # This will be recorded in the HDF5 file to give context for what was being tested
@@ -34,11 +35,13 @@ if __name__ == "__main__":
     \033[36m-p  --profile   \033[33mSelect what type of nvprof profiling to be
                     done, from:
                         \033[36mnone \033[32m(default)  \033[33mRun normally
-                        \033[36mtimeline        \033[33mSave timeline
-                        \033[36mmetric          \033[33mSave metrics
-                        \033[36marchive         \033[33mArchive results,
-                                        don't run anything
-                                        else
+                        \033[36mtimeline            \033[33mSave timeline
+                        \033[36mmetric              \033[33mSave metrics
+                        \033[36minstructionlevel    \033[33mSave per instruction
+                                            metrics
+                        \033[36marchive             \033[33mArchive results,
+                                            don't run anything
+                                            else
                     \033[35mOnly used for automation with profiling, if
                     you're not doing this, then leave this blank.\033[0m
     """
@@ -50,7 +53,7 @@ if __name__ == "__main__":
         exit()
 
     # Command line arguments. Probably don't worry too much about these. Mostly used for profiling.
-    profileState = "None"
+    profileState = ProfileState.NONE
     archivePath = ".\\archive\\"
     options, arguments = getopt.getopt(sys.argv[1:], "hpa", ["help", "profile=", "archive="])
     for option, argument in options:
@@ -59,11 +62,13 @@ if __name__ == "__main__":
             exit()
         elif option in ("--profile", "-p"):
             if argument == "timeline":
-                profileState = "TimeLine"
+                profileState = ProfileState.TIME_LINE
             elif argument == "metric":
-                profileState = "Metric"
+                profileState = ProfileState.METRIC
+            elif argument == "instructionlevel":
+                profileState = ProfileState.INSTRUCTION_LEVEL
             elif argument == "archive":
-                profileState = "Archive"
+                profileState = ProfileState.ARCHIVE
         elif option in ("--archive", "-a"):
             archivePath = argument + "\\"
 
@@ -108,7 +113,8 @@ if __name__ == "__main__":
         frequency = np.arange(1000, 1003, 1)
         simulationManager = SimulationManager(signal, frequency, archive)
         simulationManager.evaluate(False)
-        experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
+        # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
+        experimentResults = ExperimentResults.newFromSimulationManager(simulationManager)
         experimentResults.writeToArchive(archive)
         experimentResults.plot(archive, signal)
 

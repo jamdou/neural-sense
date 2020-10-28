@@ -8,9 +8,38 @@ from benchmarkResults import *
 
 class SimulationManager:
     """
-    Controls a set of simulations running, for different dressing parameters.
+    Controls a set of simulations running for different dressing parameters.
+
+    Attributes
+    ----------
+    signal : `list` of :class:`testSignal.TestSignal`
+        A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
+    trotterCutoff : `list` of `int`
+        A list of the number of squares to be used in the matrix exponentiation algorithm :func:`simulationUtilities.matrixExponentialLieTrotter()` during the simulation. :func:`evaluate()` will run simulations for all of these values.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.double`, (frequencyIndex)
+        A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
+    frequencyAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (simulationIndex)
+        The Fourier coefficient of the signal as measured from the simulation `simulationIndex`. Filled in after the simulation `simulationIndex` has been completed.
+    archive : :class:`archive.Archive`
+        The archive object to save the simulation results and parameters to.
+    stateOutput : `list` of (`numpy.ndarray` of  `numpy.cdouble`, (timeIndex, stateIndex))
+        An optional `list` to directly write the state of the simulation to. Used for benchmarks. Reference can be optionally passed in on construction.
     """
     def __init__(self, signal, frequency, archive, stateOutput = None, trotterCutoff = [28]):
+        """
+        Parameters
+        ----------
+        signal : :class:`testSignal.TestSignal` or `list` of :class:`testSignal.TestSignal`
+            A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
+        frequency : :class:`numpy.ndarray` of :class:`numpy.double`, (frequencyIndex)
+            A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
+        archive : :class:`archive.Archive`
+            The archive object to save the simulation results and parameters to.
+        stateOutput : `list` of (`numpy.ndarray` of  `numpy.cdouble`, (timeIndex, stateIndex)), optional
+            An optional `list` to directly write the state of the simulation to. Used for benchmarks.
+        trotterCutoff : `list` of `int`, optional
+            A list of the number of squares to be used in the matrix exponentiation algorithm :func:`simulationUtilities.matrixExponentialLieTrotter()` during the simulation. :func:`evaluate()` will run simulations for all of these values.
+        """
         self.signal = signal
         if not isinstance(self.signal, list):
             self.signal = [self.signal]
@@ -22,7 +51,12 @@ class SimulationManager:
 
     def evaluate(self, doPlot = False):
         """
-        Evaluates the prepared set of simulations
+        Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequencyAmplitude`. The simulation `simulationIndex` will be run with the frequency given by `frequencyIndex` mod :attr:`frequency.size`, the signal given by floor(`signalIndex` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signalIndex` / `frequency.size` / `trotterCutoff.size`).
+
+        Parameters
+        ----------
+        doPlot : `boolean`, optional
+            If `True`, plots time series of the expected spin values in each direction during execution.
         """
         print("\033[33mStarting simulations...\033[0m")
         executionTimeEndPoints = np.empty(2)
