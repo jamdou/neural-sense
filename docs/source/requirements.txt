@@ -1,1 +1,1 @@
-docs/source/exts/numbadoc
+docs/source/exts/numbadoc.py
