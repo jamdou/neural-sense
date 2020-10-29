@@ -1,1 +1,1 @@
--f \docs\source\exts\numbadoc
+-f /docs/source/_ext/numbadoc

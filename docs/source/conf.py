@@ -13,8 +13,8 @@
 
 
 """
-To build rst from comments:
-sphinx-apidoc -f -o source/ ../
+To init rst from comments:
+sphinx-apidoc -o source/ ../
 
 To build html from rst:
 make html
@@ -24,8 +24,9 @@ import os
 import sys
 import sphinx_rtd_theme
 # from import exts.numbadoc
-sys.path.insert(0, os.path.abspath('..\\..\\'))
-sys.path.insert(1, os.path.abspath('exts\\'))
+sys.path.insert(0, os.path.abspath('../../'))
+sys.path.append(os.path.abspath("./_ext"))
+# sys.path.insert(1, os.path.abspath('exts\\'))
 # from exts import numbadoc
 # sys.path.append(os.path.abspath('exts\\'))
 
