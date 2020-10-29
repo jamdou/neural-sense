@@ -123,7 +123,8 @@ class CUDAJitDeviceDocumenter(NumbaFunctionDocumenter):
 
     @classmethod
     def can_document_member(cls, member, membername, isattr, parent):
-        return isinstance(member, DeviceFunctionTemplate)
+        return isinstance(member, DeviceFunctionTemplate) and \
+            hasattr(member, 'py_func')
 
 
 class JitDirective(PyFunction):
