@@ -1,1 +1,2 @@
+numba
 -f /docs/source/_ext/numbadoc
