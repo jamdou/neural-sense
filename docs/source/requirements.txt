@@ -3,4 +3,4 @@ matplotlib
 scipy
 colorama
 numba==0.50.1
--f /docs/source/_ext/numbadoc
+-f /docs/source/_ext/ numbadoc
