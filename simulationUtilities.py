@@ -449,7 +449,7 @@ def matrixExponentialQL(exponent, result):
     result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
         The matrix which the result of the exponentiation is to be written to.
     cutoff : `int`
-        The number of terms in the Taylor expansion (:math:`c` above). See :class:`simulation.Simulation`.
+        The number of terms in the Taylor expansion (:math:`c` above).
     """
     diagonal = cuda.local.array(3, dtype = nb.float64)
     offDiagonal = cuda.local.array(2, dtype = nb.float64)
