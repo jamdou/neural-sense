@@ -25,7 +25,35 @@ def matrixExponentialLieTrotter(exponent, result, trotterCutoff):
     Assumes the exponent is an imaginary  linear combination of a subspace of :math:`su(3)`, being,
 
     .. math::
-        A = -i(x F_x + y F_y + z F_z + q F_q).
+        \\begin{align*}
+            A &= -i(x F_x + y F_y + z F_z + q F_q),
+        \\end{align*}
+    
+    with
+
+    .. math::
+        \\begin{align*}
+            F_x &= \\frac{1}{\\sqrt{2}}\\begin{pmatrix}
+                0 & 1 & 0 \\\\
+                1 & 0 & 1 \\\\
+                0 & 1 & 0
+            \\end{pmatrix},&
+            F_y &= \\frac{1}{\\sqrt{2}}\\begin{pmatrix}
+                0 & -i &  0 \\\\
+                i &  0 & -i \\\\
+                0 &  i &  0
+            \\end{pmatrix},\\\\
+            F_z &= \\begin{pmatrix}
+                1 & 0 &  0 \\\\
+                0 & 0 &  0 \\\\
+                0 & 0 & -1
+            \\end{pmatrix},&
+            F_q &= \\frac{1}{3}\\begin{pmatrix}
+                1 &  0 & 0 \\\\
+                0 & -2 & 0 \\\\
+                0 &  0 & 1
+            \\end{pmatrix}
+        \\end{align*}
 
     Then the exponential can be approximated as, for large :math:`\\tau`,
 
@@ -39,7 +67,13 @@ def matrixExponentialLieTrotter(exponent, result, trotterCutoff):
                 \\frac{e^{-i\\left(Z + \\frac{Q}{3}\\right)} (-i s_X + c_X s_Y)}{\\sqrt{2}} & e^{i\\frac{2Q}{3}} c_X c_Y & \\frac{e^{-i(Z - \\frac{Q}{3})} (-i s_X - c_X s_Y)}{\\sqrt{2}} \\\\
                 \\frac{e^{-i\\left(Z + \\frac{Q}{3}\\right)}(c_X - c_Y - i s_Xs_Y)}{2} & \\frac{e^{i\\frac{2Q}{3}} (s_Y -i c_Y s_X)}{\\sqrt{2}} & \\frac{e^{-i\\left(-Z + \\frac{Q}{3}\\right)}(c_X + c_Y + i s_Xs_Y)}{2}
             \\end{pmatrix}^{2^\\tau}\\\\
-            &= T^{2^\\tau},\\textrm{ with} \\\\
+            &= T^{2^\\tau},
+        \\end{align*}
+
+    with
+
+    .. math::
+        \\begin{align*}
             X &= 2^{-\\tau}x,\\\\
             Y &= 2^{-\\tau}y,\\\\
             Z &= 2^{-\\tau}z,\\\\
@@ -375,10 +409,38 @@ def matrixExponentialTaylor(exponent, result, cutoff):
 @cuda.jit(device = True, debug = cudaDebug)
 def matrixExponentialQL(exponent, result):
     """
-    This is based on a method in the old cython code - I couldn't get it to work either here or in the cython. Assumes the exponent is an imaginary  linear combination of a subspace of :math:`su(3)`, being,
+    This is based on a method in the old cython code - this was found to not function as intended either here or in the cython code. Assumes the exponent is an imaginary  linear combination of a subspace of :math:`su(3)`, being,
 
     .. math::
-        A = i(x F_x + y F_y + z F_z + q Q_{zz})
+        \\begin{align*}
+            A &= -i(x F_x + y F_y + z F_z + q F_q),
+        \\end{align*}
+    
+    with
+
+    .. math::
+        \\begin{align*}
+            F_x &= \\frac{1}{\\sqrt{2}}\\begin{pmatrix}
+                0 & 1 & 0 \\\\
+                1 & 0 & 1 \\\\
+                0 & 1 & 0
+            \\end{pmatrix},&
+            F_y &= \\frac{1}{\\sqrt{2}}\\begin{pmatrix}
+                0 & -i &  0 \\\\
+                i &  0 & -i \\\\
+                0 &  i &  0
+            \\end{pmatrix},\\\\
+            F_z &= \\begin{pmatrix}
+                1 & 0 &  0 \\\\
+                0 & 0 &  0 \\\\
+                0 & 0 & -1
+            \\end{pmatrix},&
+            F_q &= \\frac{1}{3}\\begin{pmatrix}
+                1 &  0 & 0 \\\\
+                0 & -2 & 0 \\\\
+                0 &  0 & 1
+            \\end{pmatrix}
+        \\end{align*}
     
     Parameters
     ----------
