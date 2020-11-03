@@ -21,11 +21,10 @@ from benchmarkResults import *          # Stores the results of, and plots bench
 import colorama
 
 if __name__ == "__main__":
-    print(type(inner))
     colorama.init()
 
     # This will be recorded in the HDF5 file to give context for what was being tested
-    descriptionOfTest = "Various benchmarks"
+    descriptionOfTest = "Spin 1/2"
 
     helpMessage = """
     \033[36m-h  --help      \033[33mShow this message
@@ -78,7 +77,7 @@ if __name__ == "__main__":
 
     # Make archive
     archive = Archive(archivePath, descriptionOfTest, profileState)
-    if profileState != "Archive":
+    if profileState != ProfileState.ARCHIVE:
         archive.newArchiveFile()
 
         # Make signal
@@ -86,10 +85,14 @@ if __name__ == "__main__":
         signal = TestSignal(
             [NeuralPulse(0.02333333, 10.0, 1000), NeuralPulse(0.0444444444, 10.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
-            [SinusoidalNoise.newDetuningNoise(10)],
+            [],
+            # [SinusoidalNoise.newDetuningNoise(10)],
             timeProperties
         )
         signal.writeToFile(archive.archiveFile)
+
+        # Make state
+        stateProperties = StateProperties(SpinQuantumNumber.HALF)
 
         cuda.profile_start()
 
@@ -109,23 +112,23 @@ if __name__ == "__main__":
         # newBenchmarkTrotterCutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
         # Run simulations
-        # frequency = np.arange(50, 3051, 3)
-        frequency = np.arange(1000, 1003, 1)
-        simulationManager = SimulationManager(signal, frequency, archive)
-        simulationManager.evaluate(False)
+        frequency = np.arange(50, 3051, 3)
+        # frequency = np.arange(1000, 1003, 1)
+        simulationManager = SimulationManager(signal, frequency, archive, stateProperties)
+        simulationManager.evaluate(False, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
         experimentResults = ExperimentResults.newFromSimulationManager(simulationManager)
         experimentResults.writeToArchive(archive)
         experimentResults.plot(archive, signal)
 
-        # # Make reconstructions
-        # reconstruction = Reconstruction(signal.timeProperties)
-        # # reconstruction.readFrequenciesFromExperimentResults(experimentResults)
+        # Make reconstructions
+        reconstruction = Reconstruction(signal.timeProperties)
+        reconstruction.readFrequenciesFromExperimentResults(experimentResults)
         # reconstruction.readFrequenciesFromTestSignal(signal)
-        # # reconstruction.evaluateFISTA()
+        reconstruction.evaluateFISTA()
         # reconstruction.evaluateISTAComplete()
-        # reconstruction.plot(archive, signal)
-        # reconstruction.writeToFile(archive.archiveFile)
+        reconstruction.plot(archive, signal)
+        reconstruction.writeToFile(archive.archiveFile)
 
         # Clean up
         archive.closeArchiveFile()

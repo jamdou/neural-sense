@@ -30,12 +30,13 @@ Classes and functions
 import numpy as np
 import scipy.linalg as spla
 import matplotlib.pyplot as plt
-import math
+import math, cmath
 from numba import cuda
 import numba as nb
 import time as tm
 from testSignal import *
-from simulationUtilities import *
+from simulationUtilities import spinOne, spinHalf, scalar
+from enum import Enum
 
 #===============================================================#
 
@@ -231,23 +232,61 @@ class SourceProperties:
         self.sourceType = np.concatenate((self.sourceType, sourceType))
         self.sourceIndexMax += 1
 
+class SpinQuantumNumber(Enum):
+    """
+    The spin quantum number of the system being simulated. 
+
+    Parameters
+    ----------
+    value : `int`
+        Dimension of the hilbert space the states belong to.
+    label : `string`
+        What to write in the HDF5 archive file.
+    """
+
+    def __init__(self, value, label):
+        super().__init__()
+        self._value_ = value
+        self.label = label
+
+    HALF = (2, "half")
+    """
+    For two level systems.
+    """
+
+    ONE = (3, "one")
+    """
+    For three level systems.
+    """
+
 class StateProperties:
     """
     The initial state fed into the simulation code.
 
     Attributes
     ----------
+    spinQuantumNumber: :class:`SpinQuantumNumber(Enum)`
+        The spin quantum number of the system being simulated. Determines the dimension of the hilbert space of the state, the algorithms used in the simulation, etc.
     stateInit : :class:`numpy.ndarray` of :class:`numpy.cdouble` (stateIndex)
         The state (spin wavefunction) of the system at the start of the simulation.
     """
-    def __init__(self, stateInit = np.asarray([1.0, 0.0, 0.0], np.cdouble)):
+    def __init__(self, spinQuantumNumber = SpinQuantumNumber.HALF, stateInit = None):
         """
         Parameters
         ----------
+        spinQuantumNumber: :class:`SpinQuantumNumber(Enum)`
+            The spin quantum number of the system being simulated. Determines the dimension of the hilbert space of the state, the algorithms used in the simulation, etc.
         stateInit : :class:`numpy.ndarray` of :class:`numpy.cdouble`
             The state (spin wavefunction) of the system at the start of the simulation.
         """
-        self.stateInit = stateInit
+        self.spinQuantumNumber = spinQuantumNumber
+        if stateInit:
+            self.stateInit = np.asarray(stateInit, np.cdouble)
+        else:
+            if self.spinQuantumNumber == SpinQuantumNumber.HALF:
+                self.stateInit = np.asarray([1, 0], np.cdouble)
+            else:
+                self.stateInit = np.asarray([1, 0, 0], np.cdouble)
 
     def writeToFile(self, archive):
         """
@@ -258,6 +297,7 @@ class StateProperties:
         """
         archiveGroup = archive.require_group("stateProperties")
         archiveGroup["stateInit"] = self.stateInit
+        archiveGroup["spinQuantumNumber"] = np.asarray(self.spinQuantumNumber.label, dtype='|S32')
 
 class SimulationResults:
     """
@@ -276,14 +316,22 @@ class SimulationResults:
     sensedFrequencyAmplitudeMethod : `string`
         The method used to find the measured Fourier coefficient (for archival purposes).
     """
-    def __init__(self, signal):
-        self.timeEvolution = np.empty([signal.timeProperties.timeIndexMax, 3, 3], np.cdouble)
-        self.state = np.empty([signal.timeProperties.timeIndexMax, 3], np.cdouble)
+    def __init__(self, signal, stateProperties):
+        """
+        Parameters
+        ----------
+        signal : :class:`testSignal.TestSignal`
+            Defines the sampling time for the simulation results.
+        stateProperties : :class:`StateProperties`
+            Defines the hilbert space dimension for the simulation results.
+        """
+        self.timeEvolution = np.empty([signal.timeProperties.timeIndexMax, stateProperties.spinQuantumNumber.value, stateProperties.spinQuantumNumber.value], np.cdouble)
+        self.state = np.empty([signal.timeProperties.timeIndexMax, stateProperties.spinQuantumNumber.value], np.cdouble)
         self.spin = np.empty([signal.timeProperties.timeIndexMax, 3], np.double)
         self.sensedFrequencyAmplitude = 0.0
         self.sensedFrequencyAmplitudeMethod = "none"
 
-    def writeToFile(self, archive, doEverything = False):
+    def writeToFile(self, archive, doWriteEverything = False):
         """
         Saves results to the hdf5 file.
 
@@ -291,11 +339,11 @@ class SimulationResults:
         ----------
         archive : :class:`h5py.Group`
             The HDF5 archive to write to.
-        doEverything : `boolean`, optional
+        doWriteEverything : `boolean`, optional
             If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         """
         archiveGroup = archive.require_group("simulationResults")
-        if doEverything:
+        if doWriteEverything:
             archiveGroup["timeEvolution"] = self.timeEvolution
             archiveGroup["state"] = self.state
             archiveGroup["spin"] = self.spin
@@ -319,7 +367,7 @@ class Simulation:
     trotterCutoff : `int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal, dressingRabiFrequency = 1e3, stateProperties = StateProperties(), trotterCutoff = 52):
+    def __init__(self, signal, dressingRabiFrequency = 1e3, stateProperties = None, trotterCutoff = 28):
         """
         Parameters
         ----------
@@ -335,7 +383,9 @@ class Simulation:
         self.signal = signal
         self.sourceProperties = SourceProperties(self.signal, dressingRabiFrequency)
         self.stateProperties = stateProperties
-        self.simulationResults = SimulationResults(self.signal)
+        if not self.stateProperties:
+            self.stateProperties = StateProperties()
+        self.simulationResults = SimulationResults(self.signal, self.stateProperties)
         self.trotterCutoff = trotterCutoff
 
         self.evaluate()
@@ -352,7 +402,11 @@ class Simulation:
         self.simulationResults.timeEvolution = cuda.device_array_like(self.simulationResults.timeEvolution)
         self.signal.timeProperties.timeCoarse = cuda.device_array_like(self.signal.timeProperties.timeCoarse)
 
-        getTimeEvolutionCommutatorFree4RotatingWave[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, cuda.to_device(self.sourceProperties.sourceAmplitude), cuda.to_device(self.sourceProperties.sourceFrequency), cuda.to_device(self.sourceProperties.sourcePhase), cuda.to_device(self.sourceProperties.sourceTimeEndPoints), self.sourceProperties.sourceQuadraticShift, self.simulationResults.timeEvolution, self.trotterCutoff)
+        if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.ONE:
+            getTimeEvolutionSpinOneCf4Rf[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, cuda.to_device(self.sourceProperties.sourceAmplitude), cuda.to_device(self.sourceProperties.sourceFrequency), cuda.to_device(self.sourceProperties.sourcePhase), cuda.to_device(self.sourceProperties.sourceTimeEndPoints), self.sourceProperties.sourceQuadraticShift, self.simulationResults.timeEvolution, self.trotterCutoff)
+
+        elif self.stateProperties.spinQuantumNumber == SpinQuantumNumber.HALF:
+            getTimeEvolutionSpinHalfCf4Rf[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, cuda.to_device(self.sourceProperties.sourceAmplitude), cuda.to_device(self.sourceProperties.sourceFrequency), cuda.to_device(self.sourceProperties.sourcePhase), cuda.to_device(self.sourceProperties.sourceTimeEndPoints), self.simulationResults.timeEvolution, self.trotterCutoff)
 
         self.simulationResults.timeEvolution = self.simulationResults.timeEvolution.copy_to_host()
         self.signal.timeProperties.timeCoarse = self.signal.timeProperties.timeCoarse.copy_to_host()
@@ -407,6 +461,9 @@ class Simulation:
         self.simulationResults.sensedFrequencyAmplitudeMethod = "demodulation"
         self.simulationResults.sensedFrequencyAmplitude = getFrequencyAmplitudeFromDemodulationLowPass(self.signal.timeProperties.timeEndPoints, spinDemodulated, self.simulationResults.sensedFrequencyAmplitude)
 
+        if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.HALF:
+            self.simulationResults.sensedFrequencyAmplitude *= 2
+
         # plt.plot(timeCoarse, spin*0 + self.simulationResults.sensedFrequencyAmplitude)
 
         if doPlotSpin:
@@ -414,7 +471,7 @@ class Simulation:
             plt.plot(self.signal.timeProperties.timeCoarse, self.simulationResults.spin[:, :])
             plt.show()
 
-    def writeToFile(self, archive):
+    def writeToFile(self, archive, doWriteEverything = False):
         """
         Saves the simulation record to hdf5.
 
@@ -422,10 +479,200 @@ class Simulation:
         ----------
         archive : :class:`h5py.Group`
             The HDF5 archive to write to.
+        doWriteEverything : `boolean`, optional
+            If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         """
         self.sourceProperties.writeToFile(archive)
         self.stateProperties.writeToFile(archive)
-        self.simulationResults.writeToFile(archive, False)
+        self.simulationResults.writeToFile(archive, doWriteEverything)
+
+@cuda.jit(debug = cudaDebug,  max_registers = 63)
+def getTimeEvolutionSpinOneCf4Rf(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
+    sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints, sourceQuadraticShift,
+    timeEvolutionCoarse, trotterCutoff):
+    """
+    Find the stepwise time evolution opperator using a 2 exponential, commutator free, order 4 Magnus integrator, in a rotating frame. This method compared to the others here has the highest accuracy for a given fine time step (increasing accuracy), or equivalently, can obtain the same accuracy using larger fine time steps (reducing execution time).
+
+    Parameters
+    ----------
+    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The time values for when the experiment is to start and finishes. In units of s.
+    timeStepFine : `float`
+        The time step used within the integration algorithm. In units of s.
+    timeStepCoarse : `float`
+        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    sourceQuadraticShift :  `float`
+        The constant quadratic shift of the spin 1 system, in Hz.
+    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
+    """
+
+    # Declare variables
+    timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
+    timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
+
+    magneticField = cuda.local.array((2, 3), dtype = nb.float64)
+    weight = cuda.local.array(2, dtype = nb.float64)
+    rotatingWaveWinding = cuda.local.array(2, dtype = nb.complex128)
+
+    # Run calculation for each coarse timestep in parallel
+    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if timeIndex < timeCoarse.size:
+        timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
+        timeFine = timeCoarse[timeIndex]
+
+        # Initialise time evolution operator to 1
+        spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
+        
+        rotatingWave = 2*math.pi*sourceAmplitude[0, 2]
+
+        # For every fine step
+        for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
+            for timeSampleIndex in range(2):
+                # 2nd order quadrature => Sample at +- 1/sqrt(3)
+                timeSample = timeFine + 0.5*timeStepFine*(1 + (2*timeSampleIndex - 1)/sqrt3)
+                rotatingWaveWinding[timeSampleIndex] = math.cos(rotatingWave*(timeSample - timeCoarse[timeIndex])) + 1j*math.sin(rotatingWave*(timeSample - timeCoarse[timeIndex]))
+                for spacialIndex in nb.prange(3):
+                    magneticField[timeSampleIndex, spacialIndex] = 0
+                for sourceIndex in range(sourceIndexMax):
+                    if timeSample >= sourceTimeEndPoints[sourceIndex, 0] and timeSample <= sourceTimeEndPoints[sourceIndex, 1]:
+                        for spacialIndex in nb.prange(3):
+                            magneticField[timeSampleIndex, spacialIndex] += 2*math.pi*sourceAmplitude[sourceIndex, spacialIndex]*math.sin(2*math.pi*sourceFrequency[sourceIndex, spacialIndex]*(timeSample - sourceTimeEndPoints[sourceIndex, 0]) + sourcePhase[sourceIndex, spacialIndex])
+                            
+            for exponentialIndex in range(-1, 2, 2):
+                weight[0] = (1.5 - exponentialIndex*sqrt3)/6
+                weight[1] = (1.5 + exponentialIndex*sqrt3)/6
+
+                X = timeStepFine*(weight[0]*(magneticField[0, 0] + 1j*magneticField[0, 1])/rotatingWaveWinding[0] + weight[1]*(magneticField[1, 0] + 1j*magneticField[1, 1])/rotatingWaveWinding[1])
+                z = timeStepFine*(weight[0]*(magneticField[0, 2] - rotatingWave) + weight[1]*(magneticField[1, 2] - rotatingWave))
+                q = timeStepFine*(weight[0]*sourceQuadraticShift + weight[1]*sourceQuadraticShift)
+
+                # Calculate the exponential from the expansion
+                spinOne.matrixExponentialLieTrotter(X.real, X.imag, z, q, timeEvolutionFine, trotterCutoff)
+
+                # Premultiply to the exitsing time evolution operator
+                spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
+                spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
+
+            timeFine += timeStepFine
+
+        # Take out of rotating frame
+        rotatingWaveWinding[0] = math.cos(rotatingWave*timeStepCoarse) + 1j*math.sin(rotatingWave*timeStepCoarse)
+
+        timeEvolutionCoarse[timeIndex, 0, 0] /= rotatingWaveWinding[0]
+        timeEvolutionCoarse[timeIndex, 0, 1] /= rotatingWaveWinding[0]
+        timeEvolutionCoarse[timeIndex, 0, 2] /= rotatingWaveWinding[0]
+
+        timeEvolutionCoarse[timeIndex, 2, 0] *= rotatingWaveWinding[0]
+        timeEvolutionCoarse[timeIndex, 2, 1] *= rotatingWaveWinding[0]
+        timeEvolutionCoarse[timeIndex, 2, 2] *= rotatingWaveWinding[0]
+
+@cuda.jit(debug = cudaDebug,  max_registers = 63)
+def getTimeEvolutionSpinHalfCf4Rf(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
+    sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints,
+    timeEvolutionCoarse, trotterCutoff):
+    """
+    Find the stepwise time evolution opperator using a 2 exponential, commutator free, order 4 Magnus integrator, in a rotating frame. This method compared to the others here has the highest accuracy for a given fine time step (increasing accuracy), or equivalently, can obtain the same accuracy using larger fine time steps (reducing execution time).
+
+    Parameters
+    ----------
+    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
+        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
+        The time values for when the experiment is to start and finishes. In units of s.
+    timeStepFine : `float`
+        The time step used within the integration algorithm. In units of s.
+    timeStepCoarse : `float`
+        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
+    sourceIndexMax : `int`
+        The number of sources in the simulation.
+    sourceAmplitude : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The amplitude of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourcePhase : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The phase offset of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of radians.
+    sourceFrequency : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, spatialIndex)
+        The frequency of the sine wave of source `sourceIndex` in direction `spatialIndex`. In units of Hz.
+    sourceTimeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex, turn on time (0) or turn off time (1))
+        The times that the sine wave of source `sourceIndex` turns on and off. In units of s.
+    sourceQuadraticShift :  `float`
+        The constant quadratic shift of the spin 1 system, in Hz.
+    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
+        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
+    trotterCutoff : `int`
+        The number of squares made by the spin 1 matrix exponentiator.
+    """
+
+    # Declare variables
+    timeEvolutionFine = cuda.local.array((2, 2), dtype = nb.complex128)
+    timeEvolutionOld = cuda.local.array((2, 2), dtype = nb.complex128)
+
+    magneticField = cuda.local.array((2, 3), dtype = nb.float64)
+    weight = cuda.local.array(2, dtype = nb.float64)
+    rotatingWaveWinding = cuda.local.array(2, dtype = nb.complex128)
+
+    # Run calculation for each coarse timestep in parallel
+    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if timeIndex < timeCoarse.size:
+        timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
+        timeFine = timeCoarse[timeIndex]
+
+        # Initialise time evolution operator to 1
+        spinHalf.setToOne(timeEvolutionCoarse[timeIndex, :])
+        
+        rotatingWave = math.pi*sourceAmplitude[0, 2]
+
+        # For every fine step
+        for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
+            for timeSampleIndex in range(2):
+                # 2nd order quadrature => Sample at +- 1/sqrt(3)
+                timeSample = timeFine + 0.5*timeStepFine*(1 + (2*timeSampleIndex - 1)/sqrt3)
+                rotatingWaveWinding[timeSampleIndex] = math.cos(rotatingWave*(timeSample - timeCoarse[timeIndex])) + 1j*math.sin(rotatingWave*(timeSample - timeCoarse[timeIndex]))
+                for spacialIndex in nb.prange(3):
+                    magneticField[timeSampleIndex, spacialIndex] = 0
+                for sourceIndex in range(sourceIndexMax):
+                    if timeSample >= sourceTimeEndPoints[sourceIndex, 0] and timeSample <= sourceTimeEndPoints[sourceIndex, 1]:
+                        for spacialIndex in nb.prange(3):
+                            magneticField[timeSampleIndex, spacialIndex] += 2*math.pi*sourceAmplitude[sourceIndex, spacialIndex]*math.sin(2*math.pi*sourceFrequency[sourceIndex, spacialIndex]*(timeSample - sourceTimeEndPoints[sourceIndex, 0]) + sourcePhase[sourceIndex, spacialIndex])
+                            
+            for exponentialIndex in range(-1, 2, 2):
+                weight[0] = (1.5 - exponentialIndex*sqrt3)/6
+                weight[1] = (1.5 + exponentialIndex*sqrt3)/6
+
+                X = timeStepFine*(weight[0]*(magneticField[0, 0] + 1j*magneticField[0, 1])/(rotatingWaveWinding[0]**2) + weight[1]*(magneticField[1, 0] + 1j*magneticField[1, 1])/(rotatingWaveWinding[1]**2))
+                z = timeStepFine*(weight[0]*(magneticField[0, 2] - 2*rotatingWave) + weight[1]*(magneticField[1, 2] - 2*rotatingWave))
+
+                # Calculate the exponential from the expansion
+                spinHalf.matrixExponentialAnalytic(X.real, X.imag, z, timeEvolutionFine)
+                # spinHalf.matrixExponentialLieTrotter(X.real, X.imag, z, timeEvolutionFine, trotterCutoff)
+
+                # Premultiply to the exitsing time evolution operator
+                spinHalf.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
+                spinHalf.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
+
+            timeFine += timeStepFine
+
+        # Take out of rotating frame
+        rotatingWaveWinding[0] = math.cos(rotatingWave*timeStepCoarse) + 1j*math.sin(rotatingWave*timeStepCoarse)
+
+        timeEvolutionCoarse[timeIndex, 0, 0] /= rotatingWaveWinding[0]
+        timeEvolutionCoarse[timeIndex, 0, 1] /= rotatingWaveWinding[0]
+
+        timeEvolutionCoarse[timeIndex, 1, 0] *= rotatingWaveWinding[0]
+        timeEvolutionCoarse[timeIndex, 1, 1] *= rotatingWaveWinding[0]
 
 @cuda.jit(debug = cudaDebug,  max_registers = 63)
 def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
@@ -465,9 +712,10 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
     # Declare variables
     timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
     timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
+    hamiltonian = cuda.local.array((3, 3), dtype = nb.complex128)
+
     magneticField = cuda.local.array((2, 3), dtype = nb.float64)
     weight = cuda.local.array(2, dtype = nb.float64)
-    hamiltonian = cuda.local.array((3, 3), dtype = nb.complex128)
     rotatingWaveWinding = cuda.local.array(2, dtype = nb.complex128)
 
     # Run calculation for each coarse timestep in parallel
@@ -477,7 +725,8 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
         timeFine = timeCoarse[timeIndex]
 
         # Initialise time evolution operator to 1
-        setToOne(timeEvolutionCoarse[timeIndex, :])
+        spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
+        
         rotatingWave = 2*math.pi*sourceAmplitude[0, 2]
 
         # For every fine step
@@ -494,10 +743,10 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
                             magneticField[timeSampleIndex, spacialIndex] += 2*math.pi*sourceAmplitude[sourceIndex, spacialIndex]*math.sin(2*math.pi*sourceFrequency[sourceIndex, spacialIndex]*(timeSample - sourceTimeEndPoints[sourceIndex, 0]) + sourcePhase[sourceIndex, spacialIndex])
                             
             for exponentialIndex in range(-1, 2, 2):
-                # Calculate hamiltonian from magnetic field
                 weight[0] = (1.5 - exponentialIndex*sqrt3)/6
                 weight[1] = (1.5 + exponentialIndex*sqrt3)/6
 
+                # Calculate hamiltonian from magnetic field
                 hamiltonian[0, 0] = (-1j*timeStepFine)*(weight[0]*(magneticField[0, 2] + sourceQuadraticShift/3 - rotatingWave) + weight[1]*(magneticField[1, 2] + sourceQuadraticShift/3 - rotatingWave))
                 hamiltonian[0, 1] = (-1j*timeStepFine)*(weight[0]*(magneticField[0, 0] - 1j*magneticField[0, 1])*rotatingWaveWinding[0] + weight[1]*(magneticField[1, 0] - 1j*magneticField[1, 1])*rotatingWaveWinding[1])/sqrt2
                 hamiltonian[0, 2] = 0
@@ -508,12 +757,16 @@ def getTimeEvolutionCommutatorFree4RotatingWave(timeCoarse, timeEndPoints, timeS
                 hamiltonian[2, 1] = hamiltonian[1, 0]
                 hamiltonian[2, 2] = (-1j*timeStepFine)*(weight[0]*(-magneticField[0, 2] + sourceQuadraticShift/3 + rotatingWave) + weight[1]*(-magneticField[1, 2] + sourceQuadraticShift/3 + rotatingWave))
 
+                X = timeStepFine*(weight[0]*(magneticField[0, 0] + 1j*magneticField[0, 1])/rotatingWaveWinding[0] + weight[1]*(magneticField[1, 0] + 1j*magneticField[1, 1])/rotatingWaveWinding[1])
+                z = timeStepFine*(weight[0]*(magneticField[0, 2] - rotatingWave) + weight[1]*(magneticField[1, 2] - rotatingWave))
+                q = timeStepFine*(weight[0]*sourceQuadraticShift + weight[1]*sourceQuadraticShift)
+
                 # Calculate the exponential from the expansion
-                matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
+                spinOne.matrixExponentialTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
 
                 # Premultiply to the exitsing time evolution operator
-                setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-                matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
+                spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
+                spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
 
             timeFine += timeStepFine
 
@@ -574,7 +827,7 @@ def getTimeEvolutionCommutatorFree4(timeCoarse, timeEndPoints, timeStepFine, tim
         timeFine = timeCoarse[timeIndex]
 
         # Initialise time evolution operator to 1
-        setToOne(timeEvolutionCoarse[timeIndex, :])
+        spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
 
         # For every fine step
         for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
@@ -604,11 +857,11 @@ def getTimeEvolutionCommutatorFree4(timeCoarse, timeEndPoints, timeStepFine, tim
                 hamiltonian[2, 2] = -hamiltonian[0, 0]
 
                 # Calculate the exponential from the expansion
-                matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
+                spinOne.matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
 
                 # Premultiply to the exitsing time evolution operator
-                setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-                matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
+                spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
+                spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
 
             timeFine += timeStepFine
 
@@ -658,7 +911,7 @@ def getTimeEvolutionHalfStep(timeCoarse, timeEndPoints, timeStepFine, timeStepCo
         timeFine = timeCoarse[timeIndex]
 
         # Initialise time evolution operator to 1
-        setToOne(timeEvolutionCoarse[timeIndex, :])
+        spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
 
         # For every fine step
         for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
@@ -682,10 +935,10 @@ def getTimeEvolutionHalfStep(timeCoarse, timeEndPoints, timeStepFine, timeStepCo
                     hamiltonian[2, 1] = (-1j*timeStepFine/2)*(magneticField[0] + 1j*magneticField[1])/sqrt2
                     hamiltonian[2, 2] = (-1j*timeStepFine/2)*(-magneticField[2])
 
-                    matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
+                    spinOne.matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
 
-                    setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-                    matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
+                    spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
+                    spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
 
             timeFine += timeStepFine
 
@@ -735,7 +988,7 @@ def getTimeEvolutionMidpointSample(timeCoarse, timeEndPoints, timeStepFine, time
         timeFine = timeCoarse[timeIndex]
 
         # Initialise time evolution operator to 1
-        setToOne(timeEvolutionCoarse[timeIndex, :])
+        spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
 
         # For every fine step
         for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
@@ -759,10 +1012,10 @@ def getTimeEvolutionMidpointSample(timeCoarse, timeEndPoints, timeStepFine, time
             hamiltonian[2, 1] = (-1j*timeStepFine)*(magneticField[0] + 1j*magneticField[1])/sqrt2
             hamiltonian[2, 2] = (-1j*timeStepFine)*(-magneticField[2])
 
-            matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
+            spinOne.matrixExponentialLieTrotter(hamiltonian, timeEvolutionFine, trotterCutoff)
 
-            setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-            matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
+            spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
+            spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
 
             timeFine += timeStepFine
 
@@ -782,24 +1035,40 @@ def getState(stateInit, state, timeEvolution):
     """
     for timeIndex in range(state.shape[0]):
         # State = time evolution * previous state
-        norm = 0
-        for xIndex in nb.prange(3):
+        for xIndex in nb.prange(state.shape[1]):
             state[timeIndex, xIndex] = 0
             if timeIndex > 0:
-                for zIndex in range(3):
+                for zIndex in range(state.shape[1]):
                     state[timeIndex, xIndex] += timeEvolution[timeIndex - 1, xIndex, zIndex]*state[timeIndex - 1, zIndex]
             else:
                 state[timeIndex, xIndex] += stateInit[xIndex]
-            norm += (state[timeIndex, xIndex]*np.conj(state[timeIndex, xIndex])).real
-
-        # Normalise the state in case of errors in the unitarity of the time evolution operator
-        # for xIndex in nb.prange(3):
-        #     state[timeIndex, xIndex] /=np.sqrt(norm)
 
 @cuda.jit(debug = cudaDebug)
 def getSpin(state, spin):
     """
     Calculate each expected spin value in parallel.
+
+    For spin half:
+
+    .. math::
+        \\begin{align*}
+            \\langle F\\rangle(t) = \\begin{pmatrix}
+                \\Re(\\psi_{+\\frac{1}{2}}(t)\\psi_{-\\frac{1}{2}}(t)^*)\\\\
+                -\\Im(\\psi_{+\\frac{1}{2}}(t)\\psi_{-\\frac{1}{2}}(t)^*)\\\\
+                \\frac{1}{2}(|\\psi_{+\\frac{1}{2}}(t)|^2 - |\\psi_{-\\frac{1}{2}}(t)|^2)
+            \\end{pmatrix}
+        \\end{align*}
+
+    For spin one:
+
+    .. math::
+        \\begin{align*}
+            \\langle F\\rangle(t) = \\begin{pmatrix}
+                \\Re(\\sqrt{2}\\psi_{0}(t)^*(\\psi_{+1}(t) + \\psi_{-1}(t))\\\\
+                -\\Im(\\sqrt{2}\\psi_{0}(t)^*(\\psi_{+1}(t) - \\psi_{-1}(t))\\\\
+                |\\psi_{+1}(t)|^2 - |\\psi_{-1}(t)|^2
+            \\end{pmatrix}
+        \\end{align*}
 
     Parameters
     ----------
@@ -810,9 +1079,14 @@ def getSpin(state, spin):
     """
     timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if timeIndex < spin.shape[0]:
-        spin[timeIndex, 0] = (2*conj(state[timeIndex, 1])*(state[timeIndex, 0] + state[timeIndex, 2])/sqrt2).real
-        spin[timeIndex, 1] = (2j*conj(state[timeIndex, 1])*(state[timeIndex, 0] - state[timeIndex, 2])/sqrt2).real
-        spin[timeIndex, 2] = state[timeIndex, 0].real**2 + state[timeIndex, 0].imag**2 - state[timeIndex, 2].real**2 - state[timeIndex, 2].imag**2
+        if state.shape[1] == 2:
+            spin[timeIndex, 0] = (state[timeIndex, 0]*scalar.conj(state[timeIndex, 1])).real
+            spin[timeIndex, 1] = (1j*state[timeIndex, 0]*scalar.conj(state[timeIndex, 1])).real
+            spin[timeIndex, 2] = 0.5*(state[timeIndex, 0].real**2 + state[timeIndex, 0].imag**2 - state[timeIndex, 1].real**2 - state[timeIndex, 1].imag**2)
+        else:
+            spin[timeIndex, 0] = (2*scalar.conj(state[timeIndex, 1])*(state[timeIndex, 0] + state[timeIndex, 2])/sqrt2).real
+            spin[timeIndex, 1] = (2j*scalar.conj(state[timeIndex, 1])*(state[timeIndex, 0] - state[timeIndex, 2])/sqrt2).real
+            spin[timeIndex, 2] = state[timeIndex, 0].real**2 + state[timeIndex, 0].imag**2 - state[timeIndex, 2].real**2 - state[timeIndex, 2].imag**2
 
 @cuda.jit(debug = cudaDebug)
 def getFrequencyAmplitudeFromDemodulationMultiply(time, spin, spinDemodulated, biasAmplitude):

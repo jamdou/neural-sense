@@ -5,6 +5,7 @@ from numba import cuda
 
 from simulationManager import *
 from simulationUtilities import *
+from simulation import *
 from benchmarkResults import *
 from archive import *
 
@@ -165,7 +166,7 @@ def newBenchmarkTrotterCutoff(archive, signal, frequency, trotterCutoff):
     """
     stateOutput = []
     error = []
-    simulationManager = SimulationManager(signal, frequency, archive, stateOutput, trotterCutoff)
+    simulationManager = SimulationManager(signal, frequency, archive, None, stateOutput, trotterCutoff)
     simulationManager.evaluate(False)
     for trotterCutoffIndex in range(trotterCutoff.size):
         errorTemp = 0
@@ -222,7 +223,7 @@ def newBenchmarkTimeStepFine(archive, signalTemplate, frequency, timeStepFine):
         signalInstance = TestSignal(signalTemplate.neuralPulses, signalTemplate.sinusoidalNoises, timeProperties, False)
         signal += [signalInstance]
 
-    simulationManager = SimulationManager(signal, frequency, archive, stateOutput)
+    simulationManager = SimulationManager(signal, frequency, archive, None, stateOutput)
     simulationManager.evaluate(False)
 
     for timeStepFineIndex in range(timeStepFine.size):

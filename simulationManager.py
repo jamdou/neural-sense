@@ -24,8 +24,10 @@ class SimulationManager:
         The archive object to save the simulation results and parameters to.
     stateOutput : `list` of (`numpy.ndarray` of  `numpy.cdouble`, (timeIndex, stateIndex))
         An optional `list` to directly write the state of the simulation to. Used for benchmarks. Reference can be optionally passed in on construction.
+    stateProperties : :class:`StateProperties`
+            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
     """
-    def __init__(self, signal, frequency, archive, stateOutput = None, trotterCutoff = [28]):
+    def __init__(self, signal, frequency, archive, stateProperties = None, stateOutput = None, trotterCutoff = [28]):
         """
         Parameters
         ----------
@@ -35,6 +37,8 @@ class SimulationManager:
             A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
         archive : :class:`archive.Archive`
             The archive object to save the simulation results and parameters to.
+        stateProperties : :class:`StateProperties`
+            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
         stateOutput : `list` of (`numpy.ndarray` of  `numpy.cdouble`, (timeIndex, stateIndex)), optional
             An optional `list` to directly write the state of the simulation to. Used for benchmarks.
         trotterCutoff : `list` of `int`, optional
@@ -48,11 +52,13 @@ class SimulationManager:
         self.frequencyAmplitude = np.empty(self.frequency.size*len(self.signal)*self.trotterCutoff.size, dtype = np.float64)
         self.archive = archive
         self.stateOutput = stateOutput
+        self.stateProperties = stateProperties
 
-    def evaluate(self, doPlot = False):
+    def evaluate(self, doPlot = False, doWriteEverything = False):
         """
         Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequencyAmplitude`. The simulation `simulationIndex` will be run with the frequency given by `frequencyIndex` mod :attr:`frequency.size`, the signal given by floor(`signalIndex` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signalIndex` / `frequency.size` / `trotterCutoff.size`).
-
+        doWriteEverything : `boolean`, optional
+            If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         Parameters
         ----------
         doPlot : `boolean`, optional
@@ -69,9 +75,9 @@ class SimulationManager:
                 for frequencyIndex in range(self.frequency.size):
                     simulationIndex = frequencyIndex + (signalIndex + trotterCutoffIndex*len(self.signal))*self.frequency.size
                     frequencyValue = self.frequency[frequencyIndex]
-                    simulation = Simulation(signalInstance, frequencyValue, trotterCutoff = trotterCutoffInstance)
+                    simulation = Simulation(signalInstance, frequencyValue, self.stateProperties, trotterCutoffInstance)
                     simulation.getFrequencyAmplitudeFromDemodulation([0.09, 0.1], doPlot)
-                    simulation.writeToFile(archiveGroupSimulations.require_group("simulation" + str(simulationIndex)))
+                    simulation.writeToFile(archiveGroupSimulations.require_group("simulation" + str(simulationIndex)), doWriteEverything)
                     self.frequencyAmplitude[simulationIndex] = simulation.simulationResults.sensedFrequencyAmplitude
                     if self.stateOutput is not None:
                         self.stateOutput += [simulation.simulationResults.state]
