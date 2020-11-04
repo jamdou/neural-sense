@@ -13,29 +13,12 @@ Subpackages
 Submodules
 ----------
 
-spinsim.experimentResults module
---------------------------------
+.. toctree::
+   :maxdepth: 4
 
-.. automodule:: spinsim.experimentResults
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-spinsim.simulation module
--------------------------
-
-.. automodule:: spinsim.simulation
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-spinsim.simulationManager module
---------------------------------
-
-.. automodule:: spinsim.simulationManager
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   spinsim.experimentResults
+   spinsim.simulation
+   spinsim.simulationManager
 
 Module contents
 ---------------

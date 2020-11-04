@@ -4,21 +4,11 @@ spinsim.benchmark package
 Submodules
 ----------
 
-spinsim.benchmark.manager module
---------------------------------
+.. toctree::
+   :maxdepth: 4
 
-.. automodule:: spinsim.benchmark.manager
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-spinsim.benchmark.results module
---------------------------------
-
-.. automodule:: spinsim.benchmark.results
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   spinsim.benchmark.manager
+   spinsim.benchmark.results
 
 Module contents
 ---------------

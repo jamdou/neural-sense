@@ -4,29 +4,12 @@ spinsim.simulationUtilities package
 Submodules
 ----------
 
-spinsim.simulationUtilities.scalar module
------------------------------------------
+.. toctree::
+   :maxdepth: 4
 
-.. automodule:: spinsim.simulationUtilities.scalar
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-spinsim.simulationUtilities.spinHalf module
--------------------------------------------
-
-.. automodule:: spinsim.simulationUtilities.spinHalf
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-spinsim.simulationUtilities.spinOne module
-------------------------------------------
-
-.. automodule:: spinsim.simulationUtilities.spinOne
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   spinsim.simulationUtilities.scalar
+   spinsim.simulationUtilities.spinHalf
+   spinsim.simulationUtilities.spinOne
 
 Module contents
 ---------------
