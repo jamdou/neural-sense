@@ -6,7 +6,7 @@ import math
 import numpy as np
 import numba as nb
 from numba import cuda
-from simulationUtilities import scalar
+from . import scalar
 
 # Important constants
 cudaDebug = False

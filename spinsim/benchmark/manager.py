@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import time as tm
 from numba import cuda
 
-from simulationManager import *
-from simulationUtilities import *
-from simulation import *
-from benchmarkResults import *
+from ..simulationManager import *
+from ..simulationUtilities import *
+from ..simulation import *
+from .results import *
 from archive import *
 
 def plotBenchmarkComparison(archive, archiveTimes, legend, title):

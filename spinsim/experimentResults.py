@@ -32,7 +32,7 @@ class ExperimentResults:
 
         Parameters
         ----------
-        simulationManager : :class:`simulationManager.SimulationManager`
+        simulationManager : :class:`.simulationManager.SimulationManager`
             The simulation manager object to read the results of.
 
         Returns

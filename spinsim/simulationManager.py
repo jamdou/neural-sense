@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import time as tm
 from numba import cuda
 
-from simulation import *
-from benchmarkResults import *
+from .simulation import *
+from .benchmark.results import *
 
 class SimulationManager:
     """
@@ -57,12 +57,12 @@ class SimulationManager:
     def evaluate(self, doPlot = False, doWriteEverything = False):
         """
         Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequencyAmplitude`. The simulation `simulationIndex` will be run with the frequency given by `frequencyIndex` mod :attr:`frequency.size`, the signal given by floor(`signalIndex` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signalIndex` / `frequency.size` / `trotterCutoff.size`).
-        doWriteEverything : `boolean`, optional
-            If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         Parameters
         ----------
         doPlot : `boolean`, optional
             If `True`, plots time series of the expected spin values in each direction during execution.
+        doWriteEverything : `boolean`, optional
+            If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         """
         print("\033[33mStarting simulations...\033[0m")
         executionTimeEndPoints = np.empty(2)

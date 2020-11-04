@@ -2,27 +2,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys, getopt      # Command line arguments
 from numba import cuda  # GPU code
+import colorama         # Colourful terminal
+colorama.init()
 
 # The different pieces that make up this sensing code
-from archive import *                   # Saving results and configurations
-from testSignal import *                # The properties of the magnetic signal, used for simulations and reconstructions
+from archive import *           # Saving results and configurations
+from testSignal import *        # The properties of the magnetic signal, used for simulations and reconstructions
 
-from simulation import *                # Simulates an 3 state atom interacting with a magnetic signal
-from simulationUtilities import *       # Tools used in the simulation
-from simulationManager import *         # Controls the running of multiple simulations
-from experimentResults import *         # A list of frequency coefficients from a simulation or actual experiment
+import spinsim                  # Main simulation package
 
-from reconstruction import *            # Uses compressive sensing to reconstruct the a magnetic signal
-
-from benchmarkManager import *          # Runs benchmarks to test accuracy of code in different configurations
-from benchmarkResults import *          # Stores the results of, and plots benchmarks
-
-# Making the terminal all colourful because that's what I live for
-import colorama
+from reconstruction import *    # Uses compressive sensing to reconstruct the a magnetic signal
 
 if __name__ == "__main__":
-    colorama.init()
-
     # This will be recorded in the HDF5 file to give context for what was being tested
     descriptionOfTest = "Spin 1/2"
 
@@ -92,7 +83,7 @@ if __name__ == "__main__":
         signal.writeToFile(archive.archiveFile)
 
         # Make state
-        stateProperties = StateProperties(SpinQuantumNumber.HALF)
+        stateProperties = spinsim.simulation.StateProperties(spinsim.simulation.SpinQuantumNumber.ONE)
 
         cuda.profile_start()
 
@@ -112,23 +103,23 @@ if __name__ == "__main__":
         # newBenchmarkTrotterCutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
         # Run simulations
-        frequency = np.arange(50, 3051, 3)
-        # frequency = np.arange(1000, 1003, 1)
-        simulationManager = SimulationManager(signal, frequency, archive, stateProperties)
+        # frequency = np.arange(50, 3051, 3)
+        frequency = np.arange(1000, 1003, 1)
+        simulationManager = spinsim.simulationManager.SimulationManager(signal, frequency, archive, stateProperties)
         simulationManager.evaluate(False, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
-        experimentResults = ExperimentResults.newFromSimulationManager(simulationManager)
+        experimentResults = spinsim.experimentResults.ExperimentResults.newFromSimulationManager(simulationManager)
         experimentResults.writeToArchive(archive)
         experimentResults.plot(archive, signal)
 
-        # Make reconstructions
-        reconstruction = Reconstruction(signal.timeProperties)
-        reconstruction.readFrequenciesFromExperimentResults(experimentResults)
-        # reconstruction.readFrequenciesFromTestSignal(signal)
-        reconstruction.evaluateFISTA()
-        # reconstruction.evaluateISTAComplete()
-        reconstruction.plot(archive, signal)
-        reconstruction.writeToFile(archive.archiveFile)
+        # # Make reconstructions
+        # reconstruction = Reconstruction(signal.timeProperties)
+        # reconstruction.readFrequenciesFromExperimentResults(experimentResults)
+        # # reconstruction.readFrequenciesFromTestSignal(signal)
+        # reconstruction.evaluateFISTA()
+        # # reconstruction.evaluateISTAComplete()
+        # reconstruction.plot(archive, signal)
+        # reconstruction.writeToFile(archive.archiveFile)
 
         # Clean up
         archive.closeArchiveFile()

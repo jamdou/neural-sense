@@ -35,7 +35,7 @@ from numba import cuda
 import numba as nb
 import time as tm
 from testSignal import *
-from simulationUtilities import spinOne, spinHalf, scalar
+from .simulationUtilities import spinOne, spinHalf, scalar
 from enum import Enum
 
 #===============================================================#
