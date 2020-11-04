@@ -9,6 +9,7 @@ import h5py
 import os
 import glob
 import shutil
+import sys, getopt
 from enum import Enum, auto
 
 class ProfileState(Enum):
@@ -40,6 +41,60 @@ class ProfileState(Enum):
     """
     The results of past profiling are to be moved to a single location to be archived.
     """
+
+def handleArguments():
+    """
+    Reads and handles arguments (mainly to do with profiling) from the command line.
+
+    Returns
+    -------
+    archivePath : `string`
+            The path where hdf5 archive files are saved. A new directory for the day, then time, will be made here to organise the archives.
+        profileState : :class:`ProfileState`, optional
+            A description of which type of profiling is being done now. Used to organise profile output files. Defaults to :obj:`ProfileState.NONE`.
+        descriptionOfTest : `string`
+            A note of the current aim of the test, to be saved to the hdf5 archive.
+    """
+    helpMessage = """
+    \033[36m-h  --help      \033[33mShow this message
+    \033[36m-a  --archive   \033[33mSelect an alternate archive path.
+                    \033[32mDefault:
+                        \033[36m.\\archive\033[0m
+    \033[36m-p  --profile   \033[33mSelect what type of nvprof profiling to be
+                    done, from:
+                        \033[36mnone \033[32m(default)  \033[33mRun normally
+                        \033[36mtimeline            \033[33mSave timeline
+                        \033[36mmetric              \033[33mSave metrics
+                        \033[36minstructionlevel    \033[33mSave per instruction
+                                            metrics
+                        \033[36marchive             \033[33mArchive results,
+                                            don't run anything
+                                            else
+                    \033[35mOnly used for automation with profiling, if
+                    you're not doing this, then leave this blank.\033[0m
+    """
+
+    # Command line arguments. Probably don't worry too much about these. Mostly used for profiling.
+    profileState = ProfileState.NONE
+    archivePath = ".\\archive\\"
+    options, arguments = getopt.getopt(sys.argv[1:], "hpa", ["help", "profile=", "archive="])
+    for option, argument in options:
+        if option in ("--help", "-h"):
+            print(helpMessage)
+            exit()
+        elif option in ("--profile", "-p"):
+            if argument == "timeline":
+                profileState = ProfileState.TIME_LINE
+            elif argument == "metric":
+                profileState = ProfileState.METRIC
+            elif argument == "instructionlevel":
+                profileState = ProfileState.INSTRUCTION_LEVEL
+            elif argument == "archive":
+                profileState = ProfileState.ARCHIVE
+        elif option in ("--archive", "-a"):
+            archivePath = argument + "\\"
+
+    return profileState, archivePath
 
 class Archive:
     """

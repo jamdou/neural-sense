@@ -1,40 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import sys, getopt      # Command line arguments
+# import sys, getopt      # Command line arguments
 from numba import cuda  # GPU code
 import colorama         # Colourful terminal
 colorama.init()
 
 # The different pieces that make up this sensing code
-from archive import *           # Saving results and configurations
-from testSignal import *        # The properties of the magnetic signal, used for simulations and reconstructions
+import archive as arch              # Saving results and configurations
+from archive import handleArguments
 
-import spinsim                  # Main simulation package
-
-from reconstruction import *    # Uses compressive sensing to reconstruct the a magnetic signal
+import testSignal                   # The properties of the magnetic signal, used for simulations and reconstructions
+import spinsim                      # Main simulation package
+import reconstruction as recon      # Uses compressive sensing to reconstruct the a magnetic signal
 
 if __name__ == "__main__":
     # This will be recorded in the HDF5 file to give context for what was being tested
     descriptionOfTest = "Spin 1/2"
 
-    helpMessage = """
-    \033[36m-h  --help      \033[33mShow this message
-    \033[36m-a  --archive   \033[33mSelect an alternate archive path.
-                    \033[32mDefault:
-                        \033[36m.\\archive\033[0m
-    \033[36m-p  --profile   \033[33mSelect what type of nvprof profiling to be
-                    done, from:
-                        \033[36mnone \033[32m(default)  \033[33mRun normally
-                        \033[36mtimeline            \033[33mSave timeline
-                        \033[36mmetric              \033[33mSave metrics
-                        \033[36minstructionlevel    \033[33mSave per instruction
-                                            metrics
-                        \033[36marchive             \033[33mArchive results,
-                                            don't run anything
-                                            else
-                    \033[35mOnly used for automation with profiling, if
-                    you're not doing this, then leave this blank.\033[0m
-    """
     # Check to see if there is a compatible GPU
     if cuda.list_devices():
         print("\033[32mUsing cuda device " + str(cuda.list_devices()[0].name) + "\033[0m")
@@ -42,39 +24,21 @@ if __name__ == "__main__":
         print("\033[31mNo cuda devices found. System is incompatible. Exiting...\033[0m")
         exit()
 
-    # Command line arguments. Probably don't worry too much about these. Mostly used for profiling.
-    profileState = ProfileState.NONE
-    archivePath = ".\\archive\\"
-    options, arguments = getopt.getopt(sys.argv[1:], "hpa", ["help", "profile=", "archive="])
-    for option, argument in options:
-        if option in ("--help", "-h"):
-            print(helpMessage)
-            exit()
-        elif option in ("--profile", "-p"):
-            if argument == "timeline":
-                profileState = ProfileState.TIME_LINE
-            elif argument == "metric":
-                profileState = ProfileState.METRIC
-            elif argument == "instructionlevel":
-                profileState = ProfileState.INSTRUCTION_LEVEL
-            elif argument == "archive":
-                profileState = ProfileState.ARCHIVE
-        elif option in ("--archive", "-a"):
-            archivePath = argument + "\\"
+    profileState, archivePath = handleArguments()
 
     # Initialise
     # cuda.profile_start()
     np.random.seed()
 
     # Make archive
-    archive = Archive(archivePath, descriptionOfTest, profileState)
-    if profileState != ProfileState.ARCHIVE:
+    archive = arch.Archive(archivePath, descriptionOfTest, profileState)
+    if profileState != arch.ProfileState.ARCHIVE:
         archive.newArchiveFile()
 
         # Make signal
-        timeProperties = TimeProperties(5e-7, 1e-7)
-        signal = TestSignal(
-            [NeuralPulse(0.02333333, 10.0, 1000), NeuralPulse(0.0444444444, 10.0, 1000)],
+        timeProperties = testSignal.TimeProperties(5e-7, 1e-7)
+        signal = testSignal.TestSignal(
+            [testSignal.NeuralPulse(0.02333333, 10.0, 1000), testSignal.NeuralPulse(0.0444444444, 10.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
             [],
             # [SinusoidalNoise.newDetuningNoise(10)],
@@ -103,8 +67,8 @@ if __name__ == "__main__":
         # newBenchmarkTrotterCutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
         # Run simulations
-        # frequency = np.arange(50, 3051, 3)
-        frequency = np.arange(1000, 1003, 1)
+        frequency = np.arange(50, 3051, 3)
+        # frequency = np.arange(1000, 1003, 1)
         simulationManager = spinsim.simulationManager.SimulationManager(signal, frequency, archive, stateProperties)
         simulationManager.evaluate(False, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
@@ -112,14 +76,14 @@ if __name__ == "__main__":
         experimentResults.writeToArchive(archive)
         experimentResults.plot(archive, signal)
 
-        # # Make reconstructions
-        # reconstruction = Reconstruction(signal.timeProperties)
-        # reconstruction.readFrequenciesFromExperimentResults(experimentResults)
-        # # reconstruction.readFrequenciesFromTestSignal(signal)
-        # reconstruction.evaluateFISTA()
-        # # reconstruction.evaluateISTAComplete()
-        # reconstruction.plot(archive, signal)
-        # reconstruction.writeToFile(archive.archiveFile)
+        # Make reconstructions
+        reconstruction = recon.Reconstruction(signal.timeProperties)
+        reconstruction.readFrequenciesFromExperimentResults(experimentResults)
+        # reconstruction.readFrequenciesFromTestSignal(signal)
+        reconstruction.evaluateFISTA()
+        # reconstruction.evaluateISTAComplete()
+        reconstruction.plot(archive, signal)
+        reconstruction.writeToFile(archive.archiveFile)
 
         # Clean up
         archive.closeArchiveFile()
