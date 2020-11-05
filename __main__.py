@@ -15,7 +15,7 @@ import reconstruction as recon      # Uses compressive sensing to reconstruct th
 
 if __name__ == "__main__":
     # This will be recorded in the HDF5 file to give context for what was being tested
-    descriptionOfTest = "Spin 1/2"
+    descriptionOfTest = "Arbitrary input"
 
     # Check to see if there is a compatible GPU
     if cuda.list_devices():
@@ -36,9 +36,10 @@ if __name__ == "__main__":
         archive.newArchiveFile()
 
         # Make signal
-        timeProperties = testSignal.TimeProperties(5e-7, 1e-7)
+        timeProperties = testSignal.TimeProperties(5e-8, 1e-8, [0, 0.01])
         signal = testSignal.TestSignal(
-            [testSignal.NeuralPulse(0.02333333, 10.0, 1000), testSignal.NeuralPulse(0.0444444444, 10.0, 1000)],
+            [],
+            # [testSignal.NeuralPulse(0.02333333, 10.0, 1000), testSignal.NeuralPulse(0.0444444444, 10.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
             [],
             # [SinusoidalNoise.newDetuningNoise(10)],
@@ -47,6 +48,7 @@ if __name__ == "__main__":
         signal.writeToFile(archive.archiveFile)
 
         # Make state
+        # [0.5, 1/math.sqrt(2), 0.5]
         stateProperties = spinsim.simulation.StateProperties(spinsim.simulation.SpinQuantumNumber.ONE)
 
         cuda.profile_start()
@@ -67,23 +69,23 @@ if __name__ == "__main__":
         # newBenchmarkTrotterCutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
         # Run simulations
-        frequency = np.arange(50, 3051, 3)
-        # frequency = np.arange(1000, 1003, 1)
+        # frequency = np.arange(50, 3051, 3)
+        frequency = np.arange(1000, 1003, 1)
         simulationManager = spinsim.simulationManager.SimulationManager(signal, frequency, archive, stateProperties)
-        simulationManager.evaluate(False, False)
+        simulationManager.evaluate(True, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
         experimentResults = spinsim.experimentResults.ExperimentResults.newFromSimulationManager(simulationManager)
         experimentResults.writeToArchive(archive)
         experimentResults.plot(archive, signal)
 
-        # Make reconstructions
-        reconstruction = recon.Reconstruction(signal.timeProperties)
-        reconstruction.readFrequenciesFromExperimentResults(experimentResults)
-        # reconstruction.readFrequenciesFromTestSignal(signal)
-        reconstruction.evaluateFISTA()
-        # reconstruction.evaluateISTAComplete()
-        reconstruction.plot(archive, signal)
-        reconstruction.writeToFile(archive.archiveFile)
+        # # Make reconstructions
+        # reconstruction = recon.Reconstruction(signal.timeProperties)
+        # reconstruction.readFrequenciesFromExperimentResults(experimentResults)
+        # # reconstruction.readFrequenciesFromTestSignal(signal)
+        # reconstruction.evaluateFISTA()
+        # # reconstruction.evaluateISTAComplete()
+        # reconstruction.plot(archive, signal)
+        # reconstruction.writeToFile(archive.archiveFile)
 
         # Clean up
         archive.closeArchiveFile()

@@ -27,7 +27,7 @@ class TimeProperties:
     timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
         A coarse grained list of time samples that the signal is defined for. In units of s.
     """
-    def __init__(self, timeStepCoarse = 5e-7, timeStepFine = 1e-7, timeEndPoints = np.asarray([0, 1e-1])):
+    def __init__(self, timeStepCoarse = 5e-7, timeStepFine = 1e-7, timeEndPoints = [0, 1e-1]):
         """
         Parameters
         ----------
@@ -38,11 +38,11 @@ class TimeProperties:
         timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
             The time values for when the experiment is to start and finishes. In units of s. Defaults to between 0s and 100ms.
         """
-        self.timeStepCoarse = timeStepCoarse            # Sampled timestep (s)
-        self.timeStepFine = timeStepFine                # Simulated timestep (s)
-        self.timeEndPoints = timeEndPoints              # When the signal starts and ends (s) [start time / end time]
+        self.timeStepCoarse = timeStepCoarse
+        self.timeStepFine = timeStepFine
+        self.timeEndPoints = np.asarray(timeEndPoints, np.double)
         self.timeIndexMax = int((self.timeEndPoints[1] - self.timeEndPoints[0])/self.timeStepCoarse)
-        self.timeCoarse = np.empty(self.timeIndexMax)   # The timeseries, mainly for x axis for plots (s) [time index]
+        self.timeCoarse = np.empty(self.timeIndexMax)
 
     def writeToFile(self, archive):
         """

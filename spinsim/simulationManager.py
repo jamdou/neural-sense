@@ -76,7 +76,7 @@ class SimulationManager:
                     simulationIndex = frequencyIndex + (signalIndex + trotterCutoffIndex*len(self.signal))*self.frequency.size
                     frequencyValue = self.frequency[frequencyIndex]
                     simulation = Simulation(signalInstance, frequencyValue, self.stateProperties, trotterCutoffInstance)
-                    simulation.getFrequencyAmplitudeFromDemodulation([0.09, 0.1], doPlot)
+                    simulation.getFrequencyAmplitudeFromDemodulation([0.9*signalInstance.timeProperties.timeEndPoints[1], signalInstance.timeProperties.timeEndPoints[1]], doPlot)
                     simulation.writeToFile(archiveGroupSimulations.require_group("simulation" + str(simulationIndex)), doWriteEverything)
                     self.frequencyAmplitude[simulationIndex] = simulation.simulationResults.sensedFrequencyAmplitude
                     if self.stateOutput is not None:
