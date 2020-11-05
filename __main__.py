@@ -36,10 +36,10 @@ if __name__ == "__main__":
         archive.newArchiveFile()
 
         # Make signal
-        timeProperties = testSignal.TimeProperties(5e-8, 1e-8, [0, 0.01])
+        timeProperties = testSignal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
         signal = testSignal.TestSignal(
-            [],
-            # [testSignal.NeuralPulse(0.02333333, 10.0, 1000), testSignal.NeuralPulse(0.0444444444, 10.0, 1000)],
+            # [],
+            [testSignal.NeuralPulse(0.02333333, 10.0, 1000), testSignal.NeuralPulse(0.0444444444, 10.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
             [],
             # [SinusoidalNoise.newDetuningNoise(10)],
@@ -53,14 +53,20 @@ if __name__ == "__main__":
 
         cuda.profile_start()
 
-        # # Time step test
+        # # Time step fine test
         # # timeStepFine = [5e-9, 1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7, 1e-6, 2e-6, 2.5e-6, 5e-6]
         # timeStepFine = timeProperties.timeStepCoarse/np.floor(np.logspace(np.log10(200), np.log10(1), 50))
         # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(1000, 1003, 5)
         # newBenchmarkTimeStepFine(archive, signal, frequency, timeStepFine)
 
-        # plotBenchmarkComparison(archive, ["20201016T120914", "20201016T121113", "20201016T120556", "20201016T121414", "20201016T113809", "20201016T121721", "20201016T122146"], ["tc = 12", "tc = 16", "tc = 20", "tc = 24", "tc = 28", "tc = 32", "tc = 36"], "Effect of trotter cutoff on timestep benchmark")
+        # # Time step source test
+        # timeStepSource = np.logspace(-9, -6, 50)
+        # frequency = np.arange(50, 3051, 300)
+        # # frequency = np.arange(1000, 1003, 5)
+        # spinsim.benchmark.manager.newBenchmarkTimeStepSource(archive, signal, frequency, stateProperties, timeStepSource)
+
+        # spinsim.benchmark.manager.plotBenchmarkComparison(archive, ["20201105T173827", "20201105T173349"], ["Linear Interpolation", "Cubic Interpolation"], "Effect of interpolation on source timestep benchmark")
 
         # Trotter Test
         # newBenchmarkTrotterCutoffMatrix(archive, np.arange(80, 0, -4), 1e1)
@@ -72,7 +78,7 @@ if __name__ == "__main__":
         # frequency = np.arange(50, 3051, 3)
         frequency = np.arange(1000, 1003, 1)
         simulationManager = spinsim.simulationManager.SimulationManager(signal, frequency, archive, stateProperties)
-        simulationManager.evaluate(True, False)
+        simulationManager.evaluate(False, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
         experimentResults = spinsim.experimentResults.ExperimentResults.newFromSimulationManager(simulationManager)
         experimentResults.writeToArchive(archive)

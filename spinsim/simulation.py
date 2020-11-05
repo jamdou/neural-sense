@@ -108,19 +108,12 @@ class SourceProperties:
             for sinusoidalNoise in signal.sinusoidalNoises:
                 self.addSinusoidalNoise(sinusoidalNoise)
 
-        self.source = np.zeros((signal.timeProperties.timeCoarse.size, stateProperties.spinQuantumNumber.value + 1), np.double)
-        for sourceIndex in range(self.sourceIndexMax):
-            for spacialIndex in range(3):
-                self.source[:, spacialIndex] += \
-                    np.asarray(signal.timeProperties.timeCoarse > self.sourceTimeEndPoints[sourceIndex, 0], np.int)*\
-                    np.asarray(signal.timeProperties.timeCoarse < self.sourceTimeEndPoints[sourceIndex, 1], np.int)*\
-                    self.sourceAmplitude[sourceIndex, spacialIndex]*\
-                    np.sin(\
-                        math.tau*self.sourceFrequency[sourceIndex, spacialIndex]*\
-                        (signal.timeProperties.timeCoarse - self.sourceTimeEndPoints[sourceIndex, 0]) +\
-                        self.sourcePhase[sourceIndex, spacialIndex]\
-                    )
-        self.source[:, 3] = self.sourceQuadraticShift
+        timeSourceIndexMax = int((signal.timeProperties.timeEndPoints[1] - signal.timeProperties.timeEndPoints[0])/signal.timeProperties.timeStepSource)
+        self.source = cuda.device_array((timeSourceIndexMax, 4), dtype = np.double)
+
+        threadsPerBlock = 64
+        blocksPerGrid = (timeSourceIndexMax + (threadsPerBlock - 1)) // threadsPerBlock
+        evaluateDressing[blocksPerGrid, threadsPerBlock](signal.timeProperties.timeStepSource, self.sourceIndexMax, cuda.to_device(self.sourceAmplitude), cuda.to_device(self.sourceFrequency), cuda.to_device(self.sourcePhase), cuda.to_device(self.sourceTimeEndPoints), self.sourceQuadraticShift, self.source)
 
     def writeToFile(self, archive):
         """
@@ -417,7 +410,7 @@ class Simulation:
         self.signal.timeProperties.timeCoarse = cuda.device_array_like(self.signal.timeProperties.timeCoarse)
 
         if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.ONE:
-            getTimeEvolutionSpinOneCf4Rf[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
+            getTimeEvolutionSpinOneCf4Rf[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
 
         elif self.stateProperties.spinQuantumNumber == SpinQuantumNumber.HALF:
             getTimeEvolutionSpinHalfCf4Rf[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.sourceProperties.sourceIndexMax, cuda.to_device(self.sourceProperties.sourceAmplitude), cuda.to_device(self.sourceProperties.sourceFrequency), cuda.to_device(self.sourceProperties.sourcePhase), cuda.to_device(self.sourceProperties.sourceTimeEndPoints), self.simulationResults.timeEvolution, self.trotterCutoff)
@@ -502,7 +495,7 @@ class Simulation:
 
 @cuda.jit(debug = cudaDebug,  max_registers = 63)
 def getTimeEvolutionSpinOneCf4Rf(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
-    source,
+    timeStepSource, source,
     timeEvolutionCoarse, trotterCutoff):
     """
     Find the stepwise time evolution opperator using a 2 exponential, commutator free, order 4 Magnus integrator, in a rotating frame. This method compared to the others here has the highest accuracy for a given fine time step (increasing accuracy), or equivalently, can obtain the same accuracy using larger fine time steps (reducing execution time).
@@ -548,33 +541,37 @@ def getTimeEvolutionSpinOneCf4Rf(timeCoarse, timeEndPoints, timeStepFine, timeSt
         for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
             for timeSampleIndex in range(2):
                 # 2nd order quadrature => Sample at +- 1/sqrt(3)
-                timeSample = ((timeFine + 0.5*timeStepFine*(1 + (2*timeSampleIndex - 1)/sqrt3)) - timeCoarse[timeIndex])/timeStepCoarse
-                rotatingWaveWinding[timeSampleIndex] = math.cos(rotatingWave*timeSample*timeStepCoarse) + 1j*math.sin(rotatingWave*timeSample*timeStepCoarse)
+                timeSample = ((timeFine + 0.5*timeStepFine*(1 + (2*timeSampleIndex - 1)/sqrt3)) - timeCoarse[timeIndex])
+                rotatingWaveWinding[timeSampleIndex] = math.cos(rotatingWave*timeSample) + 1j*math.sin(rotatingWave*timeSample)
+                timeSample = (timeSample + timeCoarse[timeIndex])/timeStepSource
+                timeIndexSource = int(timeSample)
+                # if timeIndex == 0:
+                #     print(timeSample, timeIndexSource)
+                timeSample -= timeIndexSource
 
+                timeIndexSourceNext = timeIndexSource + 1
+                if timeIndexSourceNext > source.shape[0] - 1:
+                    timeIndexSourceNext = source.shape[0] - 1
+                # Cubic
+                timeIndexSourceNextNext = timeIndexSourceNext + 1
+                if timeIndexSourceNextNext > source.shape[0] - 1:
+                    timeIndexSourceNextNext = source.shape[0] - 1
+                timeIndexSourcePrevious = timeIndexSource - 1
+                if timeIndexSourcePrevious < 0:
+                    timeIndexSourcePrevious = 0
                 for spacialIndex in nb.prange(4):
-                    timeIndexNext = timeIndex + 1
-                    if timeIndexNext > timeCoarse.size - 1:
-                        timeIndexNext = timeCoarse.size - 1
-
                     # Linear
-                    magneticField[timeSampleIndex, spacialIndex] = math.tau*(timeSample*(source[timeIndexNext, spacialIndex] - source[timeIndex, spacialIndex]) + source[timeIndex, spacialIndex])
+                    # magneticField[timeSampleIndex, spacialIndex] = math.tau*(timeSample*(source[timeIndexSourceNext, spacialIndex] - source[timeIndexSource, spacialIndex]) + source[timeIndexSource, spacialIndex])
 
-                    # # Cubic
-                    # timeIndexNextNext = timeIndexNext + 1
-                    # if timeIndexNextNext > timeCoarse.size - 1:
-                    #     timeIndexNextNext = timeCoarse.size - 1
-                    # timeIndexPrevious = timeIndex - 1
-                    # if timeIndexPrevious < 0:
-                    #     timeIndexPrevious = 0
+                    # Cubic
+                    gradient = (source[timeIndexSourceNext, spacialIndex] - source[timeIndexSourcePrevious, spacialIndex])/2
+                    gradientNext = (source[timeIndexSourceNextNext, spacialIndex] - source[timeIndexSource, spacialIndex])/2
 
-                    # gradient = (source[timeIndexNext, spacialIndex] - source[timeIndexPrevious, spacialIndex])/2
-                    # gradientNext = (source[timeIndexNextNext, spacialIndex] - source[timeIndex, spacialIndex])/2
-
-                    # magneticField[timeSampleIndex, spacialIndex] = math.tau*(\
-                    #     (2*(timeSample**3) - 3*(timeSample**2) + 1)*source[timeIndex, spacialIndex] + \
-                    #     ((timeSample**3) - 2*(timeSample**2) + timeSample)*gradient + \
-                    #     (-2*(timeSample**3) + 3*(timeSample**2))*source[timeIndexNext, spacialIndex] + \
-                    #     (timeSample**3 - timeSample**2)*gradientNext)
+                    magneticField[timeSampleIndex, spacialIndex] = math.tau*(\
+                        (2*(timeSample**3) - 3*(timeSample**2) + 1)*source[timeIndexSource, spacialIndex] + \
+                        ((timeSample**3) - 2*(timeSample**2) + timeSample)*gradient + \
+                        (-2*(timeSample**3) + 3*(timeSample**2))*source[timeIndexSourceNext, spacialIndex] + \
+                        (timeSample**3 - timeSample**2)*gradientNext)
                             
             for exponentialIndex in range(-1, 2, 2):
                 weight[0] = (1.5 - exponentialIndex*sqrt3)/6
@@ -1178,3 +1175,21 @@ def getFrequencyAmplitudeFromDemodulation(time, spin, spinDemodulated, biasAmpli
             elif timeIndexUse > spin.shape[0] - 1:
                 timeIndexUse = spin.shape[0] - 1
             spinDemodulated[timeIndex] -= 2*math.cos(2*math.pi*biasAmplitude*time[timeIndexUse])*spin[timeIndexUse]/101
+
+@cuda.jit(debug = cudaDebug)
+def evaluateDressing(timeStepSource, sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints, sourceQuadraticShift, source):
+    timeSourceIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if timeSourceIndex < source.shape[0]:
+        timeSource = timeSourceIndex*timeStepSource
+        for sourceIndex in range(sourceIndexMax):
+            for spacialIndex in range(3):
+                source[timeSourceIndex, spacialIndex] += \
+                    (timeSource >= sourceTimeEndPoints[sourceIndex, 0])*\
+                    (timeSource <= sourceTimeEndPoints[sourceIndex, 1])*\
+                    sourceAmplitude[sourceIndex, spacialIndex]*\
+                    math.sin(\
+                        math.tau*sourceFrequency[sourceIndex, spacialIndex]*\
+                        (timeSource - sourceTimeEndPoints[sourceIndex, 0]) +\
+                        sourcePhase[sourceIndex, spacialIndex]\
+                    )
+            source[timeSourceIndex, 3] = sourceQuadraticShift

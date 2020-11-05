@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time as tm
 from numba import cuda
 
-from ..simulationManager import *
+from ..simulationManager import SimulationManager
 from ..simulationUtilities import *
 from ..simulation import *
 from .results import *
@@ -133,7 +133,7 @@ def benchmarkTrotterCutoffMatrix(normBound, trotterCutoff, result):
         exponent[1, 2] = -1j*(x - 1j*y)/math.sqrt(2.0)
         exponent[2, 2] = -1j*(-z + q/3)
 
-        matrixExponentialLieTrotter(exponent, result[timeIndex, :], trotterCutoff)
+        simulationUtilities.spinOne.matrixExponentialLieTrotter(exponent, result[timeIndex, :], trotterCutoff)
 
 def newBenchmarkTrotterCutoff(archive, signal, frequency, trotterCutoff):
     """
@@ -219,7 +219,7 @@ def newBenchmarkTimeStepFine(archive, signalTemplate, frequency, timeStepFine):
 
     signal = []
     for timeStepFineInstance in timeStepFine:
-        timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, timeStepFineInstance)
+        timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, timeStepFineInstance, signalTemplate.timeProperties.timeStepSource)
         signalInstance = TestSignal(signalTemplate.neuralPulses, signalTemplate.sinusoidalNoises, timeProperties, False)
         signal += [signalInstance]
 
@@ -236,6 +236,63 @@ def newBenchmarkTimeStepFine(archive, signalTemplate, frequency, timeStepFine):
     error = np.asarray(error)
 
     benchmarkResults = BenchmarkResults(BenchmarkType.TIME_STEP_FINE, timeStepFine, error)
+    benchmarkResults.writeToArchive(archive)
+    benchmarkResults.plot(archive)
+
+    return benchmarkResults
+
+def newBenchmarkTimeStepSource(archive, signalTemplate, frequency, stateProperties, timeStepSource):
+    """
+    Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
+
+    Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`stateIndex`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `timeStepFine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
+
+    .. math::
+        \\begin{align*}
+            e_{\\mathrm{d}t} &= \\frac{1}{\\#t\\#f}\\sum_{t,f,m} |(\\psi_{f,\\mathrm{d}t})_{m,t} - (\\psi_{f,\\mathrm{d}t_0})_{m,t}|,
+        \\end{align*}
+
+    where :math:`\\#t` is the number of coarse time samples, :math:`\\#f` is the length of `frequency`.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies where to save results and plots.
+    signalTemplate : :class:`testSignal.TestSignal`
+        A description of the signal to use for the environment during the simulation. For each entry in `timeStepFine`, this template is modified so that its :attr:`testSignal.TestSignal.timeProperties.timeStepFine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+        The dressing frequencies being simulated in the benchmark.
+    timeStepFine : :class:`numpy.ndarray` of :class:`numpy.double`
+        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
+
+    Returns
+    -------
+    benchmarkResults : :class:`benchmarkResults.BenchmarkResults`
+        Contains the errors found by the benchmark.
+    """
+    timeStepSource = np.asarray(timeStepSource)
+    stateOutput = []
+    error = []
+
+    signal = []
+    for timeStepSourceInstance in timeStepSource:
+        timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, signalTemplate.timeProperties.timeStepFine, timeStepSourceInstance)
+        signalInstance = TestSignal(signalTemplate.neuralPulses, signalTemplate.sinusoidalNoises, timeProperties, False)
+        signal += [signalInstance]
+
+    simulationManager = SimulationManager(signal, frequency, archive, stateProperties, stateOutput)
+    simulationManager.evaluate(False)
+
+    for timeStepSourceIndex in range(timeStepSource.size):
+        errorTemp = 0
+        for frequencyIndex in range(frequency.size):
+            stateDifference = stateOutput[frequencyIndex + timeStepSourceIndex*frequency.size] - stateOutput[frequencyIndex]
+            errorTemp += np.sum(np.sqrt(np.real(np.conj(stateDifference)*stateDifference)))
+        error += [errorTemp/(frequency.size*stateOutput[0].size)]
+    
+    error = np.asarray(error)
+
+    benchmarkResults = BenchmarkResults(BenchmarkType.TIME_STEP_SOURCE, timeStepSource, error)
     benchmarkResults.writeToArchive(archive)
     benchmarkResults.plot(archive)
 
@@ -262,7 +319,7 @@ def newBenchmarkTimeStepFineFrequencyDrift(archive, signalTemplate, timeStepFine
 
     signals = []
     for timeStepFine in timeStepFines:
-        timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, timeStepFine)
+        timeProperties = TimeProperties(signalTemplate.timeProperties.timeStepCoarse, timeStepFine, signalTemplate.timeProperties.timeStepSource)
         signal = TestSignal(signalTemplate.neuralPulses, signalTemplate.sinusoidalNoises, timeProperties)
         signals += [signal]
 

@@ -39,6 +39,17 @@ class BenchmarkType(Enum):
     No benchmark has been defined.
     """
 
+    TIME_STEP_SOURCE = (
+        "timeStepSource",
+        "Source time step (s)",
+        "RMS error",
+        "Effect of source time step size on RMS error",
+        "log"
+    )
+    """
+    The results of :func:`benchmark.manager.newBenchmarkTrotterCutoff()`.
+    """
+
     TROTTER_CUTOFF = (
         "trotterCutoff",
         "Trotter cutoff",
@@ -47,7 +58,7 @@ class BenchmarkType(Enum):
         "linear"
     )
     """
-    The results of :func:`benchmarkManager.newBenchmarkTrotterCutoff()`.
+    The results of :func:`benchmark.manager.newBenchmarkTrotterCutoff()`.
     """
 
     TROTTER_CUTOFF_MATRIX = (
@@ -58,7 +69,7 @@ class BenchmarkType(Enum):
         "linear"
     )
     """
-    The results of :func:`benchmarkManager.newBenchmarkTrotterCutoffMatrix()`.
+    The results of :func:`benchmark.manager.newBenchmarkTrotterCutoffMatrix()`.
     """
 
     TIME_STEP_FINE = (
@@ -69,7 +80,7 @@ class BenchmarkType(Enum):
         "log"
     )
     """
-    The results of :func:`benchmarkManager.newBenchmarkTimeStepFine()`.
+    The results of :func:`benchmark.manager.newBenchmarkTimeStepFine()`.
     """
 
     TIME_STEP_FINE_FREQUENCY_DRIFT = (
@@ -80,7 +91,7 @@ class BenchmarkType(Enum):
         "log"
     )
     """
-    The results of :func:`benchmarkManager.newBenchmarkTimeStepFineFrequencyDrift()`.
+    The results of :func:`benchmark.manager.newBenchmarkTimeStepFineFrequencyDrift()`.
     """
 
 class BenchmarkResults:

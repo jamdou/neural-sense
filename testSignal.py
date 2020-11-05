@@ -27,7 +27,7 @@ class TimeProperties:
     timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
         A coarse grained list of time samples that the signal is defined for. In units of s.
     """
-    def __init__(self, timeStepCoarse = 5e-7, timeStepFine = 1e-7, timeEndPoints = [0, 1e-1]):
+    def __init__(self, timeStepCoarse = 5e-7, timeStepFine = 1e-7, timeStepSource = 1e-7, timeEndPoints = [0, 1e-1]):
         """
         Parameters
         ----------
@@ -40,9 +40,11 @@ class TimeProperties:
         """
         self.timeStepCoarse = timeStepCoarse
         self.timeStepFine = timeStepFine
+        self.timeStepSource = timeStepSource
         self.timeEndPoints = np.asarray(timeEndPoints, np.double)
         self.timeIndexMax = int((self.timeEndPoints[1] - self.timeEndPoints[0])/self.timeStepCoarse)
         self.timeCoarse = np.empty(self.timeIndexMax)
+        # self.timeSource = np.arange(self.timeEndPoints[0], self.timeEndPoints[1], self.timeStepSource, np.double)
 
     def writeToFile(self, archive):
         """

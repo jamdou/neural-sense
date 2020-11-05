@@ -4,7 +4,7 @@ import time as tm
 from numba import cuda
 
 from .simulation import *
-from .benchmark.results import *
+# from .benchmark.results import *
 
 class SimulationManager:
     """
