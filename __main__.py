@@ -48,7 +48,7 @@ if __name__ == "__main__":
         signal.writeToFile(archive.archiveFile)
 
         # Make state
-        # [0.5, 1/math.sqrt(2), 0.5]
+        # [0.5, 1/np.sqrt(2), 0.5]
         stateProperties = spinsim.simulation.StateProperties(spinsim.simulation.SpinQuantumNumber.ONE)
 
         cuda.profile_start()

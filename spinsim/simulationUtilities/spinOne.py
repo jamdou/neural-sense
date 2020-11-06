@@ -15,7 +15,7 @@ sqrt3 = math.sqrt(3)
 machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
 # trotterCutoff = 52
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialAnalytic(exponent, result):
     """
     Calculates a :math:`su(2)` matrix exponential based on its analytic form.
@@ -93,7 +93,7 @@ def matrixExponentialAnalytic(exponent, result):
         result[0, 1] = 0
         result[1, 1] = 1
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialLieTrotter(x, y, z, q, result, trotterCutoff):
     """
     Calculates a matrix exponential based on the Lie Product Formula,
@@ -211,7 +211,7 @@ def matrixExponentialLieTrotter(x, y, z, q, result, trotterCutoff):
         matrixMultiply(result, result, temporary)
         matrixMultiply(temporary, temporary, result)
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialTrotter(exponent, result, trotterCutoff):
     """
     Calculates a matrix exponential based on the Lie Product Formula,
@@ -348,7 +348,7 @@ def matrixExponentialTrotter(exponent, result, trotterCutoff):
         matrixMultiply(result, result, exponent)
         matrixMultiply(exponent, exponent, result)
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialRotatingWaveHybrid(exponent, result, trotterCutoff):
     """
     An experimental matrix exponential based off :func:`matrixExponentialLieTrotter()` and the rotating wave approximation. Not as accurate as :func:`matrixExponentialLieTrotter()`.
@@ -405,7 +405,7 @@ def matrixExponentialRotatingWaveHybrid(exponent, result, trotterCutoff):
     result[1, 2] *= cisz
     result[2, 2] *= cisz
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialCrossProduct(exponent, result):
     """
     Calculate a matrix exponential by diagonalisation using the cross product. This is the main method used in the old cython code.
@@ -570,7 +570,7 @@ def matrixExponentialCrossProduct(exponent, result):
             for zIndex in range(3):
                 result[yIndex, xIndex] += rotation[yIndex, zIndex]*winding[zIndex]*scalar.conj(rotation[xIndex, zIndex])
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialTaylor(exponent, result, cutoff):
     """
     Calculate a matrix exponential using a Taylor series. The matrix being exponentiated is complex, and of any dimension.
@@ -621,7 +621,7 @@ def matrixExponentialTaylor(exponent, result, cutoff):
             for yIndex in nb.prange(exponent.shape[0]):
                 result[yIndex, xIndex] += T[yIndex, xIndex]
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixExponentialQL(exponent, result):
     """
     This is based on a method in the old cython code - this was found to not function as intended either here or in the cython code. Assumes the exponent is an imaginary  linear combination of a subspace of :math:`su(3)`, being,
@@ -762,7 +762,7 @@ def matrixExponentialQL(exponent, result):
                 result[yIndex, xIndex] += winding[zIndex]*scalar.conj(rotation[xIndex, zIndex])*rotation[yIndex, zIndex]
     return
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def norm2(z):
     """
     The 2 norm of a complex vector.
@@ -782,7 +782,7 @@ def norm2(z):
     # Original spin 1:
     return math.sqrt(z[0].real**2 + z[0].imag**2 + z[1].real**2 + z[1].imag**2 + z[2].real**2 + z[2].imag**2)
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def cross(left, right, result):
     """
     The cross product of two vectors in :math:`\\mathbb{C}^3`.
@@ -811,7 +811,7 @@ def cross(left, right, result):
     result[1] = scalar.conj(left[2]*right[0] - left[0]*right[2])
     result[2] = scalar.conj(left[0]*right[1] - left[1]*right[0])
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def inner(left, right):
     """
     The inner (maths convention dot) product between two complex vectors. 
@@ -839,7 +839,7 @@ def inner(left, right):
     """
     return scalar.conj(left[0])*right[0] + scalar.conj(left[1])*right[1] + scalar.conj(left[2])*right[2]
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def setTo(operator, result):
     """
     Copy the contents of one matrix into another.
@@ -866,7 +866,7 @@ def setTo(operator, result):
     result[1, 2] = operator[1, 2]
     result[2, 2] = operator[2, 2]
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def setToOne(operator):
     """
     Make a matrix the multiplicative identity, ie, :math:`1`.
@@ -897,7 +897,7 @@ def setToOne(operator):
     operator[1, 2] = 0
     operator[2, 2] = 1
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def setToZero(operator):
     """
     Make a matrix the additive identity, ie, :math:`0`.
@@ -924,7 +924,7 @@ def setToZero(operator):
     operator[1, 2] = 0
     operator[2, 2] = 0
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def matrixMultiply(left, right, result):
     """
     Multiply matrices left and right together, to be returned in result.
@@ -955,7 +955,7 @@ def matrixMultiply(left, right, result):
     result[1, 2] = left[1, 0]*right[0, 2] + left[1, 1]*right[1, 2] + left[1, 2]*right[2, 2]
     result[2, 2] = left[2, 0]*right[0, 2] + left[2, 1]*right[1, 2] + left[2, 2]*right[2, 2]
 
-@cuda.jit(device = True)
+@cuda.jit(device = True, inline = True)
 def adjoint(operator, result):
     """
     Takes the hermitian adjoint of a matrix.
