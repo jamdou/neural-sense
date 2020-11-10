@@ -1,0 +1,85 @@
+PWD c:\Users\Alex\University\NeuralSense\spinsim\article
+INPUT C:\Users\Alex\AppData\Local\MiKTeX\2.9\miktex\data\le\pdftex\pdflatex.fmt
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.tex
+OUTPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.log
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\jors.cls
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\jors.cls
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\article.cls
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\article.cls
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\size12.clo
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\size12.clo
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmr12.tfm
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\xcolor\xcolor.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\xcolor\xcolor.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics-cfg\color.cfg
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics-cfg\color.cfg
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics-def\pdftex.def
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics-def\pdftex.def
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\sectsty\sectsty.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\sectsty\sectsty.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\enumitem\enumitem.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\enumitem\enumitem.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\hyperref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\hyperref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\hobsub-hyperref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\hobsub-hyperref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\hobsub-hyperref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\hobsub-generic.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\hobsub-generic.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\keyval.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\keyval.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\ifxetex\ifxetex.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\ifxetex\ifxetex.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\oberdiek\auxhook.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\oberdiek\auxhook.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\oberdiek\kvoptions.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\oberdiek\kvoptions.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\pd1enc.def
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\pd1enc.def
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\00miktex\hyperref.cfg
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\00miktex\hyperref.cfg
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\url\url.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\url\url.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\oberdiek\rerunfilecheck.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\oberdiek\rerunfilecheck.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\fancyhdr\fancyhdr.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\fancyhdr\fancyhdr.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\titlesec\titlesec.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\titlesec\titlesec.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\geometry\geometry.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\geometry\geometry.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\geometry\geometry.cfg
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\geometry\geometry.cfg
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.aux
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.aux
+OUTPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.aux
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\context\base\mkii\supp-pdf.mkii
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\context\base\mkii\supp-pdf.mkii
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\gettitlestring.sty
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\gettitlestring.sty
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+OUTPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+OUTPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.pdf
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmbx12.tfm
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmr17.tfm
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmbx12.tfm
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmsl12.tfm
+INPUT C:\Users\Alex\AppData\Local\MiKTeX\2.9\pdftex\config\pdftex.map
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmr12.tfm
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\tfm\public\cm\cmbx12.tfm
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.aux
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT c:\Users\Alex\University\NeuralSense\spinsim\article\article.out
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmbx12.pfb
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmbx12.pfb
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr12.pfb
+INPUT D:\Users\Alex\AppData\Local\Programs\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr12.pfb

@@ -66,6 +66,8 @@ expPrecision = 5                                # Where to cut off the exp Taylo
 machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
 # trotterCutoff = 52
 
+interpolate = utilities.interpolateSourceCubic
+
 class SourceProperties:
     """
     A list of sine wave parameters fed into the simulation code.
@@ -547,7 +549,6 @@ def getTimeEvolutionSo(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
     trotterCutoff : `int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-
     # Declare variables
     timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
     timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
@@ -565,7 +566,8 @@ def getTimeEvolutionSo(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
         # Initialise time evolution operator to 1
         utilities.spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
         timeSample = timeCoarse[timeIndex] + timeStepCoarse/2
-        utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample[0, :])
+        # utilities.interpolateSourceCubic
+        interpolate(source, timeSample, timeStepSource, sourceSample[0, :])
         rotatingWave = math.tau*sourceSample[0, 2]
 
         # For every fine step
