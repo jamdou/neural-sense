@@ -432,7 +432,14 @@ class Simulation:
         self.signal.timeProperties.timeCoarse = cuda.device_array_like(self.signal.timeProperties.timeCoarse)
 
         getTimeEvolution = timeEvolverFactory(self.stateProperties.spinQuantumNumber)
+
         getTimeEvolution[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution)
+
+        executionTimeEndPoints = np.empty(2)
+        executionTimeEndPoints[0] = tm.time()
+        getTimeEvolution[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution)
+        executionTimeEndPoints[1] = tm.time() - executionTimeEndPoints[0]
+        print(executionTimeEndPoints[1])
 
         # if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.ONE:
         #     getTimeEvolutionSo[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
@@ -591,131 +598,133 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
         utilitySet.setTo(timeEvolutionCoarse, timeEvolutionOld)
         utilitySet.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse)
 
-    @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
-    def transformFrameSpinOneRotating(sourceSample, rotatingWave, rotatingWaveWinding):
-        X = (sourceSample[0] + 1j*sourceSample[1])/rotatingWaveWinding
-        sourceSample[0] = X.real
-        sourceSample[1] = X.imag
-        sourceSample[2] = sourceSample[2] - rotatingWave
-
-    @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
-    def transformFrameSpinHalfRotating(sourceSample, rotatingWave, rotatingWaveWinding):
-        X = (sourceSample[0] + 1j*sourceSample[1])/(rotatingWaveWinding**2)
-        sourceSample[0] = X.real
-        sourceSample[1] = X.imag
-        sourceSample[2] = sourceSample[2] - 2*rotatingWave
-
-    @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
-    def transformFrameLab(sourceSample, rotatingWave, rotatingWaveWinding):
-        return
-
     if useRotatingFrame:
         if dimension == 3:
+            @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
+            def transformFrameSpinOneRotating(sourceSample, rotatingWave, rotatingWaveWinding):
+                X = (sourceSample[0] + 1j*sourceSample[1])/rotatingWaveWinding
+                sourceSample[0] = X.real
+                sourceSample[1] = X.imag
+                sourceSample[2] = sourceSample[2] - rotatingWave
+    
             transformFrame = transformFrameSpinOneRotating
         else:
+            @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
+            def transformFrameSpinHalfRotating(sourceSample, rotatingWave, rotatingWaveWinding):
+                X = (sourceSample[0] + 1j*sourceSample[1])/(rotatingWaveWinding**2)
+                sourceSample[0] = X.real
+                sourceSample[1] = X.imag
+                sourceSample[2] = sourceSample[2] - 2*rotatingWave
+
             transformFrame = transformFrameSpinHalfRotating
     else:
+        @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
+        def transformFrameLab(sourceSample, rotatingWave, rotatingWaveWinding):
+            return
+
         transformFrame = transformFrameLab
 
     @cuda.jit(device = True, inline = True)
     def getSource(timeSample, source, timeStepSource, sourceSample):
         utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample)
 
-    @cuda.jit(device = True, inline = True)
-    def getSourceIntegrationMagnusCF4(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
-        timeSample = ((timeFine + 0.5*timeStepFine*(1 - 1/sqrt3)) - timeCoarse)
-        rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
-        timeSample += timeCoarse
-        getSource(timeSample, source, timeStepSource, sourceSample[0, :])
-
-        timeSample = ((timeFine + 0.5*timeStepFine*(1 + 1/sqrt3)) - timeCoarse)
-        rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
-        timeSample += timeCoarse
-        getSource(timeSample, source, timeStepSource, sourceSample[1, :])
-
-    @cuda.jit(device = True, inline = True)
-    def getSourceIntegrationHalfStep(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
-        timeSample = timeFine - timeCoarse
-        rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
-        timeSample += timeCoarse
-        getSource(timeSample, source, timeStepSource, sourceSample[0, :])
-
-        timeSample = timeFine + timeStepFine - timeCoarse
-        rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
-        timeSample += timeCoarse
-        getSource(timeSample, source, timeStepSource, sourceSample[1, :])
-
-    @cuda.jit(device = True, inline = True)
-    def getSourceIntegrationMidpoint(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
-        timeSample = timeFine + 0.5*timeStepFine - timeCoarse
-        rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
-        timeSample += timeCoarse
-        getSource(timeSample, source, timeStepSource, sourceSample[0, :])
-
-    @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
-    def appendExponentiationIntegrationMagnusCF4(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
-        transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
-        transformFrame(sourceSample[1, :], rotatingWave, rotatingWaveWinding[1])
-
-        w0 = (1.5 + sqrt3)/6
-        w1 = (1.5 - sqrt3)/6
-        
-        sourceSample[2, 0] = math.tau*timeStepFine*(w0*sourceSample[0, 0] + w1*sourceSample[1, 0])
-        sourceSample[2, 1] = math.tau*timeStepFine*(w0*sourceSample[0, 1] + w1*sourceSample[1, 1])
-        sourceSample[2, 2] = math.tau*timeStepFine*(w0*sourceSample[0, 2] + w1*sourceSample[1, 2])
-        if dimension > 2:
-            sourceSample[2, 3] = math.tau*timeStepFine*(w0*sourceSample[0, 3] + w1*sourceSample[1, 3])
-
-        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
-
-        sourceSample[2, 0] = math.tau*timeStepFine*(w1*sourceSample[0, 0] + w0*sourceSample[1, 0])
-        sourceSample[2, 1] = math.tau*timeStepFine*(w1*sourceSample[0, 1] + w0*sourceSample[1, 1])
-        sourceSample[2, 2] = math.tau*timeStepFine*(w1*sourceSample[0, 2] + w0*sourceSample[1, 2])
-        if dimension > 2:
-            sourceSample[2, 3] = math.tau*timeStepFine*(w1*sourceSample[0, 3] + w0*sourceSample[1, 3])
-
-        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
-
-    @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
-    def appendExponentiationIntegrationHalfStep(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
-        transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
-        transformFrame(sourceSample[1, :], rotatingWave, rotatingWaveWinding[1])
-        
-        sourceSample[2, 0] = math.tau*timeStepFine*sourceSample[0, 0]/2
-        sourceSample[2, 1] = math.tau*timeStepFine*sourceSample[0, 1]/2
-        sourceSample[2, 2] = math.tau*timeStepFine*sourceSample[0, 2]/2
-        if dimension > 2:
-            sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[0, 3]/2
-
-        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
-
-        sourceSample[2, 0] = math.tau*timeStepFine*sourceSample[1, 0]/2
-        sourceSample[2, 1] = math.tau*timeStepFine*sourceSample[1, 1]/2
-        sourceSample[2, 2] = math.tau*timeStepFine*sourceSample[1, 2]/2
-        if dimension > 2:
-            sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[1, 3]/2
-
-        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
-
-    @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
-    def appendExponentiationIntegrationMidpoint(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
-        transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
-        
-        sourceSample[0, 0] = math.tau*timeStepFine*sourceSample[0, 0]
-        sourceSample[0, 1] = math.tau*timeStepFine*sourceSample[0, 1]
-        sourceSample[0, 2] = math.tau*timeStepFine*sourceSample[0, 2]
-        if dimension > 2:
-            sourceSample[0, 3] = math.tau*timeStepFine*sourceSample[0, 3]
-
-        appendExponentiation(sourceSample[0, :], timeEvolutionFine, timeEvolutionCoarse)
-
     if integrationMethod == IntegrationMethod.MAGNUS_CF_4:
+        @cuda.jit(device = True, inline = True)
+        def getSourceIntegrationMagnusCF4(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+            timeSample = ((timeFine + 0.5*timeStepFine*(1 - 1/sqrt3)) - timeCoarse)
+            rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+            timeSample += timeCoarse
+            getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+
+            timeSample = ((timeFine + 0.5*timeStepFine*(1 + 1/sqrt3)) - timeCoarse)
+            rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+            timeSample += timeCoarse
+            getSource(timeSample, source, timeStepSource, sourceSample[1, :])
+
+        @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
+        def appendExponentiationIntegrationMagnusCF4(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
+            transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
+            transformFrame(sourceSample[1, :], rotatingWave, rotatingWaveWinding[1])
+
+            w0 = (1.5 + sqrt3)/6
+            w1 = (1.5 - sqrt3)/6
+            
+            sourceSample[2, 0] = math.tau*timeStepFine*(w0*sourceSample[0, 0] + w1*sourceSample[1, 0])
+            sourceSample[2, 1] = math.tau*timeStepFine*(w0*sourceSample[0, 1] + w1*sourceSample[1, 1])
+            sourceSample[2, 2] = math.tau*timeStepFine*(w0*sourceSample[0, 2] + w1*sourceSample[1, 2])
+            if dimension > 2:
+                sourceSample[2, 3] = math.tau*timeStepFine*(w0*sourceSample[0, 3] + w1*sourceSample[1, 3])
+
+            appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
+            sourceSample[2, 0] = math.tau*timeStepFine*(w1*sourceSample[0, 0] + w0*sourceSample[1, 0])
+            sourceSample[2, 1] = math.tau*timeStepFine*(w1*sourceSample[0, 1] + w0*sourceSample[1, 1])
+            sourceSample[2, 2] = math.tau*timeStepFine*(w1*sourceSample[0, 2] + w0*sourceSample[1, 2])
+            if dimension > 2:
+                sourceSample[2, 3] = math.tau*timeStepFine*(w1*sourceSample[0, 3] + w0*sourceSample[1, 3])
+
+            appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
         getSourceIntegration = getSourceIntegrationMagnusCF4
         appendExponentiationIntegration = appendExponentiationIntegrationMagnusCF4
+
     elif integrationMethod == IntegrationMethod.HALF_STEP:
+        @cuda.jit(device = True, inline = True)
+        def getSourceIntegrationHalfStep(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+            timeSample = timeFine - timeCoarse
+            rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+            timeSample += timeCoarse
+            getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+
+            timeSample = timeFine + timeStepFine - timeCoarse
+            rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+            timeSample += timeCoarse
+            getSource(timeSample, source, timeStepSource, sourceSample[1, :])
+
+        @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
+        def appendExponentiationIntegrationHalfStep(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
+            transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
+            transformFrame(sourceSample[1, :], rotatingWave, rotatingWaveWinding[1])
+            
+            sourceSample[2, 0] = math.tau*timeStepFine*sourceSample[0, 0]/2
+            sourceSample[2, 1] = math.tau*timeStepFine*sourceSample[0, 1]/2
+            sourceSample[2, 2] = math.tau*timeStepFine*sourceSample[0, 2]/2
+            if dimension > 2:
+                sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[0, 3]/2
+
+            appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
+            sourceSample[2, 0] = math.tau*timeStepFine*sourceSample[1, 0]/2
+            sourceSample[2, 1] = math.tau*timeStepFine*sourceSample[1, 1]/2
+            sourceSample[2, 2] = math.tau*timeStepFine*sourceSample[1, 2]/2
+            if dimension > 2:
+                sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[1, 3]/2
+
+        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
         getSourceIntegration = getSourceIntegrationHalfStep
         appendExponentiationIntegration = appendExponentiationIntegrationHalfStep
+
     elif integrationMethod == IntegrationMethod.MIDPOINT_SAMPLE:
+        @cuda.jit(device = True, inline = True)
+        def getSourceIntegrationMidpoint(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+            timeSample = timeFine + 0.5*timeStepFine - timeCoarse
+            rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+            timeSample += timeCoarse
+            getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+
+        @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
+        def appendExponentiationIntegrationMidpoint(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
+            transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
+            
+            sourceSample[0, 0] = math.tau*timeStepFine*sourceSample[0, 0]
+            sourceSample[0, 1] = math.tau*timeStepFine*sourceSample[0, 1]
+            sourceSample[0, 2] = math.tau*timeStepFine*sourceSample[0, 2]
+            if dimension > 2:
+                sourceSample[0, 3] = math.tau*timeStepFine*sourceSample[0, 3]
+
+            appendExponentiation(sourceSample[0, :], timeEvolutionFine, timeEvolutionCoarse)
+
         getSourceIntegration = getSourceIntegrationMidpoint
         appendExponentiationIntegration = appendExponentiationIntegrationMidpoint
 
@@ -953,318 +962,6 @@ def getTimeEvolutionSh(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
 
         timeEvolutionCoarse[timeIndex, 1, 0] *= rotatingWaveWinding[0]
         timeEvolutionCoarse[timeIndex, 1, 1] *= rotatingWaveWinding[0]
-
-@cuda.jit(debug = cudaDebug,  max_registers = 63)
-def getTimeEvolutionSoCf4RfLi(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
-    timeStepSource, source,
-    timeEvolutionCoarse, trotterCutoff):
-    """
-    Find the stepwise time evolution opperator.
-
-    =========================== =================================== ====
-    Property                    Value                               Code
-    =========================== =================================== ====
-    Spin                        One                                 So
-    Integration method          Fourth order commutator free Magnus Cf4
-    Frame                       Rotating                            Rf
-    Source interpolation method Linear                              Li
-    Matrix exponentiator        Lie Trotter based (Spin 1)          
-    =========================== =================================== ====
-
-    Parameters
-    ----------
-    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes. In units of s.
-    timeStepFine : `float`
-        The time step used within the integration algorithm. In units of s.
-    timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
-    timeStepSource : `float`
-        The time difference between each element of `source`. In units of s.
-    source : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeSourceIndex, spacialIndex)
-        The strength of the source of the spin system. Fourth component is quadratic shift.
-    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
-        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    trotterCutoff : `int`
-        The number of squares made by the spin 1 matrix exponentiator.
-    """
-
-    # Declare variables
-    timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
-    timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
-
-    sourceSample = cuda.local.array((2, 4), dtype = nb.float64)
-    weight = cuda.local.array(2, dtype = nb.float64)
-    rotatingWaveWinding = cuda.local.array(2, dtype = nb.complex128)
-
-    # Run calculation for each coarse timestep in parallel
-    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    if timeIndex < timeCoarse.size:
-        timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
-        timeFine = timeCoarse[timeIndex]
-
-        # Initialise time evolution operator to 1
-        utilities.spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
-        timeSample = timeCoarse[timeIndex] + timeStepCoarse/2
-        utilities.interpolateSourceLinear(source, timeSample, timeStepSource, sourceSample[0, :])
-        rotatingWave = math.tau*sourceSample[0, 2]
-
-        # For every fine step
-        for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
-            for timeSampleIndex in range(2):
-                # 2nd order quadrature => Sample at +- 1/sqrt(3)
-                timeSample = ((timeFine + 0.5*timeStepFine*(1 + (2*timeSampleIndex - 1)/sqrt3)) - timeCoarse[timeIndex])
-                rotatingWaveWinding[timeSampleIndex] = math.cos(rotatingWave*timeSample) + 1j*math.sin(rotatingWave*timeSample)
-
-                timeSample = (timeSample + timeCoarse[timeIndex])
-                utilities.interpolateSourceLinear(source, timeSample, timeStepSource, sourceSample[timeSampleIndex, :])
-                            
-            for exponentialIndex in range(-1, 2, 2):
-                weight[0] = (1.5 - exponentialIndex*sqrt3)/6
-                weight[1] = (1.5 + exponentialIndex*sqrt3)/6
-
-                X = math.tau*timeStepFine*(weight[0]*(sourceSample[0, 0] + 1j*sourceSample[0, 1])/rotatingWaveWinding[0] + weight[1]*(sourceSample[1, 0] + 1j*sourceSample[1, 1])/rotatingWaveWinding[1])
-                z = math.tau*timeStepFine*(weight[0]*(sourceSample[0, 2] - rotatingWave/math.tau) + weight[1]*(sourceSample[1, 2] - rotatingWave/math.tau))
-                q = math.tau*timeStepFine*(weight[0]*sourceSample[0, 3] + weight[1]*sourceSample[1, 3])
-
-                # Calculate the exponential from the expansion
-                utilities.spinOne.matrixExponentialLieTrotter(X.real, X.imag, z, q, timeEvolutionFine, trotterCutoff)
-
-                # Premultiply to the exitsing time evolution operator
-                utilities.spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-                utilities.spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
-
-            timeFine += timeStepFine
-
-        # Take out of rotating frame
-        rotatingWaveWinding[0] = math.cos(rotatingWave*timeStepCoarse) + 1j*math.sin(rotatingWave*timeStepCoarse)
-
-        timeEvolutionCoarse[timeIndex, 0, 0] /= rotatingWaveWinding[0]
-        timeEvolutionCoarse[timeIndex, 0, 1] /= rotatingWaveWinding[0]
-        timeEvolutionCoarse[timeIndex, 0, 2] /= rotatingWaveWinding[0]
-
-        timeEvolutionCoarse[timeIndex, 2, 0] *= rotatingWaveWinding[0]
-        timeEvolutionCoarse[timeIndex, 2, 1] *= rotatingWaveWinding[0]
-        timeEvolutionCoarse[timeIndex, 2, 2] *= rotatingWaveWinding[0]
-
-@cuda.jit(debug = cudaDebug,  max_registers = 95)
-def getTimeEvolutionSoCf4LfCi(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
-    timeStepSource, source,
-    timeEvolutionCoarse, trotterCutoff):
-    """
-    Find the stepwise time evolution opperator.
-
-    =========================== =================================== ====
-    Property                    Value                               Code
-    =========================== =================================== ====
-    Spin                        One                                 So
-    Integration method          Fourth order commutator free Magnus Cf4
-    Frame                       Lab                                 Lf
-    Source interpolation method Cubic (Catmull-Rom)                 Ci
-    Matrix exponentiator        Lie Trotter based (Spin 1)          
-    =========================== =================================== ====
-    
-    Parameters
-    ----------
-    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes. In units of s.
-    timeStepFine : `float`
-        The time step used within the integration algorithm. In units of s.
-    timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
-    timeStepSource : `float`
-        The time difference between each element of `source`. In units of s.
-    source : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeSourceIndex, spacialIndex)
-        The strength of the source of the spin system. Fourth component is quadratic shift.
-    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
-        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    trotterCutoff : `int`
-        The number of squares made by the spin 1 matrix exponentiator.
-    """
-
-    # Declare variables
-    timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
-    timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
-    sourceSample = cuda.local.array((2, 4), dtype = nb.float64)
-    weight = cuda.local.array(2, dtype = nb.float64)
-
-    # Run calculation for each coarse timestep in parallel
-    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    if timeIndex < timeCoarse.size:
-        timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
-        timeFine = timeCoarse[timeIndex]
-
-        # Initialise time evolution operator to 1
-        utilities.spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
-
-        # For every fine step
-        for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
-            for timeSampleIndex in range(2):
-                # 2nd order quadrature => Sample at +- 1/sqrt(3)
-                timeSample = ((timeFine + 0.5*timeStepFine*(1 + (2*timeSampleIndex - 1)/sqrt3)))
-                utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample[timeSampleIndex, :])
-                            
-            for exponentialIndex in range(-1, 2, 2):
-                weight[0] = (1.5 - exponentialIndex*sqrt3)/6
-                weight[1] = (1.5 + exponentialIndex*sqrt3)/6
-
-                X = math.tau*timeStepFine*(weight[0]*(sourceSample[0, 0] + 1j*sourceSample[0, 1]) + weight[1]*(sourceSample[1, 0] + 1j*sourceSample[1, 1]))
-                z = math.tau*timeStepFine*(weight[0]*(sourceSample[0, 2]) + weight[1]*(sourceSample[1, 2]))
-                q = math.tau*timeStepFine*(weight[0]*sourceSample[0, 3] + weight[1]*sourceSample[1, 3])
-
-                # Calculate the exponential from the expansion
-                utilities.spinOne.matrixExponentialLieTrotter(X.real, X.imag, z, q, timeEvolutionFine, trotterCutoff)
-
-                # Premultiply to the exitsing time evolution operator
-                utilities.spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-                utilities.spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
-
-            timeFine += timeStepFine
-
-@cuda.jit(debug = cudaDebug,  max_registers = 95)
-def getTimeEvolutionSoHaLfCi(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
-    timeStepSource, source,
-    timeEvolutionCoarse, trotterCutoff):
-    """
-    Find the stepwise time evolution opperator.
-
-    =========================== =================================== ====
-    Property                    Value                               Code
-    =========================== =================================== ====
-    Spin                        One                                 So
-    Integration method          Halfstep sample at edge of interval Ha
-    Frame                       Lab                                 Lf
-    Source interpolation method Cubic (Catmull-Rom)                 Ci
-    Matrix exponentiator        Lie Trotter based (Spin 1)          
-    =========================== =================================== ====
-
-    The same sampling as used in the previous cython code.
-
-    Parameters
-    ----------
-    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes. In units of s.
-    timeStepFine : `float`
-        The time step used within the integration algorithm. In units of s.
-    timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
-    timeStepSource : `float`
-        The time difference between each element of `source`. In units of s.
-    source : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeSourceIndex, spacialIndex)
-        The strength of the source of the spin system. Fourth component is quadratic shift.
-    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
-        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    trotterCutoff : `int`
-        The number of squares made by the spin 1 matrix exponentiator.
-    """
-
-    # Declare variables
-    timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
-    timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
-    sourceSample = cuda.local.array(4, dtype = nb.float64)
-
-    # Run calculation for each coarse timestep in parallel
-    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    if timeIndex < timeCoarse.size:
-        timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
-        timeFine = timeCoarse[timeIndex]
-
-        # Initialise time evolution operator to 1
-        utilities.spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
-
-        # For every fine step
-        for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
-            for timeSampleIndex in range(2):
-                timeSample = timeFine + timeSampleIndex*timeStepFine
-                utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample)
-
-                X = 0.5*math.tau*timeStepFine*(sourceSample[0] + 1j*sourceSample[1])
-                z = 0.5*math.tau*timeStepFine*sourceSample[2]
-                q = 0.5*math.tau*timeStepFine*sourceSample[3]
-
-                # Calculate the exponential from the expansion
-                utilities.spinOne.matrixExponentialLieTrotter(X.real, X.imag, z, q, timeEvolutionFine, trotterCutoff)
-
-                # Premultiply to the exitsing time evolution operator
-                utilities.spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-                utilities.spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
-
-            timeFine += timeStepFine
-
-@cuda.jit(debug = cudaDebug,  max_registers = 95)
-def getTimeEvolutionSoMsLfCi(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
-    timeStepSource, source,
-    timeEvolutionCoarse, trotterCutoff):
-    """
-    Find the stepwise time evolution opperator.
-
-    =========================== =================================== ====
-    Property                    Value                               Code
-    =========================== =================================== ====
-    Spin                        One                                 So
-    Integration method          Single midpoint sample              Ms
-    Frame                       Lab                                 Lf
-    Source interpolation method Cubic (Catmull-Rom)                 Ci
-    Matrix exponentiator        Lie Trotter based (Spin 1)          
-    =========================== =================================== ====
-
-    Parameters
-    ----------
-    timeCoarse : :class:`numpy.ndarray` of :class:`numpy.double` (timeIndex)
-        A coarse grained list of time samples that the time evolution operator is found for. In units of s. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    timeEndPoints : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
-        The time values for when the experiment is to start and finishes. In units of s.
-    timeStepFine : `float`
-        The time step used within the integration algorithm. In units of s.
-    timeStepCoarse : `float`
-        The time difference between each element of `timeCoarse`. In units of s. Determines the sample rate of the outputs `timeCoarse` and `timeEvolutionCoarse`.
-    timeStepSource : `float`
-        The time difference between each element of `source`. In units of s.
-    source : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeSourceIndex, spacialIndex)
-        The strength of the source of the spin system. Fourth component is quadratic shift.
-    timeEvolutionCoarse : :class:`numpy.ndarray` of :class:`numpy.cdouble` (timeIndex, braStateIndex, ketStateIndex)
-        Time evolution operator (matrix) between the current and next timesteps, for each time sampled. See :math:`U(t)` in :ref:`overviewOfSimulationMethod`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    trotterCutoff : `int`
-        The number of squares made by the spin 1 matrix exponentiator.
-    """
-
-    # Declare variables
-    timeEvolutionFine = cuda.local.array((3, 3), dtype = nb.complex128)
-    timeEvolutionOld = cuda.local.array((3, 3), dtype = nb.complex128)
-    sourceSample = cuda.local.array(3, dtype = nb.float64)
-
-    # Run calculation for each coarse timestep in parallel
-    timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    if timeIndex < timeCoarse.size:
-        timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
-        timeFine = timeCoarse[timeIndex]
-
-        # Initialise time evolution operator to 1
-        utilities.spinOne.setToOne(timeEvolutionCoarse[timeIndex, :])
-
-        # For every fine step
-        for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
-            timeSample = timeFine
-            utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample)
-
-            X = math.tau*timeStepFine*(sourceSample[0] + 1j*sourceSample[1])
-            z = math.tau*timeStepFine*sourceSample[2]
-            q = math.tau*timeStepFine*sourceSample[3]
-
-            # Calculate the exponential from the expansion
-            utilities.spinOne.matrixExponentialLieTrotter(X.real, X.imag, z, q, timeEvolutionFine, trotterCutoff)
-
-            # Premultiply to the exitsing time evolution operator
-            utilities.spinOne.setTo(timeEvolutionCoarse[timeIndex, :], timeEvolutionOld)
-            utilities.spinOne.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse[timeIndex, :])
-
-            timeFine += timeStepFine
 
 @nb.jit(nopython = True)
 def getState(stateInit, state, timeEvolution):
