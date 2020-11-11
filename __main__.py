@@ -78,7 +78,7 @@ if __name__ == "__main__":
         # frequency = np.arange(50, 3051, 3)
         frequency = np.arange(1000, 1003, 1)
         simulationManager = spinsim.simulationManager.SimulationManager(signal, frequency, archive, stateProperties)
-        simulationManager.evaluate(False, False)
+        simulationManager.evaluate(True, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)
         experimentResults = spinsim.experimentResults.ExperimentResults.newFromSimulationManager(simulationManager)
         experimentResults.writeToArchive(archive)

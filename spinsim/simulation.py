@@ -54,7 +54,7 @@ import numba as nb
 import time as tm
 from testSignal import *
 from . import simulationUtilities as utilities
-from enum import Enum
+from enum import Enum, auto
 
 #===============================================================#
 
@@ -271,17 +271,19 @@ class SpinQuantumNumber(Enum):
         What to write in the HDF5 archive file.
     """
 
-    def __init__(self, value, label):
+    def __init__(self, value, dimension, utilitySet, label):
         super().__init__()
         self._value_ = value
+        self.dimension = dimension
+        self.utilitySet = utilitySet
         self.label = label
 
-    HALF = (2, "half")
+    HALF = (1/2, 2, utilities.spinHalf, "half")
     """
     For two level systems.
     """
 
-    ONE = (3, "one")
+    ONE = (1, 3, utilities.spinOne, "one")
     """
     For three level systems.
     """
@@ -352,8 +354,8 @@ class SimulationResults:
         stateProperties : :class:`StateProperties`
             Defines the hilbert space dimension for the simulation results.
         """
-        self.timeEvolution = np.empty([signal.timeProperties.timeIndexMax, stateProperties.spinQuantumNumber.value, stateProperties.spinQuantumNumber.value], np.cdouble)
-        self.state = np.empty([signal.timeProperties.timeIndexMax, stateProperties.spinQuantumNumber.value], np.cdouble)
+        self.timeEvolution = np.empty([signal.timeProperties.timeIndexMax, stateProperties.spinQuantumNumber.dimension, stateProperties.spinQuantumNumber.dimension], np.cdouble)
+        self.state = np.empty([signal.timeProperties.timeIndexMax, stateProperties.spinQuantumNumber.dimension], np.cdouble)
         self.spin = np.empty([signal.timeProperties.timeIndexMax, 3], np.double)
         self.sensedFrequencyAmplitude = 0.0
         self.sensedFrequencyAmplitudeMethod = "none"
@@ -429,11 +431,14 @@ class Simulation:
         self.simulationResults.timeEvolution = cuda.device_array_like(self.simulationResults.timeEvolution)
         self.signal.timeProperties.timeCoarse = cuda.device_array_like(self.signal.timeProperties.timeCoarse)
 
-        if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.ONE:
-            getTimeEvolutionSo[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
+        getTimeEvolution = timeEvolverFactory(self.stateProperties.spinQuantumNumber)
+        getTimeEvolution[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution)
 
-        elif self.stateProperties.spinQuantumNumber == SpinQuantumNumber.HALF:
-            getTimeEvolutionSh[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
+        # if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.ONE:
+        #     getTimeEvolutionSo[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
+
+        # elif self.stateProperties.spinQuantumNumber == SpinQuantumNumber.HALF:
+        #     getTimeEvolutionSh[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
 
         self.simulationResults.timeEvolution = self.simulationResults.timeEvolution.copy_to_host()
         self.signal.timeProperties.timeCoarse = self.signal.timeProperties.timeCoarse.copy_to_host()
@@ -512,6 +517,255 @@ class Simulation:
         self.sourceProperties.writeToFile(archive)
         self.stateProperties.writeToFile(archive)
         self.simulationResults.writeToFile(archive, doWriteEverything)
+
+class IntegrationMethod(Enum):
+    def __init__(self, value, description):
+        super().__init__()
+        self._value_ = value
+        self.description = description
+
+    MAGNUS_CF_4 = ("magnusCF4", "Commutator free fourth order Magnus based")
+    """
+    Commutator free fourth order Magnus based.
+    """
+
+    MIDPOINT_SAMPLE = ("midpointSample", "Single sample")
+    """
+    Naive integration method.
+    """
+
+    HALF_STEP = ("halfStep", "Naive double sample")
+    """
+    Integration method from AtomicPy.
+    """
+
+class ExponentiationMethod(Enum):
+    def __init__(self, value, index):
+        super().__init__()
+        self._value_ = value
+        self.index = index
+
+    ANALYTIC = ("lieTrotter", 0)
+    """
+    Analytic expression for spin half systems only.
+    """
+
+    LIE_TROTTER = ("lieTrotter", 1)
+    """
+    Approximation using the Lie Trotter theorem.
+    """
+
+def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMethod = IntegrationMethod.MAGNUS_CF_4, exponentiationMethod = ExponentiationMethod.LIE_TROTTER, trotterCutoff = 28):
+    """
+    Makes a time evolver just for you.
+    """
+    dimension = spinQuantumNumber.dimension
+    lieDimension = dimension + 1
+    utilitySet = spinQuantumNumber.utilitySet
+
+    if integrationMethod == IntegrationMethod.MAGNUS_CF_4:
+        sampleIndexMax = 3
+    elif integrationMethod == IntegrationMethod.HALF_STEP:
+        sampleIndexMax = 3
+    elif integrationMethod == IntegrationMethod.MIDPOINT_SAMPLE:
+        sampleIndexMax = 1
+    sampleIndexEnd = sampleIndexMax - 1
+
+    exponentiationMethodIndex = exponentiationMethod.index
+    if exponentiationMethod == ExponentiationMethod.ANALYTIC and spinQuantumNumber != SpinQuantumNumber.HALF:
+        print("\033[31mspinsim warning!!!\nAttempting to use an analytic exponentiation method outside of spin half. Switching to a Lie Trotter method.\033[0m")
+        exponentiationMethod = ExponentiationMethod.LIE_TROTTER
+        exponentiationMethodIndex = 1
+
+    @cuda.jit(device = True, inline = True)
+    def appendExponentiation(sourceSample, timeEvolutionFine, timeEvolutionCoarse):
+        timeEvolutionOld = cuda.local.array((dimension, dimension), dtype = nb.complex128)
+
+        # Calculate the exponential
+        if exponentiationMethodIndex == 1:
+            utilitySet.matrixExponentialLieTrotter(sourceSample, timeEvolutionFine, trotterCutoff)
+        elif exponentiationMethodIndex == 0:
+            utilities.spinHalf.matrixExponentialAnalytic(sourceSample, timeEvolutionFine)
+
+        # Premultiply to the exitsing time evolution operator
+        utilitySet.setTo(timeEvolutionCoarse, timeEvolutionOld)
+        utilitySet.matrixMultiply(timeEvolutionFine, timeEvolutionOld, timeEvolutionCoarse)
+
+    @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
+    def transformFrameSpinOneRotating(sourceSample, rotatingWave, rotatingWaveWinding):
+        X = (sourceSample[0] + 1j*sourceSample[1])/rotatingWaveWinding
+        sourceSample[0] = X.real
+        sourceSample[1] = X.imag
+        sourceSample[2] = sourceSample[2] - rotatingWave
+
+    @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
+    def transformFrameSpinHalfRotating(sourceSample, rotatingWave, rotatingWaveWinding):
+        X = (sourceSample[0] + 1j*sourceSample[1])/(rotatingWaveWinding**2)
+        sourceSample[0] = X.real
+        sourceSample[1] = X.imag
+        sourceSample[2] = sourceSample[2] - 2*rotatingWave
+
+    @cuda.jit("(float64[:], float64, complex128)", device = True, inline = True)
+    def transformFrameLab(sourceSample, rotatingWave, rotatingWaveWinding):
+        return
+
+    if useRotatingFrame:
+        if dimension == 3:
+            transformFrame = transformFrameSpinOneRotating
+        else:
+            transformFrame = transformFrameSpinHalfRotating
+    else:
+        transformFrame = transformFrameLab
+
+    @cuda.jit(device = True, inline = True)
+    def getSource(timeSample, source, timeStepSource, sourceSample):
+        utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample)
+
+    @cuda.jit(device = True, inline = True)
+    def getSourceIntegrationMagnusCF4(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+        timeSample = ((timeFine + 0.5*timeStepFine*(1 - 1/sqrt3)) - timeCoarse)
+        rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+        timeSample += timeCoarse
+        getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+
+        timeSample = ((timeFine + 0.5*timeStepFine*(1 + 1/sqrt3)) - timeCoarse)
+        rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+        timeSample += timeCoarse
+        getSource(timeSample, source, timeStepSource, sourceSample[1, :])
+
+    @cuda.jit(device = True, inline = True)
+    def getSourceIntegrationHalfStep(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+        timeSample = timeFine - timeCoarse
+        rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+        timeSample += timeCoarse
+        getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+
+        timeSample = timeFine + timeStepFine - timeCoarse
+        rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+        timeSample += timeCoarse
+        getSource(timeSample, source, timeStepSource, sourceSample[1, :])
+
+    @cuda.jit(device = True, inline = True)
+    def getSourceIntegrationMidpoint(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+        timeSample = timeFine + 0.5*timeStepFine - timeCoarse
+        rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
+        timeSample += timeCoarse
+        getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+
+    @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
+    def appendExponentiationIntegrationMagnusCF4(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
+        transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
+        transformFrame(sourceSample[1, :], rotatingWave, rotatingWaveWinding[1])
+
+        w0 = (1.5 + sqrt3)/6
+        w1 = (1.5 - sqrt3)/6
+        
+        sourceSample[2, 0] = math.tau*timeStepFine*(w0*sourceSample[0, 0] + w1*sourceSample[1, 0])
+        sourceSample[2, 1] = math.tau*timeStepFine*(w0*sourceSample[0, 1] + w1*sourceSample[1, 1])
+        sourceSample[2, 2] = math.tau*timeStepFine*(w0*sourceSample[0, 2] + w1*sourceSample[1, 2])
+        if dimension > 2:
+            sourceSample[2, 3] = math.tau*timeStepFine*(w0*sourceSample[0, 3] + w1*sourceSample[1, 3])
+
+        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
+        sourceSample[2, 0] = math.tau*timeStepFine*(w1*sourceSample[0, 0] + w0*sourceSample[1, 0])
+        sourceSample[2, 1] = math.tau*timeStepFine*(w1*sourceSample[0, 1] + w0*sourceSample[1, 1])
+        sourceSample[2, 2] = math.tau*timeStepFine*(w1*sourceSample[0, 2] + w0*sourceSample[1, 2])
+        if dimension > 2:
+            sourceSample[2, 3] = math.tau*timeStepFine*(w1*sourceSample[0, 3] + w0*sourceSample[1, 3])
+
+        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
+    @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
+    def appendExponentiationIntegrationHalfStep(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
+        transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
+        transformFrame(sourceSample[1, :], rotatingWave, rotatingWaveWinding[1])
+        
+        sourceSample[2, 0] = math.tau*timeStepFine*sourceSample[0, 0]/2
+        sourceSample[2, 1] = math.tau*timeStepFine*sourceSample[0, 1]/2
+        sourceSample[2, 2] = math.tau*timeStepFine*sourceSample[0, 2]/2
+        if dimension > 2:
+            sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[0, 3]/2
+
+        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
+        sourceSample[2, 0] = math.tau*timeStepFine*sourceSample[1, 0]/2
+        sourceSample[2, 1] = math.tau*timeStepFine*sourceSample[1, 1]/2
+        sourceSample[2, 2] = math.tau*timeStepFine*sourceSample[1, 2]/2
+        if dimension > 2:
+            sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[1, 3]/2
+
+        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+
+    @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
+    def appendExponentiationIntegrationMidpoint(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
+        transformFrame(sourceSample[0, :], rotatingWave, rotatingWaveWinding[0])
+        
+        sourceSample[0, 0] = math.tau*timeStepFine*sourceSample[0, 0]
+        sourceSample[0, 1] = math.tau*timeStepFine*sourceSample[0, 1]
+        sourceSample[0, 2] = math.tau*timeStepFine*sourceSample[0, 2]
+        if dimension > 2:
+            sourceSample[0, 3] = math.tau*timeStepFine*sourceSample[0, 3]
+
+        appendExponentiation(sourceSample[0, :], timeEvolutionFine, timeEvolutionCoarse)
+
+    if integrationMethod == IntegrationMethod.MAGNUS_CF_4:
+        getSourceIntegration = getSourceIntegrationMagnusCF4
+        appendExponentiationIntegration = appendExponentiationIntegrationMagnusCF4
+    elif integrationMethod == IntegrationMethod.HALF_STEP:
+        getSourceIntegration = getSourceIntegrationHalfStep
+        appendExponentiationIntegration = appendExponentiationIntegrationHalfStep
+    elif integrationMethod == IntegrationMethod.MIDPOINT_SAMPLE:
+        getSourceIntegration = getSourceIntegrationMidpoint
+        appendExponentiationIntegration = appendExponentiationIntegrationMidpoint
+
+    @cuda.jit(debug = False,  max_registers = 63)
+    def getTimeEvolution(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
+        timeStepSource, source,
+        timeEvolutionCoarse):
+        # Declare variables
+        timeEvolutionFine = cuda.local.array((dimension, dimension), dtype = nb.complex128)
+
+        sourceSample = cuda.local.array((sampleIndexMax, lieDimension), dtype = nb.float64)
+        rotatingWaveWinding = cuda.local.array(sampleIndexEnd, dtype = nb.complex128)
+
+        # Run calculation for each coarse timestep in parallel
+        timeIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+        if timeIndex < timeCoarse.size:
+            timeCoarse[timeIndex] = timeEndPoints[0] + timeStepCoarse*timeIndex
+            timeFine = timeCoarse[timeIndex]
+
+            # Initialise time evolution operator to 1
+            utilitySet.setToOne(timeEvolutionCoarse[timeIndex, :])
+            sourceSample[0, 2] = 0
+            if useRotatingFrame:
+                timeSample = timeCoarse[timeIndex] + timeStepCoarse/2
+                getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+            rotatingWave = sourceSample[0, 2]
+
+            # For every fine step
+            for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
+                getSourceIntegration(timeFine, timeCoarse[timeIndex], timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource)
+                appendExponentiationIntegration(timeEvolutionFine, timeEvolutionCoarse[timeIndex, :], sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding)
+
+                timeFine += timeStepFine
+
+            if useRotatingFrame:
+                # Take out of rotating frame
+                rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeStepCoarse) + 1j*math.sin(math.tau*rotatingWave*timeStepCoarse)
+
+                timeEvolutionCoarse[timeIndex, 0, 0] /= rotatingWaveWinding[0]
+                timeEvolutionCoarse[timeIndex, 0, 1] /= rotatingWaveWinding[0]
+                if dimension > 2:
+                    timeEvolutionCoarse[timeIndex, 0, 2] /= rotatingWaveWinding[0]
+
+                    timeEvolutionCoarse[timeIndex, 2, 0] *= rotatingWaveWinding[0]
+                    timeEvolutionCoarse[timeIndex, 2, 1] *= rotatingWaveWinding[0]
+                    timeEvolutionCoarse[timeIndex, 2, 2] *= rotatingWaveWinding[0]
+                else:
+                    timeEvolutionCoarse[timeIndex, 1, 0] *= rotatingWaveWinding[0]
+                    timeEvolutionCoarse[timeIndex, 1, 1] *= rotatingWaveWinding[0]
+    return getTimeEvolution
 
 @cuda.jit(debug = cudaDebug,  max_registers = 63)
 def getTimeEvolutionSo(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,

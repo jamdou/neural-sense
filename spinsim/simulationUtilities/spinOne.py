@@ -16,85 +16,7 @@ machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors ar
 # trotterCutoff = 52
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialAnalytic(exponent, result):
-    """
-    Calculates a :math:`su(2)` matrix exponential based on its analytic form.
-
-    Assumes the exponent is an imaginary  linear combination of :math:`su(2)`, being,
-
-    .. math::
-        \\begin{align*}
-            A &= -i(x F_x + y F_y + z F_z),
-        \\end{align*}
-    
-    with
-
-    .. math::
-        \\begin{align*}
-            F_x &= \\frac{1}{2}\\begin{pmatrix}
-                0 & 1 \\\\
-                1 & 0
-            \\end{pmatrix},&
-            F_y &= \\frac{1}{2}\\begin{pmatrix}
-                0 & -i \\\\
-                i &  0
-            \\end{pmatrix},&
-            F_z &= \\frac{1}{2}\\begin{pmatrix}
-                1 &  0  \\\\
-                0 & -1 
-            \\end{pmatrix}
-        \\end{align*}
-
-    Then the exponential can be calculated as
-
-    .. math::
-        \\begin{align*}
-            \\exp(A) &= \\exp(-ix F_x - iy F_y - iz F_z)\\\\
-            &= \\begin{pmatrix}
-                \\cos(\\frac{r}{2}) - i\\frac{z}{r}\\sin(\\frac{r}{2}) & -\\frac{y + ix}{r}\\sin(\\frac{r}{2})\\\\
-                 \\frac{y - ix}{r}\\sin(\\frac{r}{2}) & \\cos(\\frac{r}{2}) + i\\frac{z}{r}\\sin(\\frac{r}{2})
-            \\end{pmatrix}
-        \\end{align*}
-
-    with :math:`r = \\sqrt{x^2 + y^2 + z^2}`.
-
-    Parameters
-    ----------
-    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
-        The matrix to take the exponential of.
-        
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
-        The matrix which the result of the exponentiation is to be written to.
-    """
-
-    x = (1j*exponent[1, 0]).real*2
-    y = (1j*exponent[1, 0]).imag*2
-    z = (1j*exponent[0, 0]).real*2
-
-    r = math.sqrt(x**2 + y**2 + z**2)
-
-    # print(x, y, z, r, exponent[1, 0].real, exponent[1, 0].imag)
-
-    if r > 0:
-        x /= r
-        y /= r
-        z /= r
-
-        c = math.cos(r/2)
-        s = math.sin(r/2)
-
-        result[0, 0] = c - 1j*z*s
-        result[1, 0] = (y - 1j*x)*s
-        result[0, 1] = -(y + 1j*x)*s
-        result[1, 1] = c + 1j*z*s
-    else:
-        result[0, 0] = 1
-        result[1, 0] = 0
-        result[0, 1] = 0
-        result[1, 1] = 1
-
-@cuda.jit(device = True, inline = True)
-def matrixExponentialLieTrotter(x, y, z, q, result, trotterCutoff):
+def matrixExponentialLieTrotter(sourceSample, result, trotterCutoff):
     """
     Calculates a matrix exponential based on the Lie Product Formula,
 
@@ -181,10 +103,10 @@ def matrixExponentialLieTrotter(x, y, z, q, result, trotterCutoff):
         hyperCubeAmount = 0
     precision = 4**hyperCubeAmount
     
-    x /= precision
-    y /= precision
-    z /= precision
-    q /= precision
+    x = sourceSample[0]/precision
+    y = sourceSample[1]/precision
+    z = sourceSample[2]/precision
+    q = sourceSample[3]/precision
 
     cx = math.cos(x)
     sx = math.sin(x)

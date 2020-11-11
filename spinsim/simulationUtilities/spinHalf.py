@@ -16,7 +16,7 @@ machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors ar
 # trotterCutoff = 52
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialAnalytic(x, y, z, result):
+def matrixExponentialAnalytic(sourceSample, result):
     """
     Calculates a :math:`su(2)` matrix exponential based on its analytic form.
 
@@ -66,6 +66,9 @@ def matrixExponentialAnalytic(x, y, z, result):
     result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
         The matrix which the result of the exponentiation is to be written to.
     """
+    x = sourceSample[0]
+    y = sourceSample[1]
+    z = sourceSample[2]
 
     r = math.sqrt(x**2 + y**2 + z**2)
 
@@ -88,7 +91,7 @@ def matrixExponentialAnalytic(x, y, z, result):
         result[1, 1] = 1
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialLieTrotter(x, y, z, result, trotterCutoff):
+def matrixExponentialLieTrotter(sourceSample, result, trotterCutoff):
     """
     Calculates a matrix exponential based on the Lie Product Formula,
 
@@ -175,9 +178,9 @@ def matrixExponentialLieTrotter(x, y, z, result, trotterCutoff):
         hyperCubeAmount = 0
     precision = 4**hyperCubeAmount
     
-    x /= 2*precision
-    y /= 2*precision
-    z /= 2*precision
+    x = sourceSample[0]/(2*precision)
+    y = sourceSample[1]/(2*precision)
+    z = sourceSample[2]/(2*precision)
 
     cx = math.cos(x)
     sx = math.sin(x)
