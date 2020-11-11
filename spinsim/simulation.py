@@ -700,7 +700,7 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
             if dimension > 2:
                 sourceSample[2, 3] = math.tau*timeStepFine*sourceSample[1, 3]/2
 
-        appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
+            appendExponentiation(sourceSample[2, :], timeEvolutionFine, timeEvolutionCoarse)
 
         getSourceIntegration = getSourceIntegrationHalfStep
         appendExponentiationIntegration = appendExponentiationIntegrationHalfStep
