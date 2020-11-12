@@ -75,8 +75,8 @@ if __name__ == "__main__":
         # newBenchmarkTrotterCutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
         # Run simulations
-        # frequency = np.arange(50, 3051, 3)
-        frequency = np.arange(1000, 1003, 1)
+        frequency = np.arange(50, 3051, 3)
+        # frequency = np.arange(1000, 1003, 1)
         simulationManager = spinsim.simulationManager.SimulationManager(signal, frequency, archive, stateProperties)
         simulationManager.evaluate(False, False)
         # experimentResults = ExperimentResults(simulationManager.frequency, simulationManager.frequencyAmplitude)

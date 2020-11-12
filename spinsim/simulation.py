@@ -99,7 +99,7 @@ class SourceProperties:
     sourceType : :class:`numpy.ndarray` of :class:`numpy.double`, (sourceIndex)
         A string description of what source sourceIndex physically represents. Mainly for archive purposes.
     """
-    def __init__(self, signal, stateProperties, dressingRabiFrequency = 1000.0, quadraticShift = 0.0):
+    def __init__(self, signal, stateProperties, dressingRabiFrequency = 1000.0, quadraticShift = 0.0, amplitudeStep = 1.0):
         """
         Parameters
         ----------
@@ -118,6 +118,7 @@ class SourceProperties:
         self.sourceTimeEndPoints = np.empty([0, 2], np.double)
         self.sourceType = np.empty([0], object)
         self.sourceQuadraticShift = quadraticShift
+        self.sourceAmplitudeStep = amplitudeStep
 
         # Construct the signal from the dressing information and pulse description.
         if signal:
@@ -128,12 +129,14 @@ class SourceProperties:
             for sinusoidalNoise in signal.sinusoidalNoises:
                 self.addSinusoidalNoise(sinusoidalNoise)
 
-        timeSourceIndexMax = int((signal.timeProperties.timeEndPoints[1] - signal.timeProperties.timeEndPoints[0])/signal.timeProperties.timeStepSource)
-        self.source = cuda.device_array((timeSourceIndexMax, 4), dtype = np.double)
+        self.evaluateDressing = dressingEvaluatorFactory(signal.timeProperties.timeStepSource, self.sourceIndexMax, self.sourceAmplitude, self.sourceFrequency, self.sourcePhase, self.sourceTimeEndPoints, self.sourceQuadraticShift, self.sourceAmplitudeStep)
 
-        threadsPerBlock = 64
-        blocksPerGrid = (timeSourceIndexMax + (threadsPerBlock - 1)) // threadsPerBlock
-        evaluateDressing[blocksPerGrid, threadsPerBlock](signal.timeProperties.timeStepSource, self.sourceIndexMax, cuda.to_device(self.sourceAmplitude), cuda.to_device(self.sourceFrequency), cuda.to_device(self.sourcePhase), cuda.to_device(self.sourceTimeEndPoints), self.sourceQuadraticShift, self.source)
+        # timeSourceIndexMax = int((signal.timeProperties.timeEndPoints[1] - signal.timeProperties.timeEndPoints[0])/signal.timeProperties.timeStepSource)
+        # self.source = cuda.device_array((timeSourceIndexMax, 4), dtype = np.double)
+
+        # threadsPerBlock = 64
+        # blocksPerGrid = (timeSourceIndexMax + (threadsPerBlock - 1)) // threadsPerBlock
+        # evaluateDressing[blocksPerGrid, threadsPerBlock](signal.timeProperties.timeStepSource, self.sourceIndexMax, cuda.to_device(self.sourceAmplitude), cuda.to_device(self.sourceFrequency), cuda.to_device(self.sourcePhase), cuda.to_device(self.sourceTimeEndPoints), self.sourceQuadraticShift, self.source)
 
     def writeToFile(self, archive):
         """
@@ -396,7 +399,7 @@ class Simulation:
     trotterCutoff : `int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal, dressingRabiFrequency = 1e3, stateProperties = None, trotterCutoff = 28):
+    def __init__(self, signal, dressingRabiFrequency = 1e3, amplitudeStep = 1.0, stateProperties = None, trotterCutoff = 28):
         """
         Parameters
         ----------
@@ -413,13 +416,13 @@ class Simulation:
         self.stateProperties = stateProperties
         if not self.stateProperties:
             self.stateProperties = StateProperties()
-        self.sourceProperties = SourceProperties(self.signal, self.stateProperties, dressingRabiFrequency)
+        self.sourceProperties = SourceProperties(self.signal, self.stateProperties, dressingRabiFrequency, 0.0, amplitudeStep)
         self.simulationResults = SimulationResults(self.signal, self.stateProperties)
         self.trotterCutoff = trotterCutoff
 
-        self.evaluate()
+        self.getTimeEvolution = timeEvolverFactory(self.sourceProperties.evaluateDressing, self.stateProperties.spinQuantumNumber)
 
-    def evaluate(self):
+    def evaluate(self, simulationIndex):
         """
         Time evolves the system, and finds the spin at each coarse time step.
         """
@@ -431,15 +434,13 @@ class Simulation:
         self.simulationResults.timeEvolution = cuda.device_array_like(self.simulationResults.timeEvolution)
         self.signal.timeProperties.timeCoarse = cuda.device_array_like(self.signal.timeProperties.timeCoarse)
 
-        getTimeEvolution = timeEvolverFactory(self.stateProperties.spinQuantumNumber)
+        self.getTimeEvolution[blocksPerGrid, threadsPerBlock](simulationIndex, self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.simulationResults.timeEvolution)
 
-        getTimeEvolution[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution)
-
-        executionTimeEndPoints = np.empty(2)
-        executionTimeEndPoints[0] = tm.time()
-        getTimeEvolution[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution)
-        executionTimeEndPoints[1] = tm.time() - executionTimeEndPoints[0]
-        print(executionTimeEndPoints[1])
+        # executionTimeEndPoints = np.empty(2)
+        # executionTimeEndPoints[0] = tm.time()
+        # getTimeEvolution[blocksPerGrid, threadsPerBlock](0, self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.simulationResults.timeEvolution)
+        # executionTimeEndPoints[1] = tm.time() - executionTimeEndPoints[0]
+        # print(executionTimeEndPoints[1])
 
         # if self.stateProperties.spinQuantumNumber == SpinQuantumNumber.ONE:
         #     getTimeEvolutionSo[blocksPerGrid, threadsPerBlock](self.signal.timeProperties.timeCoarse, cuda.to_device(self.signal.timeProperties.timeEndPoints), self.signal.timeProperties.timeStepFine, self.signal.timeProperties.timeStepCoarse, self.signal.timeProperties.timeStepSource, cuda.to_device(self.sourceProperties.source), self.simulationResults.timeEvolution, self.trotterCutoff)
@@ -552,7 +553,7 @@ class ExponentiationMethod(Enum):
         self._value_ = value
         self.index = index
 
-    ANALYTIC = ("lieTrotter", 0)
+    ANALYTIC = ("analytic", 0)
     """
     Analytic expression for spin half systems only.
     """
@@ -562,10 +563,11 @@ class ExponentiationMethod(Enum):
     Approximation using the Lie Trotter theorem.
     """
 
-def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMethod = IntegrationMethod.MAGNUS_CF_4, exponentiationMethod = ExponentiationMethod.LIE_TROTTER, trotterCutoff = 28):
+def timeEvolverFactory(getSource, spinQuantumNumber, useRotatingFrame = True, integrationMethod = IntegrationMethod.MAGNUS_CF_4, exponentiationMethod = ExponentiationMethod.LIE_TROTTER, trotterCutoff = 28):
     """
     Makes a time evolver just for you.
     """
+
     dimension = spinQuantumNumber.dimension
     lieDimension = dimension + 1
     utilitySet = spinQuantumNumber.utilitySet
@@ -579,7 +581,7 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
     sampleIndexEnd = sampleIndexMax - 1
 
     exponentiationMethodIndex = exponentiationMethod.index
-    if exponentiationMethod == ExponentiationMethod.ANALYTIC and spinQuantumNumber != SpinQuantumNumber.HALF:
+    if (exponentiationMethod == ExponentiationMethod.ANALYTIC) and (spinQuantumNumber != SpinQuantumNumber.HALF):
         print("\033[31mspinsim warning!!!\nAttempting to use an analytic exponentiation method outside of spin half. Switching to a Lie Trotter method.\033[0m")
         exponentiationMethod = ExponentiationMethod.LIE_TROTTER
         exponentiationMethodIndex = 1
@@ -624,22 +626,20 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
 
         transformFrame = transformFrameLab
 
-    @cuda.jit(device = True, inline = True)
-    def getSource(timeSample, source, timeStepSource, sourceSample):
-        utilities.interpolateSourceCubic(source, timeSample, timeStepSource, sourceSample)
+    getSourceJIT = cuda.jit(getSource, device = True, inline = True)
 
     if integrationMethod == IntegrationMethod.MAGNUS_CF_4:
         @cuda.jit(device = True, inline = True)
-        def getSourceIntegrationMagnusCF4(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+        def getSourceIntegrationMagnusCF4(simulationIndex, timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding):
             timeSample = ((timeFine + 0.5*timeStepFine*(1 - 1/sqrt3)) - timeCoarse)
             rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
             timeSample += timeCoarse
-            getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+            getSourceJIT(timeSample, simulationIndex, sourceSample[0, :])
 
             timeSample = ((timeFine + 0.5*timeStepFine*(1 + 1/sqrt3)) - timeCoarse)
             rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
             timeSample += timeCoarse
-            getSource(timeSample, source, timeStepSource, sourceSample[1, :])
+            getSourceJIT(timeSample, simulationIndex, sourceSample[1, :])
 
         @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
         def appendExponentiationIntegrationMagnusCF4(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
@@ -670,16 +670,16 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
 
     elif integrationMethod == IntegrationMethod.HALF_STEP:
         @cuda.jit(device = True, inline = True)
-        def getSourceIntegrationHalfStep(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+        def getSourceIntegrationHalfStep(simulationIndex, timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding):
             timeSample = timeFine - timeCoarse
             rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
             timeSample += timeCoarse
-            getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+            getSourceJIT(timeSample, simulationIndex, sourceSample[0, :])
 
             timeSample = timeFine + timeStepFine - timeCoarse
             rotatingWaveWinding[1] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
             timeSample += timeCoarse
-            getSource(timeSample, source, timeStepSource, sourceSample[1, :])
+            getSourceJIT(timeSample, simulationIndex, sourceSample[1, :])
 
         @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
         def appendExponentiationIntegrationHalfStep(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
@@ -707,11 +707,11 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
 
     elif integrationMethod == IntegrationMethod.MIDPOINT_SAMPLE:
         @cuda.jit(device = True, inline = True)
-        def getSourceIntegrationMidpoint(timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource):
+        def getSourceIntegrationMidpoint(simulationIndex, timeFine, timeCoarse, timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding):
             timeSample = timeFine + 0.5*timeStepFine - timeCoarse
             rotatingWaveWinding[0] = math.cos(math.tau*rotatingWave*timeSample) + 1j*math.sin(math.tau*rotatingWave*timeSample)
             timeSample += timeCoarse
-            getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+            getSourceJIT(timeSample, simulationIndex, sourceSample[0, :])
 
         @cuda.jit("(complex128[:, :], complex128[:, :], float64[:, :], float64, float64, complex128[:])", device = True, inline = True)
         def appendExponentiationIntegrationMidpoint(timeEvolutionFine, timeEvolutionCoarse, sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding):
@@ -729,9 +729,7 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
         appendExponentiationIntegration = appendExponentiationIntegrationMidpoint
 
     @cuda.jit(debug = False,  max_registers = 63)
-    def getTimeEvolution(timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse,
-        timeStepSource, source,
-        timeEvolutionCoarse):
+    def getTimeEvolution(simulationIndex, timeCoarse, timeEndPoints, timeStepFine, timeStepCoarse, timeEvolutionCoarse):
         # Declare variables
         timeEvolutionFine = cuda.local.array((dimension, dimension), dtype = nb.complex128)
 
@@ -749,12 +747,12 @@ def timeEvolverFactory(spinQuantumNumber, useRotatingFrame = True, integrationMe
             sourceSample[0, 2] = 0
             if useRotatingFrame:
                 timeSample = timeCoarse[timeIndex] + timeStepCoarse/2
-                getSource(timeSample, source, timeStepSource, sourceSample[0, :])
+                getSourceJIT(timeSample, simulationIndex, sourceSample[0, :])
             rotatingWave = sourceSample[0, 2]
 
             # For every fine step
             for timeFineIndex in range(math.floor(timeStepCoarse/timeStepFine + 0.5)):
-                getSourceIntegration(timeFine, timeCoarse[timeIndex], timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding, source, timeStepSource)
+                getSourceIntegration(simulationIndex, timeFine, timeCoarse[timeIndex], timeStepFine, sourceSample, rotatingWave, rotatingWaveWinding)
                 appendExponentiationIntegration(timeEvolutionFine, timeEvolutionCoarse[timeIndex, :], sourceSample, timeStepFine, rotatingWave, rotatingWaveWinding)
 
                 timeFine += timeStepFine
@@ -1100,20 +1098,42 @@ def getFrequencyAmplitudeFromDemodulation(time, spin, spinDemodulated, biasAmpli
                 timeIndexUse = spin.shape[0] - 1
             spinDemodulated[timeIndex] -= 2*math.cos(2*math.pi*biasAmplitude*time[timeIndexUse])*spin[timeIndexUse]/101
 
-@cuda.jit(debug = cudaDebug)
-def evaluateDressing(timeStepSource, sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints, sourceQuadraticShift, source):
-    timeSourceIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    if timeSourceIndex < source.shape[0]:
-        timeSource = timeSourceIndex*timeStepSource
+# @cuda.jit(debug = cudaDebug)
+# def evaluateDressing(timeStepSource, sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints, sourceQuadraticShift, source):
+#     timeSourceIndex = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+#     if timeSourceIndex < source.shape[0]:
+#         timeSource = timeSourceIndex*timeStepSource
+#         for sourceIndex in range(sourceIndexMax):
+#             for spacialIndex in range(source.shape[1]):
+#                 source[timeSourceIndex, spacialIndex] += \
+#                     (timeSource >= sourceTimeEndPoints[sourceIndex, 0])*\
+#                     (timeSource <= sourceTimeEndPoints[sourceIndex, 1])*\
+#                     sourceAmplitude[sourceIndex, spacialIndex]*\
+#                     math.sin(\
+#                         math.tau*sourceFrequency[sourceIndex, spacialIndex]*\
+#                         (timeSource - sourceTimeEndPoints[sourceIndex, 0]) +\
+#                         sourcePhase[sourceIndex, spacialIndex]\
+#                     )
+#             source[timeSourceIndex, 3] = sourceQuadraticShift
+
+def dressingEvaluatorFactory(timeStepSource, sourceIndexMax, sourceAmplitude, sourceFrequency, sourcePhase, sourceTimeEndPoints, sourceQuadraticShift = 0.0, amplitudeStep = 1.0):
+    def evaluateDressing(timeSample, simulationIndex, sourceSample):
+        sourceSample[0] = 0
+        sourceSample[1] = 0
+        sourceSample[2] = 0
         for sourceIndex in range(sourceIndexMax):
-            for spacialIndex in range(source.shape[1]):
-                source[timeSourceIndex, spacialIndex] += \
-                    (timeSource >= sourceTimeEndPoints[sourceIndex, 0])*\
-                    (timeSource <= sourceTimeEndPoints[sourceIndex, 1])*\
-                    sourceAmplitude[sourceIndex, spacialIndex]*\
-                    math.sin(\
-                        math.tau*sourceFrequency[sourceIndex, spacialIndex]*\
-                        (timeSource - sourceTimeEndPoints[sourceIndex, 0]) +\
-                        sourcePhase[sourceIndex, spacialIndex]\
-                    )
-            source[timeSourceIndex, 3] = sourceQuadraticShift
+            for spacialIndex in range(sourceSample.size):
+                if (timeSample >= sourceTimeEndPoints[sourceIndex, 0]) and (timeSample <= sourceTimeEndPoints[sourceIndex, 1]):
+                    amplitude = sourceAmplitude[sourceIndex, spacialIndex]
+                    if sourceIndex == 0 and spacialIndex == 0:
+                        amplitude += simulationIndex*2*amplitudeStep
+                    sourceSample[spacialIndex] += \
+                        amplitude*\
+                        math.sin(\
+                            math.tau*sourceFrequency[sourceIndex, spacialIndex]*\
+                            (timeSample - sourceTimeEndPoints[sourceIndex, 0]) +\
+                            sourcePhase[sourceIndex, spacialIndex]\
+                        )
+        if sourceSample.size > 3:
+            sourceSample[3] = sourceQuadraticShift
+    return evaluateDressing
