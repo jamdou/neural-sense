@@ -31,7 +31,7 @@ def conj(z):
     return (z.real - 1j*z.imag)
 
 @cuda.jit(device = True, inline = True)
-def complexAbs(z):
+def complex_abs(z):
     """
     The absolute value of a complex number.
 

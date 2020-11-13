@@ -9,14 +9,14 @@ from numba import cuda
 from . import scalar
 
 # Important constants
-cudaDebug = False
+cuda_debug = False
 sqrt2 = math.sqrt(2)
 sqrt3 = math.sqrt(3)
-machineEpsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
-# trotterCutoff = 52
+machine_epsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
+# trotter_cutoff = 52
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialAnalytic(sourceSample, result):
+def matrix_exponential_analytic(source_sample, result):
     """
     Calculates a :math:`su(2)` matrix exponential based on its analytic form.
 
@@ -60,15 +60,15 @@ def matrixExponentialAnalytic(sourceSample, result):
 
     Parameters
     ----------
-    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to take the exponential of.
         
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix which the result of the exponentiation is to be written to.
     """
-    x = sourceSample[0]
-    y = sourceSample[1]
-    z = sourceSample[2]
+    x = source_sample[0]
+    y = source_sample[1]
+    z = source_sample[2]
 
     r = math.sqrt(x**2 + y**2 + z**2)
 
@@ -91,7 +91,7 @@ def matrixExponentialAnalytic(sourceSample, result):
         result[1, 1] = 1
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialLieTrotter(sourceSample, result, trotterCutoff):
+def matrix_exponential_lie_trotter(source_sample, result, trotter_cutoff):
     """
     Calculates a matrix exponential based on the Lie Product Formula,
 
@@ -162,25 +162,25 @@ def matrixExponentialLieTrotter(sourceSample, result, trotterCutoff):
 
     Parameters
     ----------
-    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to take the exponential of.
 
         .. warning::
             Will overwrite the original contents of this as part of the algorithm.
         
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix which the result of the exponentiation is to be written to.
-    trotterCutoff : `int`
+    trotter_cutoff : `int`
         The number of squares to make to the approximate matrix (:math:`\\tau` above).
     """
-    hyperCubeAmount = math.ceil(trotterCutoff/2)
-    if hyperCubeAmount < 0:
-        hyperCubeAmount = 0
-    precision = 4**hyperCubeAmount
+    hyper_cube_amount = math.ceil(trotter_cutoff/2)
+    if hyper_cube_amount < 0:
+        hyper_cube_amount = 0
+    precision = 4**hyper_cube_amount
     
-    x = sourceSample[0]/(2*precision)
-    y = sourceSample[1]/(2*precision)
-    z = sourceSample[2]/(2*precision)
+    x = source_sample[0]/(2*precision)
+    y = source_sample[1]/(2*precision)
+    z = source_sample[2]/(2*precision)
 
     cx = math.cos(x)
     sx = math.sin(x)
@@ -196,12 +196,12 @@ def matrixExponentialLieTrotter(sourceSample, result, trotterCutoff):
     result[1, 1] = (cx*cy + 1j*sx*sy)*cisz
 
     temporary = cuda.local.array((2, 2), dtype = nb.complex128)
-    for powerIndex in range(hyperCubeAmount):
-        matrixMultiply(result, result, temporary)
-        matrixMultiply(temporary, temporary, result)
+    for power_index in range(hyper_cube_amount):
+        matrix_multiply(result, result, temporary)
+        matrix_multiply(temporary, temporary, result)
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialTrotter(exponent, result, trotterCutoff):
+def matrix_exponential_trotter(exponent, result, trotter_cutoff):
     """
     Calculates a matrix exponential based on the Lie Product Formula,
 
@@ -272,26 +272,26 @@ def matrixExponentialTrotter(exponent, result, trotterCutoff):
 
     Parameters
     ----------
-    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to take the exponential of.
 
         .. warning::
             Will overwrite the original contents of this as part of the algorithm.
         
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix which the result of the exponentiation is to be written to.
-    trotterCutoff : `int`
+    trotter_cutoff : `int`
         The number of squares to make to the approximate matrix (:math:`\\tau` above).
     """
     x = (1j*exponent[1, 0]).real
     y = (1j*exponent[1, 0]).imag
     z = (1j*(exponent[0, 0])).real
 
-    # hyperCubeAmount = 2*math.ceil(trotterCutoff/4 + math.log(math.fabs(x) + math.fabs(y) + math.fabs(z) + math.fabs(q))/(4*math.log(2.0)))
-    hyperCubeAmount = math.ceil(trotterCutoff/2)
-    if hyperCubeAmount < 0:
-        hyperCubeAmount = 0
-    precision = 4**hyperCubeAmount
+    # hyper_cube_amount = 2*math.ceil(trotter_cutoff/4 + math.log(math.fabs(x) + math.fabs(y) + math.fabs(z) + math.fabs(q))/(4*math.log(2.0)))
+    hyper_cube_amount = math.ceil(trotter_cutoff/2)
+    if hyper_cube_amount < 0:
+        hyper_cube_amount = 0
+    precision = 4**hyper_cube_amount
     
     x /= precision
     y /= precision
@@ -310,12 +310,12 @@ def matrixExponentialTrotter(exponent, result, trotterCutoff):
     result[0, 1] = -(cx*sy + 1j*sx*cy)*cisz
     result[1, 1] = (cx*cy + 1j*sx*sy)*cisz
 
-    for powerIndex in range(hyperCubeAmount):
-        matrixMultiply(result, result, exponent)
-        matrixMultiply(exponent, exponent, result)
+    for power_index in range(hyper_cube_amount):
+        matrix_multiply(result, result, exponent)
+        matrix_multiply(exponent, exponent, result)
 
 @cuda.jit(device = True, inline = True)
-def matrixExponentialTaylor(exponent, result, cutoff):
+def matrix_exponential_taylor(exponent, result, cutoff):
     """
     Calculate a matrix exponential using a Taylor series. The matrix being exponentiated is complex, and of any dimension.
 
@@ -332,34 +332,34 @@ def matrixExponentialTaylor(exponent, result, cutoff):
 
     Parameters
     ----------
-    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    exponent : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to take the exponential of.
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix which the result of the exponentiation is to be written to.
     cutoff : `int`
         The number of terms in the Taylor expansion (:math:`c` above).
     """
     T = cuda.local.array((2, 2), dtype = nb.complex128)
     TOld = cuda.local.array((2, 2), dtype = nb.complex128)
-    setToOne(T)
-    setToOne(result)
+    set_to_one(T)
+    set_to_one(result)
 
     # exp(A) = 1 + A + A^2/2 + ...
-    for taylorIndex in range(cutoff):
+    for taylor_index in range(cutoff):
         # TOld = T
-        for xIndex in nb.prange(2):
-            for yIndex in nb.prange(2):
-                TOld[yIndex, xIndex] = T[yIndex, xIndex]
+        for x_index in nb.prange(2):
+            for y_index in nb.prange(2):
+                TOld[y_index, x_index] = T[y_index, x_index]
         # T = TOld*A/n
-        for xIndex in nb.prange(2):
-            for yIndex in nb.prange(2):
-                T[yIndex, xIndex] = 0
-                for zIndex in range(2):
-                    T[yIndex, xIndex] += (TOld[yIndex, zIndex]*exponent[zIndex, xIndex])/(taylorIndex + 1)
+        for x_index in nb.prange(2):
+            for y_index in nb.prange(2):
+                T[y_index, x_index] = 0
+                for z_index in range(2):
+                    T[y_index, x_index] += (TOld[y_index, z_index]*exponent[z_index, x_index])/(taylor_index + 1)
         # E = E + T
-        for xIndex in nb.prange(2):
-            for yIndex in nb.prange(2):
-                result[yIndex, xIndex] += T[yIndex, xIndex]
+        for x_index in nb.prange(2):
+            for y_index in nb.prange(2):
+                result[y_index, x_index] += T[y_index, x_index]
 
 @cuda.jit(device = True, inline = True)
 def norm2(z):
@@ -409,7 +409,7 @@ def inner(left, right):
     return scalar.conj(left[0])*right[0] + scalar.conj(left[1])*right[1]
 
 @cuda.jit(device = True, inline = True)
-def setTo(operator, result):
+def set_to(operator, result):
     """
     Copy the contents of one matrix into another.
 
@@ -418,17 +418,17 @@ def setTo(operator, result):
 
     Parameters
     ----------
-    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to copy from.
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to copy to.
     """
-    for xIndex in range(2):
-        for yIndex in range(2):
-            result[yIndex, xIndex] = operator[yIndex, xIndex]
+    for x_index in range(2):
+        for y_index in range(2):
+            result[y_index, x_index] = operator[y_index, x_index]
 
 @cuda.jit(device = True, inline = True)
-def setToOne(operator):
+def set_to_one(operator):
     """
     Make a matrix the multiplicative identity, ie, :math:`1`.
 
@@ -443,7 +443,7 @@ def setToOne(operator):
 
     Parameters
     ----------
-    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to set to :math:`1`.
     """
     operator[0, 0] = 1
@@ -453,7 +453,7 @@ def setToOne(operator):
     operator[1, 1] = 1
 
 @cuda.jit(device = True, inline = True)
-def setToZero(operator):
+def set_to_zero(operator):
     """
     Make a matrix the additive identity, ie, :math:`0`.
 
@@ -464,7 +464,7 @@ def setToZero(operator):
 
     Parameters
     ----------
-    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to set to :math:`0`.
     """
     operator[0, 0] = 0
@@ -474,7 +474,7 @@ def setToZero(operator):
     operator[1, 1] = 0
 
 @cuda.jit(device = True, inline = True)
-def matrixMultiply(left, right, result):
+def matrix_multiply(left, right, result):
     """
     Multiply matrices left and right together, to be returned in result.
 
@@ -485,11 +485,11 @@ def matrixMultiply(left, right, result):
 
     Parameters
     ----------
-    left : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    left : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to left multiply by.
-    right : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    right : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The matrix to right multiply by.
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         A matrix to be filled with the result of the product.
     """
     result[0, 0] = left[0, 0]*right[0, 0] + left[0, 1]*right[1, 0]
@@ -513,9 +513,9 @@ def adjoint(operator, result):
 
     Parameters
     ----------
-    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    operator : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         The operator to take the adjoint of.
-    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (yIndex, xIndex)
+    result : :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` of :class:`numpy.cdouble`, (y_index, x_index)
         An array to write the resultant adjoint to.
     """
     result[0, 0] = scalar.conj(operator[0, 0])
