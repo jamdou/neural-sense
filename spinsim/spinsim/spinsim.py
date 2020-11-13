@@ -77,7 +77,7 @@ class IntegrationMethod(Enum):
         The code name for this method.
     """
 
-    MAGNUS_CF_4 = "magnusCF4"
+    MAGNUS_CF_4 = "magnus_cf4"
     """
     Commutator free fourth order Magnus based.
     """
@@ -89,7 +89,7 @@ class IntegrationMethod(Enum):
 
     HALF_STEP = "half_step"
     """
-    Integration method from Atomic_py.
+    Integration method from AtomicPy.
     """
 
 class ExponentiationMethod(Enum):
@@ -123,12 +123,21 @@ class ExponentiationMethod(Enum):
     # Taylor expansion.
     # """
 
-def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = True, integration_method = IntegrationMethod.MAGNUS_CF_4, exponentiation_method = ExponentiationMethod.LIE_TROTTER, trotter_cutoff = 28):
+def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = True, integration_method = IntegrationMethod.MAGNUS_CF_4, exponentiation_method = ExponentiationMethod.LIE_TROTTER, trotter_cutoff = 28, max_registers = 63):
     """
     Makes a time evolver just for you.
 
     Parameters
     ----------
+    get_source : `function`
+        A python function that describes the source that the spin system is being put under. It must have three arguments:
+        
+        * **time_sample** (`float`) - the time to sample the source at, int units of s.
+        * **simulation_index** (`int`) - a parameter that can be swept over when multiple simulations need to be run. For example, it is used to sweep over dressing frequencies during the simulations that `spinsim` was designed for.
+        * **source_sample** (:class:`numpy.ndarray` of `numpy.double` (spatial_index)) the returned value of the source. This is a four dimensional vector, with the first three entries being x, y, z spatial directions (to model a magnetic field, for example), and the optional fourth entry being the amplitude of the quadratic shift (only appearing in spin one systems).
+
+        .. note::
+            This function must be :func:`numba.cuda.jit()` compilable, as it will be compiled into a device function.
     trotter_cutoff : `int`
         The number of squares made by the matrix exponentiator, if :obj:`ExponentiationMethod.LIE_TROTTER` is chosen.
     """
@@ -138,11 +147,13 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
 
     if integration_method == IntegrationMethod.MAGNUS_CF_4:
         sample_index_max = 3
+        sample_index_end = 4
     elif integration_method == IntegrationMethod.HALF_STEP:
         sample_index_max = 3
+        sample_index_end = 4
     elif integration_method == IntegrationMethod.MIDPOINT_SAMPLE:
         sample_index_max = 1
-    sample_index_end = sample_index_max - 1
+        sample_index_end = 1
 
     exponentiation_method_index = exponentiation_method.index
     if (exponentiation_method == ExponentiationMethod.ANALYTIC) and (spin_quantum_number != SpinQuantumNumber.HALF):
@@ -294,7 +305,8 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
         get_source_integration = get_source_integration_midpoint
         append_exponentiation_integration = append_exponentiation_integration_midpoint
 
-    @cuda.jit(debug = False,  max_registers = 63)
+    # try:
+    @cuda.jit(debug = False,  max_registers = max_registers)
     def get_time_evolution(simulation_index, time_coarse, time_end_points, time_step_fine, time_step_coarse, time_evolution_coarse):
         """
         Find the stepwise time evolution opperator.
@@ -334,6 +346,8 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
                 time_sample = time_coarse[time_index] + time_step_coarse/2
                 get_source_jit(time_sample, simulation_index, source_sample[0, :])
             rotating_wave = source_sample[0, 2]
+            if dimension == 2:
+                rotating_wave /= 2
 
             # For every fine step
             for time_fine_index in range(math.floor(time_step_coarse/time_step_fine + 0.5)):
@@ -357,6 +371,10 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
                 else:
                     time_evolution_coarse[time_index, 1, 0] *= rotating_wave_winding[0]
                     time_evolution_coarse[time_index, 1, 1] *= rotating_wave_winding[0]
+        # get_time_evolution.specialize()
+    # except:
+    #     print("\033[31mspinsim error: numba.cuda could not jit get_source function into a cuda device function.\033[0m\n")
+    #     raise
     return get_time_evolution
 
 @nb.jit(nopython = True)

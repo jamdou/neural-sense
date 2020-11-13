@@ -73,11 +73,11 @@ class SimulationManager:
         do_write_everything : `boolean`, optional
             If `True`, then save all time series data to file as well as parametric data. Defaults to `False` to reduce archive file size.
         """
-        print("\033[33m_starting simulations...\033[0m")
+        print("\033[33mStarting simulations...\033[0m")
         execution_time_end_points = np.empty(2)
         execution_time_end_points[0] = tm.time()
         execution_time_end_points[1] = execution_time_end_points[0]
-        print("Idx\t_cmp\t_tm\td_tm")
+        print("Idx\tCmp\tTm\tdTm")
         archive_group_simulations = self.archive.archive_file.require_group("simulations")
         for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
             for signal_index, signal_instance in enumerate(self.signal):
@@ -93,7 +93,7 @@ class SimulationManager:
                         self.state_output += [simulation.simulation_results.state]
                     print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
                     execution_time_end_points[1] = tm.time()
-        print("\033[32m_done!\033[0m")
+        print("\033[32mDone!\033[0m")
 
 #===============================================================#
 
@@ -430,7 +430,7 @@ class Simulation:
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
         self.trotter_cutoff = trotter_cutoff
 
-        self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number)
+        self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
 
     def evaluate(self, simulation_index):
         """

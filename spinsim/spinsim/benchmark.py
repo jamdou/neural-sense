@@ -1,15 +1,17 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import time as tm
+import numpy as np
+import numba as nb
 from numba import cuda
 from enum import Enum
+import math
 import h5py
 
 from . import manager
 from . import utilities
 from . import spinsim
 from archive import *
-from test_signal import *
+import test_signal
 
 class BenchmarkType(Enum):
     """
@@ -39,7 +41,7 @@ class BenchmarkType(Enum):
     NONE = (
         "none",
         "Nothing (rad)",
-        "RMS error",
+        "Error",
         "Nothing",
         "log"
     )
@@ -50,8 +52,8 @@ class BenchmarkType(Enum):
     TIME_STEP_SOURCE = (
         "time_step_source",
         "Source time step (s)",
-        "RMS error",
-        "Effect of source time step size on RMS error",
+        "Error",
+        "Effect of source time step size on error",
         "log"
     )
     """
@@ -61,8 +63,8 @@ class BenchmarkType(Enum):
     TROTTER_CUTOFF = (
         "trotter_cutoff",
         "Trotter cutoff",
-        "RMS error",
-        "Effect of trotter cutoff on RMS error",
+        "Error",
+        "Effect of trotter cutoff on error",
         "linear"
     )
     """
@@ -72,8 +74,8 @@ class BenchmarkType(Enum):
     TROTTER_CUTOFF_MATRIX = (
         "trotter_cutoff_matrix",
         "Trotter cutoff",
-        "RMS error",
-        "Effect of trotter cutoff on RMS error",
+        "Error",
+        "Effect of trotter cutoff on error",
         "linear"
     )
     """
@@ -83,8 +85,8 @@ class BenchmarkType(Enum):
     TIME_STEP_FINE = (
         "time_step_fine",
         "Fine time step (s)",
-        "RMS error",
-        "Effect of fine time step size on RMS error",
+        "Error",
+        "Effect of fine time step size on error",
         "log"
     )
     """
@@ -295,28 +297,16 @@ def benchmark_trotter_cutoff_matrix(norm_bound, trotter_cutoff, result):
     result : :class:`numpy.ndarray` of :class:`numpy.cdouble`
         The results of the matrix exponentiations for this value of `trotter_cutoff`.
     """
-    exponent = cuda.local.array((3, 3), dtype = nb.complex128)
+    source_sample = cuda.local.array(4,dtype = nb.float64)
 
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if time_index < result.shape[0]:
-        x = norm_bound*math.cos(1.0*time_index)/4
-        y = norm_bound*math.cos(2.0*time_index)/4
-        z = norm_bound*math.cos(4.0*time_index)/4
-        q = norm_bound*math.cos(8.0*time_index)/4
+        source_sample[0] = norm_bound*math.cos(1.0*time_index)/4
+        source_sample[1] = norm_bound*math.cos(2.0*time_index)/4
+        source_sample[2] = norm_bound*math.cos(4.0*time_index)/4
+        source_sample[3] = norm_bound*math.cos(8.0*time_index)/4
 
-        exponent[0, 0] = -1j*(z + q/3)
-        exponent[1, 0] = -1j*(x + 1j*y)/math.sqrt(2.0)
-        exponent[2, 0] = 0.0
-
-        exponent[0, 1] = -1j*(x - 1j*y)/math.sqrt(2.0)
-        exponent[1, 1] = -1j*(-2/3)*q
-        exponent[2, 1] = -1j*(x + 1j*y)/math.sqrt(2.0)
-
-        exponent[0, 2] = 0.0
-        exponent[1, 2] = -1j*(x - 1j*y)/math.sqrt(2.0)
-        exponent[2, 2] = -1j*(-z + q/3)
-
-        utilities.spin_one.matrixExponential_lie_trotter(exponent, result[time_index, :], trotter_cutoff)
+        utilities.spin_one.matrixExponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
 
 def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
     """
@@ -367,7 +357,7 @@ def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
 
     return benchmark_results
 
-def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_fine):
+def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_fine, state_properties):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
@@ -406,7 +396,7 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
         signal_instance = test_signal.TestSignal(signal_template.neural_pulses, signal_template.sinusoidal_noises, time_properties, False)
         signal += [signal_instance]
 
-    simulation_manager = manager.SimulationManager(signal, frequency, archive, None, state_output)
+    simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output)
     simulation_manager.evaluate(False)
 
     for timeStep_fine_index in range(time_step_fine.size):

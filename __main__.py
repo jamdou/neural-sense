@@ -57,16 +57,18 @@ if __name__ == "__main__":
         # # time_step_fine = [5e-9, 1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7, 1e-6, 2e-6, 2.5e-6, 5e-6]
         # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 50))
         # frequency = np.arange(50, 3051, 300)
+        # # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 10))
+        # # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(1000, 1003, 5)
-        # newBenchmarkTime_step_fine(archive, signal, frequency, time_step_fine)
+        # spinsim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
 
         # # Time step source test
         # time_step_source = np.logspace(-9, -6, 50)
         # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(1000, 1003, 5)
-        # spinsim.benchmark.manager.newBenchmarkTime_step_source(archive, signal, frequency, state_properties, time_step_source)
+        # spinsim.benchmark.manager.new_benchmark_time_step_source(archive, signal, frequency, state_properties, time_step_source)
 
-        # spinsim.benchmark.manager.plot_benchmark_comparison(archive, ["20201105T173827", "20201105T173349"], ["Linear Interpolation", "Cubic Interpolation"], "Effect of interpolation on source timestep benchmark")
+        spinsim.benchmark.plot_benchmark_comparison(archive, ["20201113T173915", "20201113T202948", "20201113T204017", "20201113T205415", "20201113T210439", "20201113T211136"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark")
 
         # Trotter Test
         # newBenchmarkTrotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)
@@ -74,15 +76,15 @@ if __name__ == "__main__":
         # frequency = np.arange(50, 3051, 30)
         # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
-        # Run simulations
-        # frequency = np.arange(50, 3051, 3)
-        frequency = np.arange(1000, 1003, 1)
-        simulation_manager = spinsim.manager.SimulationManager(signal, frequency, archive, state_properties)
-        simulation_manager.evaluate(False, False)
-        # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        experiment_results = spinsim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        experiment_results.write_to_archive(archive)
-        experiment_results.plot(archive, signal)
+        # # Run simulations
+        # # frequency = np.arange(50, 3051, 3)
+        # frequency = np.arange(1000, 1003, 1)
+        # simulation_manager = spinsim.manager.SimulationManager(signal, frequency, archive, state_properties)
+        # simulation_manager.evaluate(False, False)
+        # # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
+        # experiment_results = spinsim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        # experiment_results.write_to_archive(archive)
+        # experiment_results.plot(archive, signal)
 
         # # Make reconstructions
         # reconstruction = recon.Reconstruction(signal.time_properties)
