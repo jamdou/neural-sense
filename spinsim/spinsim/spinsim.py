@@ -161,7 +161,7 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
         exponentiation_method = ExponentiationMethod.LIE_TROTTER
         exponentiation_method_index = 1
 
-    @cuda.jit(device = True, inline = True)
+    @cuda.jit("(float64[:], complex128[:, :], complex128[:, :])", device = True, inline = True)
     def append_exponentiation(source_sample, time_evolution_fine, time_evolution_coarse):
         time_evolution_old = cuda.local.array((dimension, dimension), dtype = nb.complex128)
 
@@ -206,7 +206,7 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
     get_source_jit = cuda.jit(get_source, device = True, inline = True)
 
     if integration_method == IntegrationMethod.MAGNUS_CF_4:
-        @cuda.jit(device = True, inline = True)
+        @cuda.jit("(int64, float64, float64, float64, float64[:, :], float64, complex128[:])", device = True, inline = True)
         def get_source_integration_magnus_cf4(simulation_index, time_fine, time_coarse, time_step_fine, source_sample, rotating_wave, rotating_wave_winding):
             time_sample = ((time_fine + 0.5*time_step_fine*(1 - 1/sqrt3)) - time_coarse)
             rotating_wave_winding[0] = math.cos(math.tau*rotating_wave*time_sample) + 1j*math.sin(math.tau*rotating_wave*time_sample)
@@ -246,7 +246,7 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
         append_exponentiation_integration = append_exponentiation_integration_magnus_cf4
 
     elif integration_method == IntegrationMethod.HALF_STEP:
-        @cuda.jit(device = True, inline = True)
+        @cuda.jit("(int64, float64, float64, float64, float64[:, :], float64, complex128[:])", device = True, inline = True)
         def get_source_integration_half_step(simulation_index, time_fine, time_coarse, time_step_fine, source_sample, rotating_wave, rotating_wave_winding):
             time_sample = time_fine - time_coarse
             rotating_wave_winding[0] = math.cos(math.tau*rotating_wave*time_sample) + 1j*math.sin(math.tau*rotating_wave*time_sample)
@@ -283,7 +283,7 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
         append_exponentiation_integration = append_exponentiation_integration_half_step
 
     elif integration_method == IntegrationMethod.MIDPOINT_SAMPLE:
-        @cuda.jit(device = True, inline = True)
+        @cuda.jit("(int64, float64, float64, float64, float64[:, :], float64, complex128[:])", device = True, inline = True)
         def get_source_integration_midpoint(simulation_index, time_fine, time_coarse, time_step_fine, source_sample, rotating_wave, rotating_wave_winding):
             time_sample = time_fine + 0.5*time_step_fine - time_coarse
             rotating_wave_winding[0] = math.cos(math.tau*rotating_wave*time_sample) + 1j*math.sin(math.tau*rotating_wave*time_sample)
@@ -306,7 +306,7 @@ def time_evolver_factory(get_source, spin_quantum_number, use_rotating_frame = T
         append_exponentiation_integration = append_exponentiation_integration_midpoint
 
     # try:
-    @cuda.jit(debug = False,  max_registers = max_registers)
+    @cuda.jit("(int64, float64[:], float64[:], float64, float64, complex128[:, :, :])", debug = False,  max_registers = max_registers)
     def get_time_evolution(simulation_index, time_coarse, time_end_points, time_step_fine, time_step_coarse, time_evolution_coarse):
         """
         Find the stepwise time evolution opperator.

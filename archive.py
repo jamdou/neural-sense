@@ -204,7 +204,7 @@ class Archive:
         """
         archive_group_code_source = self.archive_file.require_group("code_source" + self.execution_time_string)
         archive_group_code_source["description_of_test"] = np.asarray([self.description_of_test], dtype = "|S512")
-        for code_source_name in glob.glob(self.source_path + "*.py") + glob.glob(self.source_path + "*.bat"):
+        for code_source_name in glob.glob(self.source_path + "**\\*.py", recursive = True) + glob.glob(self.source_path + "**\\*.bat", recursive = True):
             code_source = open(code_source_name, "r")
             archive_group_code_source[code_source_name.replace(self.source_path, "")] = code_source.read()
             code_source.close()

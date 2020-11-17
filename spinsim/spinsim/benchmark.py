@@ -190,8 +190,8 @@ class BenchmarkResults:
         if do_show_plot:
             if archive:
                 plt.title(archive.execution_time_string + "\n" + self.benchmark_type.title)
-                plt.savefig(archive.plot_path + "benchmark" + self.benchmark_type.value[0].capitalize() + self.benchmark_type.value[1:] + ".pdf")
-                plt.savefig(archive.plot_path + "benchmark" + self.benchmark_type.value[0].capitalize() + self.benchmark_type.value[1:] + ".png")
+                plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".pdf")
+                plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".png")
             plt.show()
 
 def plot_benchmark_comparison(archive, archive_times, legend, title):
@@ -217,10 +217,18 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
         benchmark_results.plot(None, False)
         archive_previous.close_archive_file(False)
     plt.legend(legend)
-    plt.title(archive.execution_time_string + "\n" + title)
-    plt.savefig(archive.plot_path + "benchmark_comparison.pdf")
-    plt.savefig(archive.plot_path + "benchmark_comparison.png")
+
+    if archive:
+        plt.title(archive.execution_time_string + "\n" + title)
+        plt.savefig(archive.plot_path + "benchmark_comparison.pdf")
+        plt.savefig(archive.plot_path + "benchmark_comparison.png")
+
+        archive_group_benchmark_results = archive.archive_file.require_group("benchmark_results/benchmark_comparison")
+        archive_group_benchmark_results["archive_times"] = np.asarray(archive_times, dtype='|S32')
+        archive_group_benchmark_results["legend"] = np.asarray(legend, dtype='|S32')
+        archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
     plt.show()
+
 
 def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.0):
     """

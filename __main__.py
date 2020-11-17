@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
         # Make state
         # [0.5, 1/np.sqrt(2), 0.5]
-        state_properties = spinsim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        state_properties = spinsim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
         cuda.profile_start()
 
@@ -68,7 +68,9 @@ if __name__ == "__main__":
         # # frequency = np.arange(1000, 1003, 5)
         # spinsim.benchmark.manager.new_benchmark_time_step_source(archive, signal, frequency, state_properties, time_step_source)
 
-        spinsim.benchmark.plot_benchmark_comparison(archive, ["20201113T173915", "20201113T202948", "20201113T204017", "20201113T205415", "20201113T210439", "20201113T211136"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark")
+        # # spinsim.benchmark.plot_benchmark_comparison(archive, ["20201113T173915", "20201113T202948", "20201113T204017", "20201113T205415", "20201113T210439", "20201113T211136"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin one)")
+
+        spinsim.benchmark.plot_benchmark_comparison(archive, ["20201116T110647", "20201116T111313", "20201116T111851", "20201116T112430", "20201116T112932", "20201116T113330"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin half)")
 
         # Trotter Test
         # newBenchmarkTrotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)
