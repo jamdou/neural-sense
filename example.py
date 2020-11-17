@@ -17,10 +17,9 @@ Example 1: Spin half Larmor precession
 """
 # Define a numba.cuda compatible source sampling function
 def get_source_larmor(time_sample, simulation_index, source_sample):
-    source_sample[2] = 1000         # Split spin z eigenstates by 1kHz
-
     source_sample[0] = 0            # Zero source in x direction
     source_sample[1] = 0            # Zero source in y direction
+    source_sample[2] = 1000         # Split spin z eigenstates by 1kHz
 
 # Return a solver which uses this function
 get_time_evolution_larmor = spinsim.time_evolver_factory(get_source_larmor, spinsim.SpinQuantumNumber.HALF)
@@ -47,7 +46,7 @@ spin = np.empty((time_index_max, 3), np.double)
 # Define an empty array to write the time evolution operator to
 time_evolution = np.empty((time_index_max, 2, 2), np.cdouble)
 
-# Set up the gpu to have threads of size 64
+# Set up the gpu to have blocks of size 64
 threads_per_block = 64
 blocks_per_grid = (time_index_max + (threads_per_block - 1)) // threads_per_block
 
@@ -80,11 +79,10 @@ Example 2: Spin one Rabi flopping
 import math
 
 def get_source_rabi(time_sample, simulation_index, source_sample):
-    # Dress atoms from the x direction, Rabi flopping at 1kHz, then doubles each simulation_index
+    # Dress atoms from the x direction, Rabi flopping at 1kHz
     source_sample[0] = 2000*math.cos(math.tau*20e3*simulation_index*time_sample)
     source_sample[1] = 0                        # Zero source in y direction
     source_sample[2] = 20e3*simulation_index    # Split spin z eigenstates by 700kHz
-
     source_sample[3] = 0                        # Zero quadratic shift, found in spin one systems
 
 # Return a solver which uses this function

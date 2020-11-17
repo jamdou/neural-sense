@@ -98,7 +98,8 @@ html_sidebars = { '**': ['globaltoc.html', 'relations.html', 'sourcelink.html', 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'numba': ('http://numba.pydata.org/numba-doc/latest/', None),
-    'numpy': ('https://numpy.org/doc/stable/', None)
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'matplotlib': ('http://matplotlib.sourceforge.net/', None)
     }
 
 add_module_names = False
