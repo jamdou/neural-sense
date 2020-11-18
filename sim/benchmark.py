@@ -8,8 +8,8 @@ import math
 import h5py
 
 from . import manager
-from . import utilities
-from . import spinsim
+from spinsim import utilities
+import spinsim
 from archive import *
 import test_signal
 

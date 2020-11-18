@@ -2,8 +2,8 @@
 Classes and methods used to control the specific experiment we are trying to simulate.
 """
 
-from . import utilities
-from . import spinsim
+from spinsim import utilities
+import spinsim
 
 import numpy as np
 import matplotlib.pyplot as plt

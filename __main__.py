@@ -9,9 +9,11 @@ colorama.init()
 import archive as arch              # Saving results and configurations
 from archive import handle_arguments
 
-import test_signal                   # The properties of the magnetic signal, used for simulations and reconstructions
-from spinsim import spinsim         # Main simulation package
+import test_signal                  # The properties of the magnetic signal, used for simulations and reconstructions
+import spinsim                      # Main simulation package
 import reconstruction as recon      # Uses compressive sensing to reconstruct the a magnetic signal
+
+import sim
 
 if __name__ == "__main__":
     # This will be recorded in the HDF5 file to give context for what was being tested
@@ -49,7 +51,7 @@ if __name__ == "__main__":
 
         # Make state
         # [0.5, 1/np.sqrt(2), 0.5]
-        state_properties = spinsim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
 
         cuda.profile_start()
 
@@ -82,10 +84,10 @@ if __name__ == "__main__":
         frequency = np.arange(70, 3071, 30)
         # frequency = np.arange(50, 3051, 3)
         # frequency = np.arange(1000, 1003, 1)
-        simulation_manager = spinsim.manager.SimulationManager(signal, frequency, archive, state_properties)
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
         simulation_manager.evaluate(False, False)
         # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        experiment_results = spinsim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
         experiment_results.write_to_archive(archive)
         experiment_results.plot(archive, signal)
 
