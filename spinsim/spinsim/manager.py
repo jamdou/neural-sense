@@ -432,44 +432,29 @@ class Simulation:
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
         self.trotter_cutoff = trotter_cutoff
 
-        self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
+        # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
+        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
 
     def evaluate(self, simulation_index):
         """
         Time evolves the system, and finds the spin at each coarse time step.
         """
-        # Decide GPU block and grid sizes
-        threads_per_block = 64
-        blocks_per_grid = (self.signal.time_properties.time_index_max + (threads_per_block - 1)) // threads_per_block
-
         # Run stepwise solver
         self.simulation_results.time_evolution = cuda.device_array_like(self.simulation_results.time_evolution)
         self.signal.time_properties.time_coarse = cuda.device_array_like(self.signal.time_properties.time_coarse)
 
-        self.get_time_evolution[blocks_per_grid, threads_per_block](simulation_index, self.signal.time_properties.time_coarse, cuda.to_device(self.signal.time_properties.time_end_points), self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.simulation_results.time_evolution)
-
-        # execution_time_end_points = np.empty(2)
-        # execution_time_end_points[0] = tm.time()
-        # get_time_evolution[blocks_per_grid, threads_per_block](0, self.signal.time_properties.time_coarse, cuda.to_device(self.signal.time_properties.time_end_points), self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.simulation_results.time_evolution)
-        # execution_time_end_points[1] = tm.time() - execution_time_end_points[0]
-        # print(execution_time_end_points[1])
-
-        # if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.ONE:
-        #     getTime_evolution_so[blocks_per_grid, threads_per_block](self.signal.time_properties.time_coarse, cuda.to_device(self.signal.time_properties.time_end_points), self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.signal.time_properties.time_step_source, cuda.to_device(self.source_properties.source), self.simulation_results.time_evolution, self.trotter_cutoff)
-
-        # elif self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
-        #     getTime_evolution_sh[blocks_per_grid, threads_per_block](self.signal.time_properties.time_coarse, cuda.to_device(self.signal.time_properties.time_end_points), self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.signal.time_properties.time_step_source, cuda.to_device(self.source_properties.source), self.simulation_results.time_evolution, self.trotter_cutoff)
+        self.simulator.get_time_evolution(simulation_index, self.signal.time_properties.time_coarse, cuda.to_device(self.signal.time_properties.time_end_points), self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.simulation_results.time_evolution)
 
         self.simulation_results.time_evolution = self.simulation_results.time_evolution.copy_to_host()
         self.signal.time_properties.time_coarse = self.signal.time_properties.time_coarse.copy_to_host()
 
         # Combine results of the stepwise solver to evaluate the timeseries for the state
-        spinsim.get_state(self.state_properties.state_init, self.simulation_results.state, self.simulation_results.time_evolution)
+        self.simulator.get_state(self.state_properties.state_init, self.simulation_results.state, self.simulation_results.time_evolution)
 
         # Evaluate the time series for the expected spin value
         self.simulation_results.spin = cuda.device_array_like(self.simulation_results.spin)
 
-        spinsim.get_spin[blocks_per_grid, threads_per_block](cuda.to_device(self.simulation_results.state), self.simulation_results.spin)
+        self.simulator.get_spin(cuda.to_device(self.simulation_results.state), self.simulation_results.spin)
 
         self.simulation_results.spin = self.simulation_results.spin.copy_to_host()
 
