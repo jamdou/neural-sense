@@ -11,6 +11,7 @@ import math, cmath
 from numba import cuda
 import numba as nb
 import time as tm
+import os
 from test_signal import *
 
 # from .benchmark.results import *
@@ -84,9 +85,10 @@ class SimulationManager:
                 simulation = Simulation(signal_instance, self.frequency[0], self.frequency[1] - self.frequency[0], self.state_properties, trotter_cutoff_instance)
                 for frequency_index in range(self.frequency.size):
                     simulation_index = frequency_index + (signal_index + trotter_cutoff_index*len(self.signal))*self.frequency.size
-                    # frequency_value = self.frequency[frequency_index]
+                    frequency_value = self.frequency[frequency_index]
                     simulation.evaluate(frequency_index)
-                    simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                    # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                    simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
                     simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
                     self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
                     if self.state_output is not None:
@@ -471,7 +473,7 @@ class Simulation:
 
         self.simulation_results.spin = self.simulation_results.spin.copy_to_host()
 
-    def get_frequency_amplitude_from_demodulation(self, demodulationTime_end_points = [0.09, 0.1], do_plot_spin = False):
+    def get_frequency_amplitude_from_demodulation(self, demodulationTime_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
         """
         Uses demodulation of the Faraday signal to find the measured Fourier coefficient.
 
@@ -519,7 +521,19 @@ class Simulation:
         if do_plot_spin:
             plt.figure()
             plt.plot(self.signal.time_properties.time_coarse, self.simulation_results.spin[:, :])
-            plt.show()
+            plt.legend(("x", "y", "z"))
+            plt.xlim(0e-3, 2e-3)
+            plt.xlabel("Time (s)")
+            plt.ylabel("Spin projection (hbar)")
+            if archive:
+                plt.title(archive.execution_time_string + "Spin projection")
+                archive_index = 0
+                while os.path.isfile(archive.plot_path + "spin_projection_" + str(archive_index) + ".png"):
+                    archive_index += 1
+                plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".pdf")
+                plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".png")
+            else:
+                plt.show()
 
     def write_to_file(self, archive, do_write_everything = False):
         """

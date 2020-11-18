@@ -19,9 +19,9 @@ if __name__ == "__main__":
 
     # Check to see if there is a compatible GPU
     if cuda.list_devices():
-        print("\033[32m_using cuda device " + str(cuda.list_devices()[0].name) + "\033[0m")
+        print("\033[32mUsing cuda device " + str(cuda.list_devices()[0].name) + "\033[0m")
     else:
-        print("\033[31m_no cuda devices found. System is incompatible. Exiting...\033[0m")
+        print("\033[31mNo cuda devices found. System is incompatible. Exiting...\033[0m")
         exit()
 
     profile_state, archive_path = handle_arguments()
@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
         # Make state
         # [0.5, 1/np.sqrt(2), 0.5]
-        state_properties = spinsim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
+        state_properties = spinsim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
 
         cuda.profile_start()
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
         # # spinsim.benchmark.plot_benchmark_comparison(archive, ["20201113T173915", "20201113T202948", "20201113T204017", "20201113T205415", "20201113T210439", "20201113T211136"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin one)")
 
-        spinsim.benchmark.plot_benchmark_comparison(archive, ["20201116T110647", "20201116T111313", "20201116T111851", "20201116T112430", "20201116T112932", "20201116T113330"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin half)")
+        # spinsim.benchmark.plot_benchmark_comparison(archive, ["20201116T110647", "20201116T111313", "20201116T111851", "20201116T112430", "20201116T112932", "20201116T113330"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin half)")
 
         # Trotter Test
         # newBenchmarkTrotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)
@@ -78,15 +78,16 @@ if __name__ == "__main__":
         # frequency = np.arange(50, 3051, 30)
         # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
-        # # Run simulations
-        # # frequency = np.arange(50, 3051, 3)
+        # Run simulations
+        frequency = np.arange(70, 3071, 30)
+        # frequency = np.arange(50, 3051, 3)
         # frequency = np.arange(1000, 1003, 1)
-        # simulation_manager = spinsim.manager.SimulationManager(signal, frequency, archive, state_properties)
-        # simulation_manager.evaluate(False, False)
-        # # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        # experiment_results = spinsim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        # experiment_results.write_to_archive(archive)
-        # experiment_results.plot(archive, signal)
+        simulation_manager = spinsim.manager.SimulationManager(signal, frequency, archive, state_properties)
+        simulation_manager.evaluate(False, False)
+        # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
+        experiment_results = spinsim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        experiment_results.write_to_archive(archive)
+        experiment_results.plot(archive, signal)
 
         # # Make reconstructions
         # reconstruction = recon.Reconstruction(signal.time_properties)

@@ -56,21 +56,21 @@ def handle_arguments():
             A note of the current aim of the test, to be saved to the hdf5 archive.
     """
     help_message = """
-    \033[36m-h  --help      \033[33m_show this message
-    \033[36m-a  --archive   \033[33m_select an alternate archive path.
-                    \033[32m_default:
+    \033[36m-h  --help      \033[33mShow this message
+    \033[36m-a  --archive   \033[33mSelect an alternate archive path.
+                    \033[32mDefault:
                         \033[36m.\\archive\033[0m
-    \033[36m-p  --profile   \033[33m_select what type of nvprof profiling to be
+    \033[36m-p  --profile   \033[33mSelect what type of nvprof profiling to be
                     done, from:
-                        \033[36mnone \033[32m(default)  \033[33m_run normally
-                        \033[36mtimeline            \033[33m_save timeline
-                        \033[36mmetric              \033[33m_save metrics
-                        \033[36minstructionlevel    \033[33m_save per instruction
+                        \033[36mnone \033[32m(default)  \033[33mRun normally
+                        \033[36mtimeline            \033[33mSave timeline
+                        \033[36mmetric              \033[33mSave metrics
+                        \033[36minstructionlevel    \033[33mSave per instruction
                                             metrics
-                        \033[36marchive             \033[33m_archive results,
+                        \033[36marchive             \033[33mArchive results,
                                             don't run anything
                                             else
-                    \033[35m_only used for automation with profiling, if
+                    \033[35mOnly used for automation with profiling, if
                     you're not doing this, then leave this blank.\033[0m
     """
 
