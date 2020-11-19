@@ -62,17 +62,19 @@ if __name__ == "__main__":
         # # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 10))
         # # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(1000, 1003, 5)
-        # spinsim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
+        # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
 
         # # Time step source test
         # time_step_source = np.logspace(-9, -6, 50)
         # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(1000, 1003, 5)
-        # spinsim.benchmark.manager.new_benchmark_time_step_source(archive, signal, frequency, state_properties, time_step_source)
+        # sim.benchmark.new_benchmark_time_step_source(archive, signal, frequency, state_properties, time_step_source)
 
         # # spinsim.benchmark.plot_benchmark_comparison(archive, ["20201113T173915", "20201113T202948", "20201113T204017", "20201113T205415", "20201113T210439", "20201113T211136"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin one)")
 
-        # spinsim.benchmark.plot_benchmark_comparison(archive, ["20201116T110647", "20201116T111313", "20201116T111851", "20201116T112430", "20201116T112932", "20201116T113330"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark (spin half)")
+        # sim.benchmark.plot_benchmark_comparison(archive, ["20201116T110647", "20201116T111313", "20201116T111851", "20201116T112430", "20201116T112932", "20201116T113330"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, lie trotter)")
+
+        # sim.benchmark.plot_benchmark_comparison(archive, ["20201119T181459", "20201119T181809", "20201119T182040", "20201119T182334", "20201119T182612", "20201119T182817"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, analytic)")
 
         # Trotter Test
         # newBenchmarkTrotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)

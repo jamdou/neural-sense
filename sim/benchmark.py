@@ -411,6 +411,7 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
         error_temp = 0
         for frequency_index in range(frequency.size):
             state_difference = state_output[frequency_index + timeStep_fine_index*frequency.size] - state_output[frequency_index]
+
             error_temp += np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
         error += [error_temp/(frequency.size*state_output[0].size)]
     

@@ -87,12 +87,12 @@ class SimulationManager:
                     simulation_index = frequency_index + (signal_index + trotter_cutoff_index*len(self.signal))*self.frequency.size
                     frequency_value = self.frequency[frequency_index]
                     simulation.evaluate(frequency_index)
-                    # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
-                    simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
+                    simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                    # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
                     simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
                     self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
                     if self.state_output is not None:
-                        self.state_output += [simulation.simulation_results.state]
+                        self.state_output += [simulation.simulation_results.state.copy()]
                     print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
                     execution_time_end_points[1] = tm.time()
         print("\033[32mDone!\033[0m")
@@ -433,7 +433,7 @@ class Simulation:
         self.trotter_cutoff = trotter_cutoff
 
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
-        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
+        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, True, spinsim.IntegrationMethod.MAGNUS_CF_4, spinsim.ExponentiationMethod.ANALYTIC, trotter_cutoff = trotter_cutoff)
 
     def evaluate(self, simulation_index):
         """
