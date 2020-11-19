@@ -42,20 +42,20 @@ class ProfileState(Enum):
     The results of past profiling are to be moved to a single location to be archived.
     """
 
-def handleArguments():
+def handle_arguments():
     """
     Reads and handles arguments (mainly to do with profiling) from the command line.
 
     Returns
     -------
-    archivePath : `string`
+    archive_path : `string`
             The path where hdf5 archive files are saved. A new directory for the day, then time, will be made here to organise the archives.
-        profileState : :class:`ProfileState`, optional
+        profile_state : :class:`ProfileState`, optional
             A description of which type of profiling is being done now. Used to organise profile output files. Defaults to :obj:`ProfileState.NONE`.
-        descriptionOfTest : `string`
+        description_of_test : `string`
             A note of the current aim of the test, to be saved to the hdf5 archive.
     """
-    helpMessage = """
+    help_message = """
     \033[36m-h  --help      \033[33mShow this message
     \033[36m-a  --archive   \033[33mSelect an alternate archive path.
                     \033[32mDefault:
@@ -75,26 +75,26 @@ def handleArguments():
     """
 
     # Command line arguments. Probably don't worry too much about these. Mostly used for profiling.
-    profileState = ProfileState.NONE
-    archivePath = ".\\archive\\"
+    profile_state = ProfileState.NONE
+    archive_path = ".\\archive\\"
     options, arguments = getopt.getopt(sys.argv[1:], "hpa", ["help", "profile=", "archive="])
     for option, argument in options:
         if option in ("--help", "-h"):
-            print(helpMessage)
+            print(help_message)
             exit()
         elif option in ("--profile", "-p"):
             if argument == "timeline":
-                profileState = ProfileState.TIME_LINE
+                profile_state = ProfileState.TIME_LINE
             elif argument == "metric":
-                profileState = ProfileState.METRIC
+                profile_state = ProfileState.METRIC
             elif argument == "instructionlevel":
-                profileState = ProfileState.INSTRUCTION_LEVEL
+                profile_state = ProfileState.INSTRUCTION_LEVEL
             elif argument == "archive":
-                profileState = ProfileState.ARCHIVE
+                profile_state = ProfileState.ARCHIVE
         elif option in ("--archive", "-a"):
-            archivePath = argument + "\\"
+            archive_path = argument + "\\"
 
-    return profileState, archivePath
+    return profile_state, archive_path
 
 class Archive:
     """
@@ -102,116 +102,116 @@ class Archive:
 
     Attributes
     ----------
-    executionTimeString : `string`
+    execution_time_string : `string`
         The time when the code was first executed, in YYYYmmddTHHMMSS format.
-    descriptionOfTest : `string`
+    description_of_test : `string`
         A note of the current aim of the test, to be saved to the hdf5 archive.
-    archiveFile : :class:`h5py.File`
+    archive_file : :class:`h5py.File`
         The hdf5 file to use when archiving.
-    archivePath : `string`
+    archive_path : `string`
         The archive path to save the hdf5 archive to.
-    plotPath : `string`
+    plot_path : `string`
         The archive path to save plots to.
-    profilePath : `string`
+    profile_path : `string`
         The archive path to save profile outputs to.
-    profileState : :class:`ProfileState`
+    profile_state : :class:`ProfileState`
         A description of which type of profiling is being done now. Used to organise profile output files.
-    sourcePath : `string`
+    source_path : `string`
         Path to source files.
-    profileLocalPath : `string`
-        Path to temporary profile outputs, to be properly archived when `profileState` is :obj:`ProfileState.ARCHIVE`.
+    profile_local_path : `string`
+        Path to temporary profile outputs, to be properly archived when `profile_state` is :obj:`ProfileState.ARCHIVE`.
     """
-    def __init__(self, archivePath, descriptionOfTest, profileState = ProfileState.NONE):
+    def __init__(self, archive_path, description_of_test, profile_state = ProfileState.NONE):
         """
         Parameters
         ----------
-        archivePath : `string`
+        archive_path : `string`
             The path where hdf5 archive files are saved. A new directory for the day, then time, will be made here to organise the archives.
-        descriptionOfTest : `string`
+        description_of_test : `string`
             A note of the current aim of the test, to be saved to the hdf5 archive.
-        profileState : :class:`ProfileState`, optional
+        profile_state : :class:`ProfileState`, optional
             A description of which type of profiling is being done now. Used to organise profile output files. Defaults to :obj:`ProfileState.NONE`.
         """
         # Set up profile directories
-        self.profileState = profileState
-        self.sourcePath = ".\\"
-        self.profileLocalPath = self.sourcePath + "profile\\"
-        if profileState == ProfileState.ARCHIVE:
-            profileFlagFile = open(self.profileLocalPath + "profileFlag", "r")
-            self.executionTimeString = profileFlagFile.read()
-            profileFlagFile.close()
-            os.remove(self.profileLocalPath + "profileFlag")
+        self.profile_state = profile_state
+        self.source_path = ".\\"
+        self.profile_local_path = self.source_path + "profile\\"
+        if profile_state == ProfileState.ARCHIVE:
+            profile_flag_file = open(self.profile_local_path + "profile_flag", "r")
+            self.execution_time_string = profile_flag_file.read()
+            profile_flag_file.close()
+            os.remove(self.profile_local_path + "profile_flag")
         else:
-            self.executionTimeString = dtm.datetime.now().strftime("%Y%m%dT%H%M%S")
+            self.execution_time_string = dtm.datetime.now().strftime("%Y%m%dT%H%M%S")
         
         # Set up archive directories
-        self.archivePath = archivePath + self.executionTimeString[:8] + "\\" + self.executionTimeString + "\\"
-        self.profilePath = self.archivePath + "profile\\"
-        self.plotPath = self.archivePath + "plots\\"
-        self.descriptionOfTest = descriptionOfTest
-        self.archiveFile = None
+        self.archive_path = archive_path + self.execution_time_string[:8] + "\\" + self.execution_time_string + "\\"
+        self.profile_path = self.archive_path + "profile\\"
+        self.plot_path = self.archive_path + "plots\\"
+        self.description_of_test = description_of_test
+        self.archive_file = None
 
-        if profileState == ProfileState.ARCHIVE:
-            self.archiveFile = h5py.File(self.archivePath + "archive.hdf5", "a")
-            self.writeProfiles()
+        if profile_state == ProfileState.ARCHIVE:
+            self.archive_file = h5py.File(self.archive_path + "archive.hdf5", "a")
+            self.write_profiles()
         else:
-            if not os.path.exists(self.plotPath):
-                os.makedirs(self.plotPath)
-            if profileState == ProfileState.TIME_LINE:
-                if not os.path.exists(self.profilePath):
-                    os.makedirs(self.profilePath)
+            if not os.path.exists(self.plot_path):
+                os.makedirs(self.plot_path)
+            if profile_state == ProfileState.TIME_LINE:
+                if not os.path.exists(self.profile_path):
+                    os.makedirs(self.profile_path)
 
-    def newArchiveFile(self):
+    def new_archive_file(self):
         """
         Makes a new hdf5 file at the archive path.
         """
-        self.archiveFile = h5py.File(self.archivePath + "archive.hdf5", "w")
+        self.archive_file = h5py.File(self.archive_path + "archive.hdf5", "w")
 
-    def openArchiveFile(self, oldExecutionTimeString):
+    def open_archive_file(self, oldExecution_time_string):
         """
         Reads an existing hdf5 archive file, referenced by a given time.
 
         Parameters
         ----------
-        oldExecutionTimeString : `string`
+        oldExecution_time_string : `string`
             The time identity of the archive to be opened.
         """
-        self.archiveFile = h5py.File(self.archivePath[:-25] + oldExecutionTimeString[:8] + "\\" + oldExecutionTimeString + "\\archive.hdf5", "r")
+        self.archive_file = h5py.File(self.archive_path[:-25] + oldExecution_time_string[:8] + "\\" + oldExecution_time_string + "\\archive.hdf5", "r")
 
-    def closeArchiveFile(self, doSaveSource = True):
+    def close_archive_file(self, do_save_source = True):
         """
         Archive source code and profile files.
 
         Parameters
         ----------
-        doSaveSource : `boolean`, optional
+        do_save_source : `boolean`, optional
             If `True`, will write copies of the source code to the archive on closing. Defaults to `True`.
         """
-        if self.archiveFile:
-            if doSaveSource:
-                self.writeCodeSource()
-            self.archiveFile.close()
-            if self.profileState == ProfileState.TIME_LINE:
-                profileFlagFile = open(self.profileLocalPath + "profileFlag", "w")
-                profileFlagFile.write(self.executionTimeString)
-                profileFlagFile.close()
+        if self.archive_file:
+            if do_save_source:
+                self.write_code_source()
+            self.archive_file.close()
+            if self.profile_state == ProfileState.TIME_LINE:
+                profile_flag_file = open(self.profile_local_path + "profile_flag", "w")
+                profile_flag_file.write(self.execution_time_string)
+                profile_flag_file.close()
         else:
             raise Warning("No archive currently open.")
 
-    def writeCodeSource(self):
+    def write_code_source(self):
         """
         Save source code to the hdf5 file.
         """
-        archiveGroupCodeSource = self.archiveFile.require_group("codeSource" + self.executionTimeString)
-        archiveGroupCodeSource["descriptionOfTest"] = np.asarray([self.descriptionOfTest], dtype = "|S512")
-        for codeSourceName in glob.glob(self.sourcePath + "*.py") + glob.glob(self.sourcePath + "*.bat"):
-            codeSource = open(codeSourceName, "r")
-            archiveGroupCodeSource[codeSourceName.replace(self.sourcePath, "")] = codeSource.read()
-            codeSource.close()
+        archive_group_code_source = self.archive_file.require_group("code_source" + self.execution_time_string)
+        archive_group_code_source["description_of_test"] = np.asarray([self.description_of_test], dtype = "|S512")
+        for code_source_name in glob.glob(self.source_path + "**\\*.py", recursive = True) + glob.glob(self.source_path + "**\\*.bat", recursive = True):
+            code_source = open(code_source_name, "r")
+            archive_group_code_source[code_source_name.replace(self.source_path, "")] = code_source.read()
+            code_source.close()
 
-    def writeProfiles(self):
+    def write_profiles(self):
         """
-        Organise the generated profile files to the `profilePath`.
+        Organise the generated profile files to the `profile_path`.
         """
-        for profileName in glob.glob(self.profileLocalPath + "*.prof"):
-            shutil.copyfile(profileName, profileName.replace(self.profileLocalPath, self.profilePath))
+        for profile_name in glob.glob(self.profile_local_path + "*.prof"):
+            shutil.copyfile(profile_name, profile_name.replace(self.profile_local_path, self.profile_path))
