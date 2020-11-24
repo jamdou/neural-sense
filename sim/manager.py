@@ -433,30 +433,15 @@ class Simulation:
         self.trotter_cutoff = trotter_cutoff
 
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
-        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, True, spinsim.IntegrationMethod.MAGNUS_CF_4, spinsim.ExponentiationMethod.ANALYTIC, trotter_cutoff = trotter_cutoff)
+        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
 
     def evaluate(self, simulation_index):
         """
         Time evolves the system, and finds the spin at each coarse time step.
         """
-        # Run stepwise solver
-        self.simulation_results.time_evolution = cuda.device_array_like(self.simulation_results.time_evolution)
-        self.signal.time_properties.time_coarse = cuda.device_array_like(self.signal.time_properties.time_coarse)
-
-        self.simulator.get_time_evolution(simulation_index, self.signal.time_properties.time_coarse, cuda.to_device(self.signal.time_properties.time_end_points), self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.simulation_results.time_evolution)
-
-        self.simulation_results.time_evolution = self.simulation_results.time_evolution.copy_to_host()
-        self.signal.time_properties.time_coarse = self.signal.time_properties.time_coarse.copy_to_host()
-
-        # Combine results of the stepwise solver to evaluate the timeseries for the state
-        self.simulator.get_state(self.state_properties.state_init, self.simulation_results.state, self.simulation_results.time_evolution)
-
-        # Evaluate the time series for the expected spin value
-        self.simulation_results.spin = cuda.device_array_like(self.simulation_results.spin)
-
-        self.simulator.get_spin(cuda.to_device(self.simulation_results.state), self.simulation_results.spin)
-
-        self.simulation_results.spin = self.simulation_results.spin.copy_to_host()
+        self.simulation_results.state, self.signal.time_properties.time_coarse = self.simulator.get_state(simulation_index, self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
+        self.simulation_results.time_evolution = self.simulator.time_evolution_coarse
+        self.simulation_results.spin = self.simulator.get_spin(self.simulation_results.state)
 
     def get_frequency_amplitude_from_demodulation(self, demodulationTime_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
         """
