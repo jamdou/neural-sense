@@ -299,8 +299,8 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
         plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices")
-        plt.savefig(archive.plot_path + "benchmark_parallelisation.pdf")
-        plt.savefig(archive.plot_path + "benchmark_parallelisation.png")
+        plt.savefig(archive.plot_path + "benchmark_device.pdf")
+        plt.savefig(archive.plot_path + "benchmark_device.png")
     plt.show()
 
     plt.figure()
@@ -312,8 +312,8 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
         plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices,\nfirst run")
-        plt.savefig(archive.plot_path + "benchmark_parallelisation_first.pdf")
-        plt.savefig(archive.plot_path + "benchmark_parallelisation_first.png")
+        plt.savefig(archive.plot_path + "benchmark_device_first.pdf")
+        plt.savefig(archive.plot_path + "benchmark_device_first.png")
     plt.show()
 
     return
