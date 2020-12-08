@@ -65,8 +65,11 @@ if __name__ == "__main__":
         # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
 
         # Time test
-        frequency = np.arange(50, 3051, 1000)
-        sim.benchmark.new_benchmark_device(archive, signal, frequency, state_properties)
+        # frequency = np.arange(50, 3051, 1000)
+        # sim.benchmark.new_benchmark_device(archive, signal, frequency, state_properties)
+
+        # Device aggregate
+        sim.benchmark.new_benchmark_device_aggregate(archive, ["20201208T132324", "20201208T174451"])
 
         # # Time step source test
         # time_step_source = np.logspace(-9, -6, 50)

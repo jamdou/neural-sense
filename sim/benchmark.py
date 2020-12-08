@@ -231,6 +231,52 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
         archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
     plt.show()
 
+def new_benchmark_device_aggregate(archive, archive_times):
+    device_label = []
+    execution_time = np.empty(0, dtype = np.float64)
+    for archive_time in archive_times:
+        archive_previous = Archive(archive.archive_path[:-25], "")
+        archive_previous.open_archive_file(archive_time)
+        archive_group_benchmark_device = archive_previous.archive_file.require_group("benchmark_results/device")
+        device_label = np.append(device_label, np.asarray(archive_group_benchmark_device["device"]))
+        execution_time = np.append(execution_time, archive_group_benchmark_device["execution_time"])
+        archive_previous.close_archive_file(False)
+
+    order = np.argsort(execution_time)
+    order = order[::-1]
+    execution_time = execution_time[order]
+    device_label = device_label[order]
+    device_label = device_label.tolist()
+    execution_frequency = 1/execution_time
+
+    colour = []
+    for device_label_index in range(len(device_label)):
+        device_label[device_label_index] = device_label[device_label_index].decode('UTF-8')
+        device_label_instance = device_label[device_label_index]
+        if "intel" in device_label_instance.lower():
+            colour += ["b"]
+        elif "cuda" in device_label_instance.lower():
+            colour += ["g"]
+        else:
+            colour += ["r"]
+
+    plt.figure()
+    plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
+    plt.barh(range(len(device_label)), execution_frequency, tick_label = device_label, color = colour)
+    for device_index in range(len(device_label)):
+        if execution_frequency[device_index] > 0.6*execution_frequency[len(device_label) - 1]:
+            plt.text(execution_frequency[device_index], device_index, " {:.1f}ms per sim ".format(execution_time[device_index]*1e3), ha = "right", va = "center", color = "w")
+        else:
+            plt.text(execution_frequency[device_index], device_index, " {:.1f}ms per sim ".format(execution_time[device_index]*1e3), ha = "left", va = "center")
+
+    plt.xlabel("Execution speed (simulations per second)")
+    if archive:
+        plt.title(archive.execution_time_string + "\nParallelisation speed for various devices")
+        plt.savefig(archive.plot_path + "benchmark_device_aggregate.pdf")
+        plt.savefig(archive.plot_path + "benchmark_device_aggregate.png")
+    plt.show()
+    
+
 def new_benchmark_device(archive, signal, frequency, state_properties):
     """
     Runs a benchmark to compare (single and multicore) CPU performance to GPU performance.
@@ -260,10 +306,15 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
         "{}\nmulti thread".format(cpu_name),
         "{}\ncuda".format(gpu_name)
     ]
-    if "Intel" in cpu_name:
-        colour = ["b", "b", "g"]
-    else:
-        colour = ["r", "r", "g"]
+
+    colour = []
+    for device_label_instance in device_label:
+        if "intel" in device_label_instance.lower():
+            colour += ["b"]
+        elif "cuda" in device_label_instance.lower():
+            colour += ["g"]
+        else:
+            colour += ["r"]
 
     simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, execution_time_output = execution_time_output, device = device)
     simulation_manager.evaluate(False)
@@ -293,9 +344,12 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     plt.figure()
     plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
     plt.barh(range(len(device)), execution_time[0]/execution_time, tick_label = device_label, color = colour)
-    plt.text(speed_up[0], 0, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up[0], execution_time[0]*1e3), ha = "left", va = "center")
-    plt.text(speed_up[1], 1, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up[1], execution_time[1]*1e3), ha = "left", va = "center")
-    plt.text(speed_up[2], 2, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up[2], execution_time[2]*1e3), ha = "right", va = "center", color = "w")
+    for device_index in range(len(device_label)):
+        if speed_up[device_index] > 0.6*speed_up[len(device_label) - 1]:
+            plt.text(speed_up[device_index], device_index, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up[device_index], execution_time[device_index]*1e3), ha = "right", va = "center", color = "w")
+        else:
+            plt.text(speed_up[device_index], device_index, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up[device_index], execution_time[device_index]*1e3), ha = "left", va = "center")
+    
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
         plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices")
