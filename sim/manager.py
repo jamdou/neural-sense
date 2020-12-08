@@ -2,7 +2,7 @@
 Classes and methods used to control the specific experiment we are trying to simulate.
 """
 
-from spinsim import utilities
+# from spinsim import utilities
 import spinsim
 
 import numpy as np
@@ -37,7 +37,7 @@ class SimulationManager:
     state_properties : :class:`StateProperties`
             The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
     """
-    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, trotter_cutoff = [28]):
+    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, trotter_cutoff = [28], device = spinsim.Device.CUDA, execution_time_output = None):
         """
         Parameters
         ----------
@@ -57,12 +57,16 @@ class SimulationManager:
         self.signal = signal
         if not isinstance(self.signal, list):
             self.signal = [self.signal]
+        self.device = device
+        if not isinstance(self.device, list):
+            self.device = [self.device]
         self.trotter_cutoff = np.asarray(trotter_cutoff)
         self.frequency = np.asarray(frequency, dtype = np.float64)
-        self.frequency_amplitude = np.empty(self.frequency.size*len(self.signal)*self.trotter_cutoff.size, dtype = np.float64)
+        self.frequency_amplitude = np.empty(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device), dtype = np.float64)
         self.archive = archive
         self.state_output = state_output
         self.state_properties = state_properties
+        self.execution_time_output = execution_time_output
 
     def evaluate(self, do_plot = False, do_write_everything = False):
         """
@@ -80,21 +84,24 @@ class SimulationManager:
         execution_time_end_points[1] = execution_time_end_points[0]
         print("Idx\tCmp\tTm\tdTm")
         archive_group_simulations = self.archive.archive_file.require_group("simulations")
-        for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
-            for signal_index, signal_instance in enumerate(self.signal):
-                simulation = Simulation(signal_instance, self.frequency[0], self.frequency[1] - self.frequency[0], self.state_properties, trotter_cutoff_instance)
-                for frequency_index in range(self.frequency.size):
-                    simulation_index = frequency_index + (signal_index + trotter_cutoff_index*len(self.signal))*self.frequency.size
-                    frequency_value = self.frequency[frequency_index]
-                    simulation.evaluate(frequency_index)
-                    simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
-                    # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
-                    simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
-                    self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
-                    if self.state_output is not None:
-                        self.state_output += [simulation.simulation_results.state.copy()]
-                    print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
-                    execution_time_end_points[1] = tm.time()
+        for device_index, device_instance in enumerate(self.device):
+            for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
+                for signal_index, signal_instance in enumerate(self.signal):
+                    simulation = Simulation(signal_instance, self.frequency[0], self.frequency[1] - self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance)
+                    for frequency_index in range(self.frequency.size):
+                        simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
+                        frequency_value = self.frequency[frequency_index]
+                        simulation.evaluate(frequency_index)
+                        simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                        # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
+                        simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
+                        self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
+                        if self.state_output is not None:
+                            self.state_output += [simulation.simulation_results.state.copy()]
+                        if self.execution_time_output is not None:
+                            self.execution_time_output += [tm.time() - execution_time_end_points[1]]
+                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
+                        execution_time_end_points[1] = tm.time()
         print("\033[32mDone!\033[0m")
 
 #===============================================================#
@@ -107,7 +114,7 @@ exp_precision = 5                                # Where to cut off the exp Tayl
 machine_epsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
 # trotter_cutoff = 52
 
-interpolate = utilities.interpolate_source_cubic
+# interpolate = utilities.interpolate_source_cubic
 
 class SourceProperties:
     """
@@ -411,7 +418,7 @@ class Simulation:
     trotter_cutoff : `int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal, dressing_rabi_frequency = 1e3, amplitude_step = 1.0, state_properties = None, trotter_cutoff = 28):
+    def __init__(self, signal, dressing_rabi_frequency = 1e3, amplitude_step = 1.0, state_properties = None, trotter_cutoff = 28, device = spinsim.Device.CUDA):
         """
         Parameters
         ----------
@@ -431,9 +438,10 @@ class Simulation:
         self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, amplitude_step)
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
         self.trotter_cutoff = trotter_cutoff
+        self.device = device
 
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
-        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
+        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
 
     def evaluate(self, simulation_index):
         """

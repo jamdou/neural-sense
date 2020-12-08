@@ -6,9 +6,11 @@ from numba import cuda
 from enum import Enum
 import math
 import h5py
+import subprocess
+import textwrap
 
 from . import manager
-from spinsim import utilities
+# from spinsim import utilities
 import spinsim
 from archive import *
 import test_signal
@@ -229,6 +231,92 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
         archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
     plt.show()
 
+def new_benchmark_device(archive, signal, frequency, state_properties):
+    """
+    Runs a benchmark to compare (single and multicore) CPU performance to GPU performance.
+
+    archive : :class:`archive.Archive`
+        Specifies the path to save the plot to, as well as the archive file to save the results to.
+    signal : `list` of :class:`test_signal.TestSignal`
+        The signals being simulated in the benchmark.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+        The dressing frequencies being simulated in the benchmark.
+    state_properties : :class:`sim.StateProperties`
+        Specifies the initial state and spin quantum number of the quantum system simulated in the benchmarked.
+    """
+    state_output = []
+    execution_time_output = []
+    device = [
+        spinsim.Device.CPU_SINGLE,
+        spinsim.Device.CPU,
+        spinsim.Device.CUDA
+    ]
+
+    cpu_name = "\n".join(textwrap.wrap(subprocess.check_output(["wmic","cpu","get", "name"]).strip().decode('utf-8').split("\n")[1], width = 24))
+
+    gpu_name = cuda.list_devices()[0].name.decode('UTF-8')
+    device_label = [
+        "{}\nsingle thread".format(cpu_name),
+        "{}\nmulti thread".format(cpu_name),
+        "{}\ncuda".format(gpu_name)
+    ]
+    if "Intel" in cpu_name:
+        colour = ["b", "b", "g"]
+    else:
+        colour = ["r", "r", "g"]
+
+    simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, execution_time_output = execution_time_output, device = device)
+    simulation_manager.evaluate(False)
+
+    execution_time = np.zeros(len(device), np.double)
+    execution_time_first = np.zeros(len(device), np.double)
+
+    for device_index in range(len(device)):
+        for frequency_index in range(frequency.size):
+            if frequency_index == 0:
+                execution_time_first[device_index] = execution_time_output[device_index*frequency.size]
+            else:
+                execution_time[device_index] += execution_time_output[frequency_index + device_index*frequency.size]
+    execution_time /= frequency.size - 1
+
+    speed_up = execution_time[0]/execution_time
+    speed_up_first = execution_time_first[0]/execution_time_first
+
+    if archive:
+        archive_group_benchmark_device = archive.archive_file.require_group("benchmark_results/device")
+        archive_group_benchmark_device["device"] = np.asarray(device_label, dtype='|S128')
+        archive_group_benchmark_device["execution_time"] = execution_time
+        archive_group_benchmark_device["speed_up"] = speed_up
+        archive_group_benchmark_device["execution_time_first"] = execution_time
+        archive_group_benchmark_device["speed_up_first"] = speed_up_first
+
+    plt.figure()
+    plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
+    plt.barh(range(len(device)), execution_time[0]/execution_time, tick_label = device_label, color = colour)
+    plt.text(speed_up[0], 0, " {:.1f}x speed up \n {:.1f}ms per sim ".format(speed_up[0], execution_time[0]*1e3), ha = "left", va = "center")
+    plt.text(speed_up[1], 1, " {:.1f}x speed up \n {:.1f}ms per sim ".format(speed_up[1], execution_time[1]*1e3), ha = "left", va = "center")
+    plt.text(speed_up[2], 2, " {:.1f}x speed up \n {:.1f}ms per sim ".format(speed_up[2], execution_time[2]*1e3), ha = "right", va = "center", color = "w")
+    plt.xlabel("Speedup compared to single CPU thread")
+    if archive:
+        plt.title(archive.execution_time_string + "\nParallelisation speedup for various devices")
+        plt.savefig(archive.plot_path + "benchmark_parallelisation.pdf")
+        plt.savefig(archive.plot_path + "benchmark_parallelisation.png")
+    plt.show()
+
+    plt.figure()
+    plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
+    plt.barh(range(len(device)), execution_time_first[0]/execution_time_first, tick_label = device_label, color = colour)
+    plt.text(speed_up_first[0], 0, " {:.1f}x speed up \n {:.1f}ms per sim ".format(speed_up_first[0], execution_time_first[0]*1e3), ha = "left", va = "center")
+    plt.text(speed_up_first[1], 1, " {:.1f}x speed up \n {:.1f}ms per sim ".format(speed_up_first[1], execution_time_first[1]*1e3), ha = "left", va = "center")
+    plt.text(speed_up_first[2], 2, " {:.1f}x speed up \n {:.1f}ms per sim ".format(speed_up_first[2], execution_time_first[2]*1e3), ha = "right", va = "center", color = "w")
+    plt.xlabel("Speedup compared to single CPU thread")
+    if archive:
+        plt.title(archive.execution_time_string + "\nParallelisation speedup for various devices,\nfirst run")
+        plt.savefig(archive.plot_path + "benchmark_parallelisation_first.pdf")
+        plt.savefig(archive.plot_path + "benchmark_parallelisation_first.png")
+    plt.show()
+
+    return
 
 def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.0):
     """
@@ -314,7 +402,7 @@ def benchmark_trotter_cutoff_matrix(norm_bound, trotter_cutoff, result):
         source_sample[2] = norm_bound*math.cos(4.0*time_index)/4
         source_sample[3] = norm_bound*math.cos(8.0*time_index)/4
 
-        utilities.spin_one.matrixExponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
+        # utilities.spin_one.matrixExponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
 
 def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
     """

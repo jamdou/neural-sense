@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     # Check to see if there is a compatible GPU
     if cuda.list_devices():
-        print("\033[32mUsing cuda device " + str(cuda.list_devices()[0].name) + "\033[0m")
+        print("\033[32mUsing cuda device {}\033[0m".format(cuda.list_devices()[0].name.decode('UTF-8')))
     else:
         print("\033[31mNo cuda devices found. System is incompatible. Exiting...\033[0m")
         exit()
@@ -64,6 +64,10 @@ if __name__ == "__main__":
         # # frequency = np.arange(1000, 1003, 5)
         # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
 
+        # Time test
+        frequency = np.arange(50, 3051, 1000)
+        sim.benchmark.new_benchmark_device(archive, signal, frequency, state_properties)
+
         # # Time step source test
         # time_step_source = np.logspace(-9, -6, 50)
         # frequency = np.arange(50, 3051, 300)
@@ -82,16 +86,16 @@ if __name__ == "__main__":
         # frequency = np.arange(50, 3051, 30)
         # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
-        # Run simulations
-        frequency = np.arange(70, 3071, 30)
-        # frequency = np.arange(50, 3051, 3)
-        # frequency = np.arange(1000, 1003, 1)
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
-        simulation_manager.evaluate(False, False)
-        # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        experiment_results.write_to_archive(archive)
-        experiment_results.plot(archive, signal)
+        # # Run simulations
+        # frequency = np.arange(70, 3071, 30)
+        # # frequency = np.arange(50, 3051, 3)
+        # # frequency = np.arange(1000, 1003, 1)
+        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
+        # simulation_manager.evaluate(False, False)
+        # # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
+        # experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        # experiment_results.write_to_archive(archive)
+        # experiment_results.plot(archive, signal)
 
         # # Make reconstructions
         # reconstruction = recon.Reconstruction(signal.time_properties)
