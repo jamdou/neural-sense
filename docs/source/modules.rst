@@ -6,5 +6,5 @@
 
    archive
    reconstruction
-   spinsim
-   testSignal
+   sim
+   test_signal

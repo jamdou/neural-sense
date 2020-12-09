@@ -24,21 +24,21 @@ import os
 import sys
 import sphinx_rtd_theme
 # from import exts.numbadoc
-sys.path.insert(0, os.path.abspath('../../'))
-sys.path.append(os.path.abspath("./_ext"))
-# sys.path.insert(1, os.path.abspath('exts\\'))
+sys.path.insert(0, os.path.abspath('../'))
+sys.path.append(os.path.abspath("../../"))
+sys.path.insert(1, os.path.abspath('_ext\\'))
 # from exts import numbadoc
 # sys.path.append(os.path.abspath('exts\\'))
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'NeuralSense'
-copyright = '2020, Alexander Tritt'
+project = 'neuralsense'
+copyright = '2020, Monash University'
 author = 'Alexander Tritt'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = '0.1.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -47,13 +47,16 @@ release = '0.1'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "sphinx.ext.autodoc",   # Generate documentation from code
-    "sphinx.ext.napoleon",  # Use numpy standard formatting
-    "sphinx_rtd_theme",     # Documentation theme
-    "numbadoc"              # Is able to document numba
+    "sphinx.ext.autodoc",       # Generate documentation from code
+    "sphinx.ext.napoleon",      # Use numpy standard formatting
+    "sphinx_rtd_theme",         # Documentation theme
+    "numbadoc",                 # Is able to document numba
+    "sphinx.ext.intersphinx",   # Link to other documentation
+    "sphinxcontrib.bibtex"      # Bibtex support
 ]
 
 autoclass_content = 'both'
+numfig = True
 
 # Napoleon settings
 napoleon_google_docstring = False
@@ -92,3 +95,14 @@ html_theme = "sphinx_rtd_theme"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 html_sidebars = { '**': ['globaltoc.html', 'relations.html', 'sourcelink.html', 'searchbox.html'] }
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numba': ('http://numba.pydata.org/numba-doc/latest/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'matplotlib': ('http://matplotlib.sourceforge.net/', None),
+    'h5py' : ('https://docs.h5py.org/en/stable/', None),
+    'spinsim' : ('https://spinsim.readthedocs.io/en/latest/', None)
+    }
+
+# add_module_names = False

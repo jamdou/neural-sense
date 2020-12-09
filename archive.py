@@ -1,5 +1,5 @@
 """
-A class to handle archiving inputs and results, as well as an :class:`Enum` to help organise profiling results.
+A class to handle archiving inputs and results, as well as an :class:`enum.Enum` to help organise profiling results.
 """
 
 import numpy as np
@@ -48,12 +48,12 @@ def handle_arguments():
 
     Returns
     -------
-    archive_path : `string`
-            The path where hdf5 archive files are saved. A new directory for the day, then time, will be made here to organise the archives.
-        profile_state : :class:`ProfileState`, optional
-            A description of which type of profiling is being done now. Used to organise profile output files. Defaults to :obj:`ProfileState.NONE`.
-        description_of_test : `string`
-            A note of the current aim of the test, to be saved to the hdf5 archive.
+    archive_path : :obj:`str`
+        The path where hdf5 archive files are saved. A new directory for the day, then time, will be made here to organise the archives.
+    profile_state : :class:`ProfileState`, optional
+        A description of which type of profiling is being done now. Used to organise profile output files. Defaults to :obj:`ProfileState.NONE`.
+    description_of_test : :obj:`str`
+        A note of the current aim of the test, to be saved to the hdf5 archive.
     """
     help_message = """
     \033[36m-h  --help      \033[33mShow this message
@@ -102,32 +102,32 @@ class Archive:
 
     Attributes
     ----------
-    execution_time_string : `string`
+    execution_time_string : :obj:`str`
         The time when the code was first executed, in YYYYmmddTHHMMSS format.
-    description_of_test : `string`
+    description_of_test : :obj:`str`
         A note of the current aim of the test, to be saved to the hdf5 archive.
     archive_file : :class:`h5py.File`
         The hdf5 file to use when archiving.
-    archive_path : `string`
+    archive_path : :obj:`str`
         The archive path to save the hdf5 archive to.
-    plot_path : `string`
+    plot_path : :obj:`str`
         The archive path to save plots to.
-    profile_path : `string`
+    profile_path : :obj:`str`
         The archive path to save profile outputs to.
     profile_state : :class:`ProfileState`
         A description of which type of profiling is being done now. Used to organise profile output files.
-    source_path : `string`
+    source_path : :obj:`str`
         Path to source files.
-    profile_local_path : `string`
+    profile_local_path : :obj:`str`
         Path to temporary profile outputs, to be properly archived when `profile_state` is :obj:`ProfileState.ARCHIVE`.
     """
     def __init__(self, archive_path, description_of_test, profile_state = ProfileState.NONE):
         """
         Parameters
         ----------
-        archive_path : `string`
+        archive_path : :obj:`str`
             The path where hdf5 archive files are saved. A new directory for the day, then time, will be made here to organise the archives.
-        description_of_test : `string`
+        description_of_test : :obj:`str`
             A note of the current aim of the test, to be saved to the hdf5 archive.
         profile_state : :class:`ProfileState`, optional
             A description of which type of profiling is being done now. Used to organise profile output files. Defaults to :obj:`ProfileState.NONE`.
@@ -167,16 +167,16 @@ class Archive:
         """
         self.archive_file = h5py.File(self.archive_path + "archive.hdf5", "w")
 
-    def open_archive_file(self, oldExecution_time_string):
+    def open_archive_file(self, old_execution_time_string):
         """
         Reads an existing hdf5 archive file, referenced by a given time.
 
         Parameters
         ----------
-        oldExecution_time_string : `string`
+        old_execution_time_string : :obj:`str`
             The time identity of the archive to be opened.
         """
-        self.archive_file = h5py.File(self.archive_path[:-25] + oldExecution_time_string[:8] + "\\" + oldExecution_time_string + "\\archive.hdf5", "r")
+        self.archive_file = h5py.File(self.archive_path[:-25] + old_execution_time_string[:8] + "\\" + old_execution_time_string + "\\archive.hdf5", "r")
 
     def close_archive_file(self, do_save_source = True):
         """
