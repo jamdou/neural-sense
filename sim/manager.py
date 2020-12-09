@@ -447,9 +447,11 @@ class Simulation:
         """
         Time evolves the system, and finds the spin at each coarse time step.
         """
-        self.simulation_results.state, self.signal.time_properties.time_coarse = self.simulator.get_state(simulation_index, self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
-        self.simulation_results.time_evolution = self.simulator.time_evolution_coarse
-        self.simulation_results.spin = self.simulator.get_spin(self.simulation_results.state)
+        results = self.simulator.evaluate(simulation_index, self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
+        self.simulation_results.state = results.state
+        self.signal.time_properties.time_coarse = results.time
+        self.simulation_results.time_evolution = results.time_evolution
+        self.simulation_results.spin = results.spin
 
     def get_frequency_amplitude_from_demodulation(self, demodulationTime_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
         """
