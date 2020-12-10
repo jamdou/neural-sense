@@ -26,7 +26,7 @@ import sphinx_rtd_theme
 # from import exts.numbadoc
 sys.path.insert(0, os.path.abspath('../'))
 sys.path.append(os.path.abspath("../../"))
-sys.path.insert(1, os.path.abspath("./_ext"))
+sys.path.append(os.path.abspath("./_ext"))
 # from exts import numbadoc
 # sys.path.append(os.path.abspath('exts\\'))
 
