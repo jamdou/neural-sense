@@ -21,15 +21,15 @@ class BenchmarkType(Enum):
 
     Parameters
     ----------
-    _value_ : `string`
+    _value_ : :obj:`str`
         Label for the archive.
-    x_label : `string`
+    x_label : :obj:`str`
         Horizontal label for when plotting.
-    y_label : `string`
+    y_label : :obj:`str`
         Vertical label for when plotting.
-    title : `string`
+    title : :obj:`str`
         Title for when plotting.
-    x_scale : `string`
+    x_scale : :obj:`str`
         The type of scaling to apply to the x axis for when plotting. Either `"linear"` for a linear scale, or `"log"` for a log scale.
     """
     def __init__(self, value, x_label, y_label, title, x_scale):
@@ -176,8 +176,8 @@ class BenchmarkResults:
         ----------
         archive : :class:`archive.Archive`, optional
             If specified, will save plots to the archive's `plot_path`.
-        do_show_plot : `boolean`, optional
-            If `True`, will attempt to show and save the plots. Can be set to false to overlay multiple archive results to be plotted later, as is done with :func:`benchmark_manager.plot_benchmark_comparison()`.
+        do_show_plot : :obj:`bool`, optional
+            If :obj:`True`, will attempt to show and save the plots. Can be set to false to overlay multiple archive results to be plotted later, as is done with :func:`benchmark_manager.plot_benchmark_comparison()`.
         """
         if do_show_plot:
             plt.figure()
@@ -204,11 +204,11 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
     ----------
     archive : :class:`archive.Archive`
         Specifies the path to save the plot to.
-    archive_times : `list` of `string`
+    archive_times : :obj:`list` of :obj:`str`
         The identifiers of the archvies containing the benchmark results to be compared.
-    legend : `list` of `string`
+    legend : :obj:`list` of :obj:`str`
         Labels that describe what each of the benchmark result curves respresent.
-    title : `string`
+    title : :obj:`str`
         What this comparison is trying to compare.
     """
     plt.figure()
@@ -232,6 +232,16 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
     plt.show()
 
 def new_benchmark_device_aggregate(archive, archive_times):
+    """
+    Collects results for multiple runs of :func:`new_benchmark_device()`, and combines them into a single bar chart.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies the location to save the plots to, as well as execution time.
+    archive_times : :obj:`list` of :obj:`str`
+        The execution times for the archvies to be read in.
+    """
     device_label = []
     execution_time = np.empty(0, dtype = np.float64)
     for archive_time in archive_times:
@@ -281,11 +291,13 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     """
     Runs a benchmark to compare (single and multicore) CPU performance to GPU performance.
 
+    Parameters
+    ----------
     archive : :class:`archive.Archive`
         Specifies the path to save the plot to, as well as the archive file to save the results to.
-    signal : `list` of :class:`test_signal.TestSignal`
+    signal : :obj:`list` of :class:`test_signal.TestSignal`
         The signals being simulated in the benchmark.
-    frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
     state_properties : :class:`sim.StateProperties`
         Specifies the initial state and spin quantum number of the quantum system simulated in the benchmarked.
@@ -319,8 +331,8 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, execution_time_output = execution_time_output, device = device)
     simulation_manager.evaluate(False)
 
-    execution_time = np.zeros(len(device), np.double)
-    execution_time_first = np.zeros(len(device), np.double)
+    execution_time = np.zeros(len(device), np.float64)
+    execution_time_first = np.zeros(len(device), np.float64)
 
     for device_index in range(len(device)):
         for frequency_index in range(frequency.size):
@@ -406,17 +418,46 @@ def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.
 
     Returns
     -------
-    benchmark_results : :class:`benchmark_results.BenchmarkResults`
+    benchmark_results : :class:`BenchmarkResults`
         Contains the errors found by the benchmark.
     """
     print("\033[33m_starting benchmark...\033[0m")
+
+    threads_per_block = 64
+    utilities = spinsim.Utilities(spinsim.SpinQuantumNumber.ONE, spinsim.Device.CUDA, threads_per_block)
+    matrix_exponential_lie_trotter = utilities.matrix_exponential_lie_trotter
+
+    @cuda.jit
+    def benchmark_trotter_cutoff_matrix(norm_bound, trotter_cutoff, result):
+        """
+        Runs the exponentiations for the trotter matrix benchmark.
+
+        Parameters
+        ----------
+        norm_bound : `float`, optional
+            An upper bound to the size of the norm of the matrices being exponentiated, since :func:`utilities.matrixExponential_lie_trotter()` works better using matrices with smaller norms. Defaults to 1.
+        trotter_cutoff : :obj:`int`
+            The value trotter cutoff to run the matrix exponentiator at.
+        result : :class:`numpy.ndarray` of :class:`numpy.complex128`
+            The results of the matrix exponentiations for this value of `trotter_cutoff`.
+        """
+        source_sample = cuda.local.array(4,dtype = nb.float64)
+
+        time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+        if time_index < result.shape[0]:
+            source_sample[0] = norm_bound*math.cos(1.0*time_index)/4
+            source_sample[1] = norm_bound*math.cos(2.0*time_index)/4
+            source_sample[2] = norm_bound*math.cos(4.0*time_index)/4
+            source_sample[3] = norm_bound*math.cos(8.0*time_index)/4
+
+            matrix_exponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
+
     time_index_max = 1000000
     result = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     result_bench = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     trotter_cutoff = np.asarray(trotter_cutoff)
-    error = np.empty_like(trotter_cutoff, dtype = np.double)
+    error = np.empty_like(trotter_cutoff, dtype = np.float64)
     
-    threads_per_block = 128
     blocks_per_grid = (time_index_max + (threads_per_block - 1)) // threads_per_block
     benchmark_trotter_cutoff_matrix[blocks_per_grid, threads_per_block](norm_bound, trotter_cutoff[0], result_bench)
 
@@ -432,31 +473,6 @@ def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.
     benchmark_results.plot(archive)
 
     return benchmark_results
-
-@cuda.jit
-def benchmark_trotter_cutoff_matrix(norm_bound, trotter_cutoff, result):
-    """
-    Runs the exponentiations for the trotter matrix benchmark.
-
-    Parameters
-    ----------
-    norm_bound : `float`, optional
-        An upper bound to the size of the norm of the matrices being exponentiated, since :func:`utilities.matrixExponential_lie_trotter()` works better using matrices with smaller norms. Defaults to 1.
-    trotter_cutoff : `int`
-        The value trotter cutoff to run the matrix exponentiator at.
-    result : :class:`numpy.ndarray` of :class:`numpy.cdouble`
-        The results of the matrix exponentiations for this value of `trotter_cutoff`.
-    """
-    source_sample = cuda.local.array(4,dtype = nb.float64)
-
-    time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    if time_index < result.shape[0]:
-        source_sample[0] = norm_bound*math.cos(1.0*time_index)/4
-        source_sample[1] = norm_bound*math.cos(2.0*time_index)/4
-        source_sample[2] = norm_bound*math.cos(4.0*time_index)/4
-        source_sample[3] = norm_bound*math.cos(8.0*time_index)/4
-
-        # utilities.spin_one.matrixExponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
 
 def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
     """
@@ -475,16 +491,16 @@ def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
     ----------
     archive : :class:`archive.Archive`
         Specifies where to save results and plots.
-    signal : `list` of :class:`test_signal.TestSignal`
+    signal : :obj:`list` of :class:`test_signal.TestSignal`
         The signals being simulated in the benchmark.
-    frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
     trotter_cutoff : :class:`numpy.ndarray` of :class:`numpy.int`
         An array of values of the trotter cutoff to run the simulations at. The accuracy of the simulation output with each of these values are then compared.
 
     Returns
     -------
-    benchmark_results : :class:`benchmark_results.BenchmarkResults`
+    benchmark_results : :class:`BenchmarkResults`
         Contains the errors found by the benchmark.
     """
     state_output = []
@@ -526,14 +542,14 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
         Specifies where to save results and plots.
     signal_template : :class:`test_signal.TestSignal`
         A description of the signal to use for the environment during the spinsim. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
-    frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
-    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.double`
+    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
         An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
 
     Returns
     -------
-    benchmark_results : :class:`benchmark_results.BenchmarkResults`
+    benchmark_results : :class:`BenchmarkResults`
         Contains the errors found by the benchmark.
     """
     time_step_fine = np.asarray(time_step_fine)
@@ -567,6 +583,8 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
 
 def new_benchmark_time_step_source(archive, signal_template, frequency, state_properties, time_step_source):
     """
+    **(benchmark for obsolete interpolation mode, might be useful to keep if such a mode is re-added in the future)**
+
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
     Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `time_step_fine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
@@ -584,14 +602,14 @@ def new_benchmark_time_step_source(archive, signal_template, frequency, state_pr
         Specifies where to save results and plots.
     signal_template : :class:`test_signal.TestSignal`
         A description of the signal to use for the environment during the spinsim. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
-    frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
-    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.double`
-        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
+    time_step_source : :class:`numpy.ndarray` of :class:`numpy.float64`
+        An array of time steps to run the interpolation with. The accuracy of the simulation output with each of these values are then compared.
 
     Returns
     -------
-    benchmark_results : :class:`benchmark_results.BenchmarkResults`
+    benchmark_results : :class:`BenchmarkResults`
         Contains the errors found by the benchmark.
     """
     time_step_source = np.asarray(time_step_source)
@@ -632,9 +650,9 @@ def new_benchmark_time_step_fine_frequency_drift(archive, signal_template, time_
         Specifies where to save results and plots.
     signal_template : :class:`test_signal.TestSignal`
         A description of the signal to use for the environment during the spinsim. For each entry in `time_step_fines`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
-    time_step_fines : :class:`numpy.ndarray` of :class:`numpy.double`
+    time_step_fines : :class:`numpy.ndarray` of :class:`numpy.float64`
         An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
-    dressing_frequency : :class:`numpy.ndarray` of :class:`numpy.double`
+    dressing_frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
     """
     dressing_frequency = np.asarray(dressing_frequency)

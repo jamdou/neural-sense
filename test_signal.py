@@ -22,7 +22,7 @@ class TimeProperties:
         The time step used within the integration algorithm. In units of s.
     time_end_points : :class:`numpy.ndarray` of :class:`numpy.double` (start time (0) or end time (1))
         The time values for when the experiment is to start and finishes. In units of s.
-    time_index_max : `int`
+    time_index_max : :obj:`int`
         The number of times to be sampled. That is, the size of `time_coarse`.
     time_coarse : :class:`numpy.ndarray` of :class:`numpy.double` (time_index)
         A coarse grained list of time samples that the signal is defined for. In units of s.
@@ -124,7 +124,7 @@ class SinusoidalNoise:
         The frequency of each spatial component of the noise as a 3D vector. In units of Hz.
     phase : :class:`numpy.ndarray` of :class:`numpy.double`, (spatial_index)
         The frequency of each spatial component of the noise as a 3D vector. In units of rad.
-    type : `string`
+    type : :obj:`str`
         A label for the kind of noise this represents. For archival purposes.
     """
     def __init__(self, amplitude = [0, 0, 0], frequency = [50, 50, 50], phase = [math.pi/2, math.pi/2, math.pi/2], type = "SinusoidalNoise"):
@@ -137,7 +137,7 @@ class SinusoidalNoise:
             The frequency of each spatial component of the noise as a 3D vector. In units of Hz. Defaults to 50Hz in each direction.
         phase : :class:`numpy.ndarray` of :class:`numpy.double`, (spatial_index)
             The frequency of each spatial component of the noise as a 3D vector. In units of rad. Defaults to :math:`\\frac{\\pi}{2}` rad in each direction.
-        type : `string`, optional
+        type : :obj:`str`, optional
         A label for the kind of noise this represents. For archival purposes. Defaults to `"SinusoidalNoise"`.
         """
         self.amplitude = np.asarray(amplitude, dtype=np.double)
@@ -260,8 +260,8 @@ class TestSignal:
             List of individual noise sources that add to the environment of the spin system. Defaults to no noise.
         time_properties : :class:`TimeProperties`, optional
             Details describing time for the signal.
-        do_evaluate : `boolean`
-            If `True`, calls functions :func:`get_amplitude()` and :func:`get_frequency_amplitude()` to evaluate `amplitude` and `frequency_amplitude`. Otherwise leaves these arrays empty, saving computational time. Defaults to `True`.
+        do_evaluate : :obj:`bool`
+            If :obj:`True`, calls functions :func:`get_amplitude()` and :func:`get_frequency_amplitude()` to evaluate `amplitude` and `frequency_amplitude`. Otherwise leaves these arrays empty, saving computational time. Defaults to :obj:`True`.
         """
         self.time_properties = time_properties
         self.neural_pulses = neural_pulses

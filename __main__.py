@@ -83,11 +83,11 @@ if __name__ == "__main__":
 
         # sim.benchmark.plot_benchmark_comparison(archive, ["20201119T181459", "20201119T181809", "20201119T182040", "20201119T182334", "20201119T182612", "20201119T182817"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, analytic)")
 
-        # Trotter Test
-        # newBenchmarkTrotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)
-        # frequency = np.arange(50, 3051, 300)
-        # frequency = np.arange(50, 3051, 30)
-        # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
+        # # Trotter Test
+        # sim.benchmark.new_benchmark_trotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)
+        # # frequency = np.arange(50, 3051, 300)
+        # # frequency = np.arange(50, 3051, 30)
+        # # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
         # Run simulations
         frequency = np.arange(70, 3071, 30)

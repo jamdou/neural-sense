@@ -184,8 +184,8 @@ class Archive:
 
         Parameters
         ----------
-        do_save_source : `boolean`, optional
-            If `True`, will write copies of the source code to the archive on closing. Defaults to `True`.
+        do_save_source : :obj:`bool`, optional
+            If :obj:`True`, will write copies of the source code to the archive on closing. Defaults to :obj:`True`.
         """
         if self.archive_file:
             if do_save_source:
