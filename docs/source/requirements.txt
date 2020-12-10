@@ -3,4 +3,5 @@ matplotlib
 scipy
 colorama
 numba==0.50.1
+sphinxcontrib.bibtex==1.0.0
 -f /docs/source/_ext/ numbadoc
