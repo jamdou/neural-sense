@@ -541,7 +541,7 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
     archive : :class:`archive.Archive`
         Specifies where to save results and plots.
     signal_template : :class:`test_signal.TestSignal`
-        A description of the signal to use for the environment during the spinsim. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
     frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
     time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
@@ -601,7 +601,7 @@ def new_benchmark_time_step_source(archive, signal_template, frequency, state_pr
     archive : :class:`archive.Archive`
         Specifies where to save results and plots.
     signal_template : :class:`test_signal.TestSignal`
-        A description of the signal to use for the environment during the spinsim. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
     frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
     time_step_source : :class:`numpy.ndarray` of :class:`numpy.float64`
@@ -649,7 +649,7 @@ def new_benchmark_time_step_fine_frequency_drift(archive, signal_template, time_
     archive : :class:`archive.Archive`
         Specifies where to save results and plots.
     signal_template : :class:`test_signal.TestSignal`
-        A description of the signal to use for the environment during the spinsim. For each entry in `time_step_fines`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fines`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
     time_step_fines : :class:`numpy.ndarray` of :class:`numpy.float64`
         An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
     dressing_frequency : :class:`numpy.ndarray` of :class:`numpy.float64`

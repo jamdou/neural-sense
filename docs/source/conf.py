@@ -100,8 +100,8 @@ intersphinx_mapping = {
     'numba': ('http://numba.pydata.org/numba-doc/latest/', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
     'matplotlib': ('http://matplotlib.sourceforge.net/', None),
-    'h5py' : ('https://docs.h5py.org/en/stable/', None),
-    'spinsim' : ('https://spinsim.readthedocs.io/en/latest/', None)
-    }
+    'h5py': ('https://docs.h5py.org/en/stable/', None),
+    'spinsim': ('https://spinsim.readthedocs.io/en/latest/', None)
+}
 
 # add_module_names = False
