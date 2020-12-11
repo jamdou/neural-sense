@@ -138,7 +138,7 @@ class SourceProperties:
     
     Attributes
     ----------
-    dressing_rabi_frequency : `float`
+    dressing_rabi_frequency : :obj:`float`
         The amplitude of the dressing in units of Hz.
     source_index_max : :obj:`int`
         The number of sources in the simulation.
@@ -150,7 +150,7 @@ class SourceProperties:
         The frequency of the sine wave of source `source_index` in direction `spatial_index`. See :math:`f` above. In units of Hz.
     source_time_end_points : :class:`numpy.ndarray` of :class:`numpy.float64`, (source_index, turn on time (0) or turn off time (1))
         The times that the sine wave of source `source_index` turns on and off. See :math:`\\tau` above. In units of s.
-    source_quadratic_shift :  `float`
+    source_quadratic_shift :  :obj:`float`
         The constant quadratic shift of the spin 1 system, in Hz.
     source_type : :class:`numpy.ndarray` of :class:`numpy.float64`, (source_index)
         A string description of what source source_index physically represents. Mainly for archive purposes.
@@ -163,9 +163,9 @@ class SourceProperties:
             An object that contains high level descriptions of the signal to be measured, as well as noise.
         state_properties : :class:`StateProperties`
             An object that contains the initial state and spin quatum number of the system.
-        dressing_rabi_frequency : `float`, optional
+        dressing_rabi_frequency : :obj:`float`, optional
             The amplitude of the dressing in units of Hz.
-        quadratic_shift :  `float`, optional
+        quadratic_shift :  :obj:`float`, optional
             The constant quadratic shift of the spin 1 system, in Hz.
         """
         self.dressing_rabi_frequency = dressing_rabi_frequency
@@ -221,7 +221,7 @@ class SourceProperties:
         ----------
         signal : :class:`test_signal.TestSignal`
             The signal object. Needed to specify how long the dressing and bias should be on for.
-        bias_amplitude : `float`, optional
+        bias_amplitude : :obj:`float`, optional
             The strength of the dc bias field in Hz. Also the frequency of the dressing.
             If one wants to add detuning, one can do that via detuning noise in :class:`test_signal.SinusoidalNoise.new_detuning_noise()`.
         """
@@ -371,7 +371,7 @@ class SimulationResults:
         The state (wavefunction) of the spin system in the lab frame, for each time sampled.
     spin : :class:`numpy.ndarray` of :class:`numpy.float64` (time_index, spatial_index)
         The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`.
-    sensed_frequency_amplitude : `float`
+    sensed_frequency_amplitude : :obj:`float`
         The measured Fourier coefficient from the simulation.
     sensed_frequency_amplitude_method : :obj:`str`
         The method used to find the measured Fourier coefficient (for archival purposes).
@@ -433,7 +433,7 @@ class Simulation:
         ----------
         signal : :class:`test_signal.TestSignal`
             The :class:`test_signal.TestSignal` object source signal to be measured.
-        dressing_rabi_frequency : `float`, optional
+        dressing_rabi_frequency : :obj:`float`, optional
             The amplitude of the dressing radiation to be applied to the system. Units of Hz.
         state_properties : :class:`StateProperties`, optional
             The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
@@ -559,7 +559,7 @@ def get_frequency_amplitude_from_demodulation_multiply(time, spin, spin_demodula
         The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`.
     spin_demodulated : :class:`numpy.ndarray` of :class:`numpy.float64` (time_index, spatial_index)
         The expected value for hyperfine spin of the spin system in the lab frame, multiplied by :math:`-2\\cos(2\\pi f_\\mathrm{bias, amp} t)` for each time sampled. Units of :math:`\\hbar`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    bias_amplitude : `float`
+    bias_amplitude : :obj:`float`
         The carrier frequency :math:`f_\\mathrm{bias, amp}` for which to demodulate by.
     """
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
@@ -577,7 +577,7 @@ def get_frequency_amplitude_from_demodulation_low_pass(time_end_points, spin, se
         The bounds of the interval where Faraday demodulation is used to acquire the measured frequency amplitude (Fourier coefficient) required for reconstruction
     spin : :class:`numpy.ndarray` of :class:`numpy.float64` (time_index, spatial_index)
         The expected value for hyperfine spin of the spin system in the lab frame, multiplied by :math:`-2\\cos(2\\pi f_\\mathrm{bias, amp} t)` for each time sampled. Units of :math:`\\hbar`. The output `spin_demodulated` from :func:`get_frequency_amplitude_from_demodulation_multiply()`.
-    sensed_frequency_amplitude : `float`
+    sensed_frequency_amplitude : :obj:`float`
         The measured Fourier coefficient from the simulation. This is an output.
     """
     sensed_frequency_amplitude = 0.0
@@ -600,7 +600,7 @@ def get_frequency_amplitude_from_demodulation(time, spin, spin_demodulated, bias
         The expected value for hyperfine spin of the spin system in the lab frame, for each time sampled. Units of :math:`\\hbar`.
     spin_demodulated : :class:`numpy.ndarray` of :class:`numpy.float64` (time_index, spatial_index)
         The expected value for hyperfine spin of the spin system in the lab frame, demodulated by `bias_amplitude` for each time sampled. Units of :math:`\\hbar`. This is an output, so use an empty :class:`numpy.ndarray` with :func:`numpy.empty()`, or declare a :class:`numba.cuda.cudadrv.devicearray.DeviceNDArray` using :func:`numba.cuda.device_array_like()`.
-    bias_amplitude : `float`
+    bias_amplitude : :obj:`float`
         The carrier frequency :math:`f_\\mathrm{bias, amp}` for which to demodulate by.
     """
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
@@ -648,7 +648,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
         The frequency of the sine wave of source `source_index` in direction `spatial_index`. See :math:`f` above. In units of Hz.
     source_time_end_points : :class:`numpy.ndarray` of :class:`numpy.float64`, (source_index, turn on time (0) or turn off time (1))
         The times that the sine wave of source `source_index` turns on and off. See :math:`\\tau` above. In units of s.
-    source_quadratic_shift :  `float`
+    source_quadratic_shift :  :obj:`float`
         The constant quadratic shift of the spin 1 system, in Hz.
 
     Returns
