@@ -17,5 +17,8 @@ nvprof --quiet --source-level-analysis instruction_execution --export-profile .\
 REM Run slowly and collects metrics for the smart report in nvvp
 nvprof --quiet --metrics all --events all -o .\profile\metricsEvents.prof python . --profile=metric
 
+REM Run python profiler
+python -m cProfile -o .\profile\python.profile __main__.py
+
 REM Archive the generated profiles
 python . --profile=archive

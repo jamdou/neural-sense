@@ -213,5 +213,5 @@ class Archive:
         """
         Organise the generated profile files to the `profile_path`.
         """
-        for profile_name in glob.glob(self.profile_local_path + "*.prof"):
+        for profile_name in glob.glob(self.profile_local_path + "*"):
             shutil.copyfile(profile_name, profile_name.replace(self.profile_local_path, self.profile_path))
