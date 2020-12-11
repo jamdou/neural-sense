@@ -4,4 +4,5 @@ scipy
 colorama
 numba==0.50.1
 sphinxcontrib.bibtex==1.0.0
+spinsim
 -f /docs/source/_ext/ numbadoc
