@@ -307,17 +307,18 @@ def new_benchmark_scipy(archive, signal_template, frequency, time_step_fine, sta
     execution_time_end_points[0] = tm.time()
     execution_time_end_points[1] = execution_time_end_points[0]
     simulation_index = 0
+    time = np.arange(0e-3, 100e-3, 5e-7, dtype = np.float64)
     for time_step_fine_instance in time_step_fine:
-        time = np.arange(0e-3, 100e-3, time_step_fine_instance, dtype = np.float64)
         source_properties = manager.SourceProperties(signal_template, state_properties)
 
         for frequency_instance in frequency:
-            # def evaluate_dressing(time, dressing):
-            #     source_properties.evaluate_dressing(time, frequency_instance, dressing)
             def evaluate_dressing(time, dressing):
-                dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
-                dressing[1] = 0
-                dressing[2] = 700e3
+                source_properties.evaluate_dressing(time, frequency_instance, dressing)
+
+            # def evaluate_dressing(time, dressing):
+            #     dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
+            #     dressing[1] = 0
+            #     dressing[2] = 700e3
                 
             def derivative(time, state):
                 dressing = np.empty(4, np.float64)
@@ -325,8 +326,8 @@ def new_benchmark_scipy(archive, signal_template, frequency, time_step_fine, sta
                 matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz + dressing[3]*Q)
                 return np.matmul(matrix, state)
 
-            results = scipy.integrate.solve_ivp(derivative, [0e-3, 100e-3], state_properties.state_init, t_eval = time)
-            state_output += [np.transpose(results.y)[::int((5e-7)/time_step_fine_instance)]]
+            results = scipy.integrate.solve_ivp(derivative, [0e-3, 100e-3], state_properties.state_init, t_eval = time, max_step = time_step_fine_instance)
+            state_output += [np.transpose(results.y)]
             
             print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(len(frequency)*len(time_step_fine)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
             simulation_index += 1
