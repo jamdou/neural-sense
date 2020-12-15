@@ -154,6 +154,8 @@ class SourceProperties:
         The constant quadratic shift of the spin 1 system, in Hz.
     source_type : :class:`numpy.ndarray` of :class:`numpy.float64`, (source_index)
         A string description of what source source_index physically represents. Mainly for archive purposes.
+    evaluate_dressing : :obj:`callable`
+        The dressing function fed into the intergator.
     """
     def __init__(self, signal, state_properties, dressing_rabi_frequency = 1000.0, quadratic_shift = 0.0):
         """
@@ -667,7 +669,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
         field_sample[1] = 0
         field_sample[2] = 0
         for source_index in range(source_index_max):
-            for spacial_index in range(field_sample.size):
+            for spacial_index in range(field_sample.size - 1):
                 if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample <= source_time_end_points[source_index, 1]):
                     amplitude = source_amplitude[source_index, spacial_index]
                     if source_index == 0 and spacial_index == 0:
