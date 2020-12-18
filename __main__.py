@@ -38,7 +38,7 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # Make signal
-        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+        time_properties = test_signal.TimeProperties(5e-5, 1e-7, 1e-8, [0, 0.1])
         signal = test_signal.TestSignal(
             # [],
             [test_signal.NeuralPulse(0.02333333, 10.0, 1000), test_signal.NeuralPulse(0.0444444444, 10.0, 1000)],
@@ -55,17 +55,17 @@ if __name__ == "__main__":
 
         cuda.profile_start()
 
-        # Time step fine test
-        # time_step_fine = [5e-9, 1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7, 1e-6, 2e-6, 2.5e-6, 5e-6]
-        # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 50))
-        # frequency = np.arange(50, 3051, 300)
+        # # Time step fine test
+        # # time_step_fine = [5e-9, 1e-8, 2e-8, 2.5e-8, 4e-8, 5e-8, 1e-7, 2e-7, 2.5e-7, 4e-7, 5e-7, 1e-6, 2e-6, 2.5e-6, 5e-6]
+        # # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 50))
+        # # frequency = np.arange(50, 3051, 300)
+        # # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 10))
+        # # frequency = np.arange(50, 3051, 300)
+        # # frequency = np.arange(1000, 1003, 5)
+        # # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
+        # frequency = np.asarray([1000], dtype = np.float64)
         # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 10))
-        # frequency = np.arange(50, 3051, 300)
-        # frequency = np.arange(1000, 1003, 5)
-        # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fine, state_properties)
-        frequency = np.asarray([1000], dtype = np.float64)
-        time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 10))
-        sim.benchmark.new_benchmark_scipy(archive, signal, frequency, time_step_fine, state_properties)
+        # sim.benchmark.new_benchmark_scipy(archive, signal, frequency, time_step_fine, state_properties)
 
         # # Time test
         # frequency = np.arange(50, 3051, 1000)
@@ -92,25 +92,25 @@ if __name__ == "__main__":
         # # frequency = np.arange(50, 3051, 30)
         # # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
-        # # Run simulations
+        # Run simulations
         # frequency = np.arange(70, 3071, 30)
-        # # frequency = np.arange(50, 3051, 3)
-        # # frequency = np.arange(1000, 1003, 1)
-        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
-        # simulation_manager.evaluate(False, False)
-        # # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        # experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        # experiment_results.write_to_archive(archive)
-        # experiment_results.plot(archive, signal)
+        # frequency = np.arange(50, 3051, 3)
+        frequency = np.arange(1000, 1003, 1)
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
+        simulation_manager.evaluate(False, False)
+        # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
+        experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        experiment_results.write_to_archive(archive)
+        experiment_results.plot(archive, signal)
 
-        # # Make reconstructions
-        # reconstruction = recon.Reconstruction(signal.time_properties)
-        # reconstruction.readFrequenciesFrom_experiment_results(experiment_results)
-        # # reconstruction.readFrequenciesFrom_test_signal(signal)
-        # reconstruction.evaluateFISTA()
-        # # reconstruction.evaluateISTAComplete()
-        # reconstruction.plot(archive, signal)
-        # reconstruction.write_to_file(archive.archive_file)
+        # Make reconstructions
+        reconstruction = recon.Reconstruction(signal.time_properties)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results)
+        # reconstruction.readFrequenciesFrom_test_signal(signal)
+        reconstruction.evaluate_fista()
+        # reconstruction.evaluateISTAComplete()
+        reconstruction.plot(archive, signal)
+        reconstruction.write_to_file(archive.archive_file)
 
         # Clean up
         archive.close_archive_file()

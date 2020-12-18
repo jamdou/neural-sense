@@ -13,8 +13,13 @@ import numba as nb
 import time as tm
 import os
 from test_signal import *
+import enum
 
 # from .benchmark.results import *
+
+class MeasurementMethod(enum.Enum):
+    FARADAY_DEMODULATION = "faraday demodulation"
+    HARD_PULSE = "hard pulse"
 
 class SimulationManager:
     """
@@ -40,8 +45,10 @@ class SimulationManager:
         The target device (hardware) that the simulation is to be run on.
     execution_time_output : :obj:`list` of :obj:`float`
         If not :obj:`None`, the execution times for each full simulation will be appended to this.
+    measurement_method : :obj:`MeasurementMethod`
+        Method used to retrieve frequency amplitudes.
     """
-    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, trotter_cutoff = [28], device = None, execution_time_output = None):
+    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, trotter_cutoff = [28], device = None, execution_time_output = None, measurement_method = MeasurementMethod.HARD_PULSE):
         """
         Parameters
         ----------
@@ -61,6 +68,8 @@ class SimulationManager:
             The target device (hardware) that the simulation is to be run on.
         execution_time_output : :obj:`list` of :obj:`float`
             If not :obj:`None`, the execution times for each full simulation will be appended to this.
+        measurement_method : :obj:`MeasurementMethod`
+            Method used to retrieve frequency amplitudes.
         """
         self.signal = signal
         if not isinstance(self.signal, list):
@@ -75,6 +84,7 @@ class SimulationManager:
         self.state_output = state_output
         self.state_properties = state_properties
         self.execution_time_output = execution_time_output
+        self.measurement_method = measurement_method
 
     def evaluate(self, do_plot = False, do_write_everything = False):
         """
@@ -95,12 +105,18 @@ class SimulationManager:
         for device_index, device_instance in enumerate(self.device):
             for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
                 for signal_index, signal_instance in enumerate(self.signal):
-                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance)
+                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method)
                     for frequency_index in range(self.frequency.size):
                         simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
                         frequency_value = self.frequency[frequency_index]
                         simulation.evaluate(frequency_value)
-                        simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                        if self.measurement_method == MeasurementMethod.FARADAY_DEMODULATION:
+                            simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                        else:
+                            simulation.get_frequency_amplitude_from_projection()
+                            plt.figure()
+                            plt.plot(simulation.simulation_results.spin)
+                            plt.show()
                         # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
                         simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
                         self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
@@ -157,7 +173,7 @@ class SourceProperties:
     evaluate_dressing : :obj:`callable`
         The dressing function fed into the intergator.
     """
-    def __init__(self, signal, state_properties, dressing_rabi_frequency = 1000.0, quadratic_shift = 0.0):
+    def __init__(self, signal, state_properties, dressing_rabi_frequency = 1000.0, quadratic_shift = 0.0, measurement_method = MeasurementMethod.FARADAY_DEMODULATION):
         """
         Parameters
         ----------
@@ -178,6 +194,7 @@ class SourceProperties:
         self.source_time_end_points = np.empty([0, 2], np.float64)
         self.source_type = np.empty([0], object)
         self.source_quadratic_shift = quadratic_shift
+        self.measurement_method = measurement_method
 
         # Construct the signal from the dressing information and pulse description.
         if signal:
@@ -215,7 +232,7 @@ class SourceProperties:
         archive_group["source_index_max"] = np.asarray([self.source_index_max])
         archive_group["source_quadratic_shift"] = np.asarray([self.source_quadratic_shift])
 
-    def add_dressing(self, signal, bias_amplitude = 700e3):
+    def add_dressing(self, signal, bias_amplitude = 460e3):
         """
         Adds a specified bias field and dressing field to the list of sources.
 
@@ -227,25 +244,66 @@ class SourceProperties:
             The strength of the dc bias field in Hz. Also the frequency of the dressing.
             If one wants to add detuning, one can do that via detuning noise in :class:`test_signal.SinusoidalNoise.new_detuning_noise()`.
         """
-        # Initialise
-        source_amplitude = np.zeros([1, 3])
-        source_phase = np.zeros([1, 3])
-        source_frequency = np.zeros([1, 3])
-        source_time_end_points = np.zeros([1, 2])
-        source_type = np.empty([1], dtype = object)
+        if self.measurement_method == MeasurementMethod.HARD_PULSE:
+            # Initialise
+            source_amplitude = np.zeros([3, 3])
+            source_phase = np.zeros([3, 3])
+            source_frequency = np.zeros([3, 3])
+            source_time_end_points = np.zeros([3, 2])
+            source_type = np.empty([3], dtype = object)
 
-        # Label
-        source_type[0] = "Dressing"
+            # Label
+            source_type[0] = "Dressing"
+            source_type[1] = "Readout"
+            source_type[2] = "Bias"
 
-        # Bias
-        source_amplitude[0, 2] = bias_amplitude
-        source_phase[0, 2] = math.pi/2
+            # Bias
+            source_amplitude[2, 2] = bias_amplitude
+            source_phase[2, 2] = math.pi/2
 
-        #Dressing
-        source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
-        source_frequency[0, 0] = bias_amplitude #self.dressing_frequency
-        source_time_end_points[0, :] = 1*signal.time_properties.time_end_points
-        source_phase[0, 0] = math.pi/2
+            #Dressing
+            readout_amplitude = 1e4
+            dressing_end_buffer = 1/readout_amplitude
+
+            source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
+            source_frequency[0, 0] = bias_amplitude
+            source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - (1/readout_amplitude)/4 - dressing_end_buffer
+            source_phase[0, 0] = math.pi/2
+
+            source_amplitude[1, 0] = 2*readout_amplitude
+            source_frequency[1, 0] = bias_amplitude
+            source_time_end_points[1, 0] = source_time_end_points[0, 1]
+            source_time_end_points[1, 1] = signal.time_properties.time_end_points[1] - dressing_end_buffer
+            source_phase[1, 0] = math.tau*math.fmod(bias_amplitude*(source_time_end_points[1, 0]), 1)
+
+            source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
+
+            self.source_index_max += 3
+
+        elif self.measurement_method == MeasurementMethod.FARADAY_DEMODULATION:
+            # Initialise
+            source_amplitude = np.zeros([1, 3])
+            source_phase = np.zeros([1, 3])
+            source_frequency = np.zeros([1, 3])
+            source_time_end_points = np.zeros([1, 2])
+            source_type = np.empty([1], dtype = object)
+
+            # Label
+            source_type[0] = "Dressing"
+
+            # Bias
+            source_amplitude[0, 2] = bias_amplitude
+            source_phase[0, 2] = math.pi/2
+
+            #Dressing
+            source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
+            source_frequency[0, 0] = bias_amplitude
+            source_time_end_points[0, :] = 1*signal.time_properties.time_end_points
+            source_phase[0, 0] = math.pi/2
+
+            self.source_index_max += 1
 
         # Add
         self.source_amplitude = np.concatenate((self.source_amplitude, source_amplitude))
@@ -253,7 +311,6 @@ class SourceProperties:
         self.source_frequency = np.concatenate((self.source_frequency, source_frequency))
         self.source_time_end_points = np.concatenate((self.source_time_end_points, source_time_end_points))
         self.source_type = np.concatenate((self.source_type, source_type))
-        self.source_index_max += 1
 
     def add_neural_pulse(self, neural_pulse):
         """
@@ -429,7 +486,7 @@ class Simulation:
     trotter_cutoff : :obj:`int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal, dressing_rabi_frequency = 1e3, state_properties = None, trotter_cutoff = 28, device = spinsim.Device.CUDA):
+    def __init__(self, signal, dressing_rabi_frequency = 1e3, state_properties = None, trotter_cutoff = 28, device = spinsim.Device.CUDA, measurement_method = MeasurementMethod.FARADAY_DEMODULATION):
         """
         Parameters
         ----------
@@ -448,7 +505,7 @@ class Simulation:
         self.state_properties = state_properties
         if not self.state_properties:
             self.state_properties = StateProperties()
-        self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0)
+        self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, measurement_method = measurement_method)
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
         self.trotter_cutoff = trotter_cutoff
         self.device = device
@@ -470,6 +527,14 @@ class Simulation:
         self.signal.time_properties.time_coarse = results.time
         self.simulation_results.time_evolution = results.time_evolution
         self.simulation_results.spin = results.spin
+
+    def get_frequency_amplitude_from_projection(self):
+        self.simulation_results.sensed_frequency_amplitude = self.simulation_results.spin[self.simulation_results.spin.shape[0] - 1, 2]
+        print(self.simulation_results.sensed_frequency_amplitude)
+        self.simulation_results.sensed_frequency_amplitude *= 1/(2*math.pi*(self.signal.time_properties.time_end_points[1] - self.signal.time_properties.time_end_points[0]))
+
+        if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
+            self.simulation_results.sensed_frequency_amplitude *= 2
 
     def get_frequency_amplitude_from_demodulation(self, demodulationTime_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
         """
@@ -670,7 +735,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
         field_sample[2] = 0
         for source_index in range(source_index_max):
             for spacial_index in range(field_sample.size - 1):
-                if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample <= source_time_end_points[source_index, 1]):
+                if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
                     amplitude = source_amplitude[source_index, spacial_index]
                     if source_index == 0 and spacial_index == 0:
                         amplitude = 2*rabi_frequency
