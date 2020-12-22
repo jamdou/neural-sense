@@ -20,6 +20,7 @@ import enum
 class MeasurementMethod(enum.Enum):
     FARADAY_DEMODULATION = "faraday demodulation"
     HARD_PULSE = "hard pulse"
+    ADIABATIC_DEMAPPING = "adiabatic demapping"
 
 class SimulationManager:
     """
@@ -114,9 +115,9 @@ class SimulationManager:
                             simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
                         else:
                             simulation.get_frequency_amplitude_from_projection()
-                            plt.figure()
-                            plt.plot(simulation.simulation_results.spin)
-                            plt.show()
+                            # plt.figure()
+                            # plt.plot(simulation.simulation_results.spin)
+                            # plt.show()
                         # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
                         simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
                         self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
@@ -205,7 +206,7 @@ class SourceProperties:
             for sinusoidal_noise in signal.sinusoidal_noises:
                 self.add_sinusoidal_noise(sinusoidal_noise)
 
-        self.evaluate_dressing = dressing_evaluator_factory(self.source_index_max, self.source_amplitude, self.source_frequency, self.source_phase, self.source_time_end_points, self.source_quadratic_shift)
+        self.evaluate_dressing = dressing_evaluator_factory(self.source_index_max, self.source_amplitude, self.source_frequency, self.source_phase, self.source_time_end_points, self.source_quadratic_shift, measurement_method)
 
         # timeSource_index_max = int((signal.time_properties.time_end_points[1] - signal.time_properties.time_end_points[0])/signal.time_properties.time_step_source)
         # self.source = cuda.device_array((timeSource_index_max, 4), dtype = np.float64)
@@ -262,8 +263,8 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 1e4
-            dressing_end_buffer = 1/readout_amplitude
+            readout_amplitude = 1e3
+            dressing_end_buffer = (1/readout_amplitude)/4
 
             source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
             source_frequency[0, 0] = bias_amplitude
@@ -275,14 +276,14 @@ class SourceProperties:
             source_frequency[1, 0] = bias_amplitude
             source_time_end_points[1, 0] = source_time_end_points[0, 1]
             source_time_end_points[1, 1] = signal.time_properties.time_end_points[1] - dressing_end_buffer
-            source_phase[1, 0] = math.tau*math.fmod(bias_amplitude*(source_time_end_points[1, 0]), 1)
+            source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
 
             source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
             source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
 
             self.source_index_max += 3
 
-        elif self.measurement_method == MeasurementMethod.FARADAY_DEMODULATION:
+        else:
             # Initialise
             source_amplitude = np.zeros([1, 3])
             source_phase = np.zeros([1, 3])
@@ -347,11 +348,11 @@ class SourceProperties:
 
     def add_sinusoidal_noise(self, sinusoidal_noise):
         """
-        Adds sinusoidal noise from a :class:`test_signal.Sinusidal_noise` object to the list of sources.
+        Adds sinusoidal noise from a :class:`test_signal.SinusoidalNoise` object to the list of sources.
 
         Parameters
         ----------
-        sinusoidal_noise : :class:`test_signal.Sinusidal_noise`
+        sinusoidal_noise : :class:`test_signal.SinusoidalNoise`
             The sinusoidal noise object to add to the list of sources.
         """
         # Initialise
@@ -530,8 +531,8 @@ class Simulation:
 
     def get_frequency_amplitude_from_projection(self):
         self.simulation_results.sensed_frequency_amplitude = self.simulation_results.spin[self.simulation_results.spin.shape[0] - 1, 2]
-        print(self.simulation_results.sensed_frequency_amplitude)
-        self.simulation_results.sensed_frequency_amplitude *= 1/(2*math.pi*(self.signal.time_properties.time_end_points[1] - self.signal.time_properties.time_end_points[0]))
+        # print(self.simulation_results.sensed_frequency_amplitude)
+        self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal.time_properties.time_end_points[1] - self.signal.time_properties.time_end_points[0]))
 
         if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
             self.simulation_results.sensed_frequency_amplitude *= 2
@@ -699,7 +700,7 @@ def get_frequency_amplitude_from_demodulation(time, spin, spin_demodulated, bias
 #                     )
 #             source[time_source_index, 3] = source_quadratic_shift
 
-def dressing_evaluator_factory(source_index_max, source_amplitude, source_frequency, source_phase, source_time_end_points, source_quadratic_shift = 0.0):
+def dressing_evaluator_factory(source_index_max, source_amplitude, source_frequency, source_phase, source_time_end_points, source_quadratic_shift = 0.0, measurement_method = MeasurementMethod.FARADAY_DEMODULATION):
     """
     Makes a field :obj:`callable` for :mod:`spinsim` of block pulses and false neural pulses. `field_modifier` sweeps the Rabi frequency.
 
@@ -729,25 +730,74 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
         * **rabi_frequency** (:class:`numpy.float64`) - The amplitude of the dressing of the atoms. Measured in Hz.
         * **field_sample** (:class:`numpy.ndarray` of :class:`numpy.float64`) - The returned sampled field amplitude at time `time_sample`. Measured in Hz.
     """
-    def evaluate_dressing(time_sample, rabi_frequency, field_sample):
-        field_sample[0] = 0
-        field_sample[1] = 0
-        field_sample[2] = 0
-        for source_index in range(source_index_max):
-            for spacial_index in range(field_sample.size - 1):
-                if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
-                    amplitude = source_amplitude[source_index, spacial_index]
+    if measurement_method == MeasurementMethod.ADIABATIC_DEMAPPING:
+        sweep_duration = 2e-2
+        sweep_speed = 10
+        def evaluate_dressing(time_sample, rabi_frequency, field_sample):
+            field_sample[0] = 0
+            field_sample[1] = 0
+            field_sample[2] = 0
+            for source_index in range(source_index_max):
+                for spacial_index in range(field_sample.size - 1):
                     if source_index == 0 and spacial_index == 0:
-                        amplitude = 2*rabi_frequency
-                    field_sample[spacial_index] += \
-                        amplitude*\
-                        math.sin(\
-                            math.tau*source_frequency[source_index, spacial_index]*\
-                            (time_sample - source_time_end_points[source_index, 0]) +\
-                            source_phase[source_index, spacial_index]\
-                        )
-        if field_sample.size > 3:
-            field_sample[3] = source_quadratic_shift
+                        if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
+                            if time_sample >= source_time_end_points[source_index, 1] - sweep_duration:
+                                # Circular
+                                sweep_attenuation = math.cos((math.pi/2)*(time_sample - (source_time_end_points[source_index, 1] - sweep_duration))/sweep_duration)
+                                amplitude = rabi_frequency*sweep_attenuation
+                                phase = math.tau*rabi_frequency*(2*sweep_duration/math.pi)*(1 - sweep_attenuation)
+
+                                # # Hyperbolic
+                                # sweep_attenuation = 1/math.cosh(sweep_speed*(time_sample - (source_time_end_points[source_index, 1] - sweep_duration))/sweep_duration)
+                                # amplitude = rabi_frequency*sweep_attenuation
+                                # phase = math.tau*rabi_frequency*(sweep_duration/sweep_speed)*math.log(sweep_attenuation)
+
+                                # # Linear
+                                # sweep_attenuation = (time_sample - (source_time_end_points[source_index, 1] - sweep_duration))/sweep_duration
+                                # amplitude = rabi_frequency*(1 - sweep_attenuation)
+                                # phase = math.tau*(4*sweep_duration*rabi_frequency/2)*(sweep_attenuation**2)
+                            else:
+                                amplitude = rabi_frequency
+                                phase = 0
+                            field_sample[spacial_index] += \
+                                2*amplitude*\
+                                math.sin(\
+                                    math.tau*source_frequency[source_index, spacial_index]*\
+                                    (time_sample - source_time_end_points[source_index, 0]) +\
+                                    source_phase[source_index, spacial_index] +\
+                                    phase\
+                                )
+                    else:
+                        if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
+                            field_sample[spacial_index] += \
+                                source_amplitude[source_index, spacial_index]*\
+                                math.sin(\
+                                    math.tau*source_frequency[source_index, spacial_index]*\
+                                    (time_sample - source_time_end_points[source_index, 0]) +\
+                                    source_phase[source_index, spacial_index]\
+                                )
+            if field_sample.size > 3:
+                field_sample[3] = source_quadratic_shift
+    else:
+        def evaluate_dressing(time_sample, rabi_frequency, field_sample):
+            field_sample[0] = 0
+            field_sample[1] = 0
+            field_sample[2] = 0
+            for source_index in range(source_index_max):
+                for spacial_index in range(field_sample.size - 1):
+                    if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
+                        amplitude = source_amplitude[source_index, spacial_index]
+                        if source_index == 0 and spacial_index == 0:
+                            amplitude = 2*rabi_frequency
+                        field_sample[spacial_index] += \
+                            amplitude*\
+                            math.sin(\
+                                math.tau*source_frequency[source_index, spacial_index]*\
+                                (time_sample - source_time_end_points[source_index, 0]) +\
+                                source_phase[source_index, spacial_index]\
+                            )
+            if field_sample.size > 3:
+                field_sample[3] = source_quadratic_shift
     return evaluate_dressing
 
 class ExperimentResults:

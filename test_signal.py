@@ -177,7 +177,7 @@ class SinusoidalNoise:
         return SinusoidalNoise([0, 0, -z_amplitude], [0, 0, 0], [math.pi/2, math.pi/2, math.pi/2], "Detuning_noise")
 
     @staticmethod
-    def new_line_noise(amplitude = [100.0, 0.0, 0.0], phase = [0.0, 0.0, 0.0]):
+    def new_line_noise(amplitude = [0.0, 0.0, 500.0], phase = [0.0, 0.0, 0.0]):
         """
         A shorthand constructor for line noise.
 

@@ -17,7 +17,7 @@ import sim
 
 if __name__ == "__main__":
     # This will be recorded in the HDF5 file to give context for what was being tested
-    description_of_test = "Arbitrary input"
+    description_of_test = "Adiabatic sweep"
 
     # Check to see if there is a compatible GPU
     if cuda.list_devices():
@@ -38,13 +38,13 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # Make signal
-        time_properties = test_signal.TimeProperties(5e-5, 1e-7, 1e-8, [0, 0.1])
+        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
         signal = test_signal.TestSignal(
             # [],
-            [test_signal.NeuralPulse(0.02333333, 10.0, 1000), test_signal.NeuralPulse(0.0444444444, 10.0, 1000)],
+            [test_signal.NeuralPulse(0.02333333, 1.0, 1000), test_signal.NeuralPulse(0.0444444444, 1.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
             [],
-            # [SinusoidalNoise.new_detuning_noise(10)],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties
         )
         signal.write_to_file(archive.archive_file)
@@ -94,8 +94,8 @@ if __name__ == "__main__":
         
         # Run simulations
         # frequency = np.arange(70, 3071, 30)
-        # frequency = np.arange(50, 3051, 3)
-        frequency = np.arange(1000, 1003, 1)
+        frequency = np.arange(250, 3251, 3)
+        # frequency = np.arange(1000, 1003, 1)
         simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
         simulation_manager.evaluate(False, False)
         # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         # Make reconstructions
         reconstruction = recon.Reconstruction(signal.time_properties)
         reconstruction.read_frequencies_from_experiment_results(experiment_results)
-        # reconstruction.readFrequenciesFrom_test_signal(signal)
+        # reconstruction.read_frequencies_from_test_signal(signal)
         reconstruction.evaluate_fista()
         # reconstruction.evaluateISTAComplete()
         reconstruction.plot(archive, signal)

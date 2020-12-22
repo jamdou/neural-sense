@@ -72,12 +72,12 @@ class Reconstruction():
         """
         Run compressive sensing based on the Iterative Shrinkage Thresholding Algorithm (ISTA)
         """
-        print("\033[33m_starting reconstruction...\033[0m")
+        print("\033[33mStarting reconstruction...\033[0m")
 
         # Start timing reconstruction
-        executionTime_end_points = np.empty(2)
-        executionTime_end_points[0] = tm.time()
-        executionTime_end_points[1] = executionTime_end_points[0]
+        execution_time_end_points = np.empty(2)
+        execution_time_end_points[0] = tm.time()
+        execution_time_end_points[1] = execution_time_end_points[0]
 
         self.amplitude = np.empty_like(self.time_properties.time_coarse)                          # Reconstructed signal
         frequency_amplitude_prediction = np.empty_like(self.frequency_amplitude)                   # Partial sine Fourier transform of reconstructed signal
@@ -85,13 +85,13 @@ class Reconstruction():
 
         # Setup GPU block and grid sizes
         threads_per_block = 128
-        blocksPer_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
+        blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
 
-        reconstruct_ista_complete[blocksPer_grid_time, threads_per_block](self.time_properties.time_coarse, self.amplitude, self.frequency, self.frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.time_properties.time_step_coarse, 0, 100.0, 10.0)
+        reconstruct_ista_complete[blocks_per_grid_time, threads_per_block](self.time_properties.time_coarse, self.amplitude, self.frequency, self.frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.time_properties.time_step_coarse, 0, 100.0, 10.0)
 
-        print(str(tm.time() - executionTime_end_points[1]) + "s")
+        print(str(tm.time() - execution_time_end_points[1]) + "s")
         print("\033[32m_done!\033[0m")
-        executionTime_end_points[1] = tm.time()
+        execution_time_end_points[1] = tm.time()
 
     def evaluate_fista(self):
         """
@@ -100,21 +100,22 @@ class Reconstruction():
         print("\033[33m_starting reconstruction...\033[0m")
 
         # Start timing reconstruction
-        executionTime_end_points = np.empty(2)
-        executionTime_end_points[0] = tm.time()
-        executionTime_end_points[1] = executionTime_end_points[0]
+        execution_time_end_points = np.empty(2)
+        execution_time_end_points[0] = tm.time()
+        execution_time_end_points[1] = execution_time_end_points[0]
 
         self.amplitude = np.empty_like(self.time_properties.time_coarse)                          # Reconstructed signal
         frequency_amplitude_prediction = np.empty_like(self.frequency_amplitude)                   # Partial sine Fourier transform of reconstructed signal
         fourier_transform = np.empty((self.frequency.size, self.time_properties.time_coarse.size)) # Storage for sine Fourier transform operator
+        fourier_transform = cuda.to_device(fourier_transform)
 
         # Setup GPU block and grid sizes
         threads_per_block = 128
-        blocksPer_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
-        blocksPer_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
+        blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
+        blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
         # Initialise 
-        reconstruct_ista_initialisation_step[blocksPer_grid_time, threads_per_block](self.frequency, self.frequency_amplitude, self.time_properties.time_step_coarse, self.time_properties.time_coarse, self.amplitude, fourier_transform)
+        reconstruct_ista_initialisation_step[blocks_per_grid_time, threads_per_block](self.frequency, self.frequency_amplitude, self.time_properties.time_step_coarse, self.time_properties.time_coarse, self.amplitude, fourier_transform)
 
         amplitude_previous = 0*self.amplitude    # The last amplitude, used in the fast step, and to check (Cauchy) convergence
         fast_step_size = 1                        # Initialise the fast step size to one
@@ -124,18 +125,18 @@ class Reconstruction():
             amplitude_previous = 1*self.amplitude    # Keep track of previous amplitude
 
             # Run ISTA steps
-            reconstruct_ista_prediction_step[blocksPer_grid_frequency, threads_per_block](self.frequency_amplitude, self.amplitude, fourier_transform, frequency_amplitude_prediction)
-            reconstruct_sista_manifold_step[blocksPer_grid_time, threads_per_block](frequency_amplitude_prediction, self.step_size_manifold, fourier_transform, self.amplitude)
-            reconstruct_ista_sparse_step[blocksPer_grid_time, threads_per_block](self.step_size_sparse, self.amplitude)
+            reconstruct_ista_prediction_step[blocks_per_grid_frequency, threads_per_block](self.frequency_amplitude, self.amplitude, fourier_transform, frequency_amplitude_prediction)
+            reconstruct_ista_manifold_step[blocks_per_grid_time, threads_per_block](frequency_amplitude_prediction, self.step_size_manifold, fourier_transform, self.amplitude)
+            reconstruct_ista_sparse_step[blocks_per_grid_time, threads_per_block](self.step_size_sparse, self.amplitude)
 
             # Run the fast step
             fastStep_size_previous = fast_step_size
             fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
             self.amplitude = self.amplitude + ((fastStep_size_previous - 1)/fast_step_size)*(self.amplitude - amplitude_previous)
 
-        print(str(tm.time() - executionTime_end_points[1]) + "s")
-        print("\033[32m_done!\033[0m")
-        executionTime_end_points[1] = tm.time()
+        print(str(tm.time() - execution_time_end_points[1]) + "s")
+        print("\033[32mDone!\033[0m")
+        execution_time_end_points[1] = tm.time()
     
     def evaluate_naive_ista(self):
         """
@@ -147,11 +148,11 @@ class Reconstruction():
         fourier_transform = np.empty((self.frequency.size, self.time_properties.time_coarse.size))
 
         threads_per_block = 128
-        blocksPer_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
-        blocksPer_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
-        reconstructNaive_initialisation_step[blocksPer_grid_time, threads_per_block](self.frequency, self.frequency_amplitude, self.time_properties.time_step_coarse, self.time_properties.time_coarse, self.amplitude, fourier_transform)
+        blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
+        blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
+        reconstructNaive_initialisation_step[blocks_per_grid_time, threads_per_block](self.frequency, self.frequency_amplitude, self.time_properties.time_step_coarse, self.time_properties.time_coarse, self.amplitude, fourier_transform)
         # manifold_step_size = 100000
-        reconstructNaive_prediction_step[blocksPer_grid_frequency, threads_per_block](self.frequency_amplitude, self.amplitude, fourier_transform, frequency_amplitude_prediction)
+        reconstructNaive_prediction_step[blocks_per_grid_frequency, threads_per_block](self.frequency_amplitude, self.amplitude, fourier_transform, frequency_amplitude_prediction)
         square_loss = sum(frequency_amplitude_prediction**2)
 
         # frequency = cuda.to_device(frequency)
@@ -165,22 +166,22 @@ class Reconstruction():
         # plt.plot(time_coarse, amplitude)
         # plt.show()
         amplitude_previous = 0*self.amplitude
-        while sum((self.amplitude - amplitude_previous)**2) > 1:
+        while sum((self.amplitude - amplitude_previous)**2) > 1e0:
             # if iteration_index == 0:
             #     manifold_step_size = 2
             # else:
             #     manifold_step_size = 0.00005
             # if square_loss < 1e-4:
             amplitude_previous = 1*self.amplitude
-            reconstruct_ista_sparse_step[blocksPer_grid_time, threads_per_block](self.step_size_sparse, self.amplitude)
-            reconstruct_ista_prediction_step[blocksPer_grid_frequency, threads_per_block](self.frequency_amplitude, self.amplitude, fourier_transform, frequency_amplitude_prediction)
+            reconstruct_ista_sparse_step[blocks_per_grid_time, threads_per_block](self.step_size_sparse, self.amplitude)
+            reconstruct_ista_prediction_step[blocks_per_grid_frequency, threads_per_block](self.frequency_amplitude, self.amplitude, fourier_transform, frequency_amplitude_prediction)
             # square_loss_previous = square_loss
             # square_loss = sum(frequency_amplitude_prediction**2)
             # if square_loss > square_loss_previous:
             #     manifold_step_size *= 2
             # else:
             #     manifold_step_size /= 2
-            reconstruct_sista_manifold_step[blocksPer_grid_time, threads_per_block](frequency_amplitude_prediction, self.step_size_manifold, fourier_transform, self.amplitude)
+            reconstruct_ista_manifold_step[blocks_per_grid_time, threads_per_block](frequency_amplitude_prediction, self.step_size_manifold, fourier_transform, self.amplitude)
             # if iteration_index % 1 == 0:
             #     # print(square_loss)
             #     # print(frequency_amplitude_prediction)
@@ -294,7 +295,7 @@ def reconstruct_ista_prediction_step(frequency_amplitude, amplitude, fourier_tra
             frequency_amplitude_prediction[frequency_index] += fourier_transform[frequency_index, time_index]*amplitude[time_index]
 
 @cuda.jit()
-def reconstruct_sista_manifold_step(frequency_amplitude_prediction, step_size, fourier_transform, amplitude):
+def reconstruct_ista_manifold_step(frequency_amplitude_prediction, step_size, fourier_transform, amplitude):
     """
     Use gradient decent to bring the reconstruction closer to having the correct partial sine Fourier transform.
 
