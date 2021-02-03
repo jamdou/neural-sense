@@ -20,6 +20,7 @@ import enum
 class MeasurementMethod(enum.Enum):
     FARADAY_DEMODULATION = "faraday demodulation"
     HARD_PULSE = "hard pulse"
+    HARD_PULSE_ROTATING = "hard pulse (rotating)"
     ADIABATIC_DEMAPPING = "adiabatic demapping"
 
 class SimulationManager:
@@ -246,6 +247,51 @@ class SourceProperties:
             If one wants to add detuning, one can do that via detuning noise in :class:`test_signal.SinusoidalNoise.new_detuning_noise()`.
         """
         if self.measurement_method == MeasurementMethod.HARD_PULSE:
+            # # Initialise
+            # source_amplitude = np.zeros([3, 3])
+            # source_phase = np.zeros([3, 3])
+            # source_frequency = np.zeros([3, 3])
+            # source_time_end_points = np.zeros([3, 2])
+            # source_type = np.empty([3], dtype = object)
+
+            # # Label
+            # source_type[0] = "Dressing"
+            # source_type[1] = "Readout"
+            # source_type[2] = "Bias"
+
+            # # Bias
+            # source_amplitude[2, 2] = bias_amplitude
+            # source_phase[2, 2] = math.pi/2
+
+            # #Dressing
+            # readout_amplitude = 1e4
+            # cycle_amplitude = 2*bias_amplitude
+            # readout_amplitude = 0.125*cycle_amplitude/math.floor(0.125*cycle_amplitude/readout_amplitude)
+            # dressing_end_buffer = (1/readout_amplitude)
+
+            # phase_offset = 1/8
+            # source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
+            # source_frequency[0, 0] = bias_amplitude
+            # source_time_end_points[0, 0] = signal.time_properties.time_end_points[0] + phase_offset/cycle_amplitude
+            # source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - 2*dressing_end_buffer
+            # source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]*cycle_amplitude) + phase_offset)/cycle_amplitude
+            # source_phase[0, 0] = math.tau*(0.25 + math.fmod(signal.time_properties.time_end_points[0]*bias_amplitude + phase_offset, 1))
+
+            # source_amplitude[1, 0] = 2*readout_amplitude
+            # source_frequency[1, 0] = bias_amplitude
+            # # source_time_end_points[1, 0] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - dressing_end_buffer
+            # source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
+            # source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]*cycle_amplitude) + phase_offset)/cycle_amplitude
+            # # source_time_end_points[1, 1] = signal.time_properties.time_end_points[1] - dressing_end_buffer
+            # source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
+            # # source_time_end_points[1, 1] = (math.floor(source_time_end_points[1, 1]*bias_amplitude) + 0.5)/bias_amplitude
+            # source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+
+            # source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
+            # source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
+
+            # self.source_index_max += 3
+
             # Initialise
             source_amplitude = np.zeros([3, 3])
             source_phase = np.zeros([3, 3])
@@ -263,20 +309,69 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 1e3
-            dressing_end_buffer = (1/readout_amplitude)/4
+            readout_amplitude = 1e4
+            # cycle_period = 1/(2*bias_amplitude)
+            cycle_period = 1/(bias_amplitude)
+            dressing_end_buffer = (1/readout_amplitude)
 
+            source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - 2*dressing_end_buffer
+            # print(source_time_end_points[0, 1])
+            source_time_end_points[0, 1] = math.floor(source_time_end_points[0, 1]/cycle_period)*cycle_period
+            # print(source_time_end_points[0, 1])
             source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
             source_frequency[0, 0] = bias_amplitude
-            source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
-            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - (1/readout_amplitude)/4 - dressing_end_buffer
             source_phase[0, 0] = math.pi/2
 
-            source_amplitude[1, 0] = 2*readout_amplitude
+            source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
+            source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
+            source_amplitude[1, 0] = 2*correct_bloch_siegert_shift_frequency(readout_amplitude, bias_amplitude)
             source_frequency[1, 0] = bias_amplitude
-            source_time_end_points[1, 0] = source_time_end_points[0, 1]
-            source_time_end_points[1, 1] = signal.time_properties.time_end_points[1] - dressing_end_buffer
             source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+
+            source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
+
+            self.source_index_max += 3
+
+        elif self.measurement_method == MeasurementMethod.HARD_PULSE_ROTATING:
+            # Initialise
+            source_amplitude = np.zeros([3, 3])
+            source_phase = np.zeros([3, 3])
+            source_frequency = np.zeros([3, 3])
+            source_time_end_points = np.zeros([3, 2])
+            source_type = np.empty([3], dtype = object)
+
+            # Label
+            source_type[0] = "Dressing"
+            source_type[1] = "Readout"
+            source_type[2] = "Bias"
+
+            # Bias
+            source_amplitude[2, 2] = bias_amplitude
+            source_phase[2, 2] = math.pi/2
+
+            #Dressing
+            readout_amplitude = 1e4
+            dressing_end_buffer = (1/readout_amplitude)
+
+            source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - 2*dressing_end_buffer
+            source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
+            source_frequency[0, 0] = bias_amplitude
+            source_phase[0, 0] = math.pi/2
+            source_amplitude[0, 1] = 2*self.dressing_rabi_frequency
+            source_frequency[0, 1] = bias_amplitude
+            source_phase[0, 1] = 0
+
+            source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
+            source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
+            source_amplitude[1, 0] = readout_amplitude
+            source_frequency[1, 0] = bias_amplitude
+            source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+            source_amplitude[1, 1] = readout_amplitude
+            source_frequency[1, 1] = bias_amplitude
+            source_phase[1, 1] = math.tau*math.fmod(0.25 + bias_amplitude*(source_time_end_points[1, 0]), 1)
 
             source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
             source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
@@ -514,7 +609,7 @@ class Simulation:
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
         self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
 
-    def evaluate(self, rabi_frequency):
+    def evaluate(self, rabi_frequency, bias_amplitude = 460e3):
         """
         Time evolves the system, and finds the spin at each coarse time step.
 
@@ -523,7 +618,7 @@ class Simulation:
         rabi_frequency : :obj:`float`
             A value that modifies the field sampling in a simulation. Used to make rabi frequency sweeps.
         """
-        results = self.simulator.evaluate(rabi_frequency, self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
+        results = self.simulator.evaluate(correct_bloch_siegert_shift_frequency(rabi_frequency, bias_amplitude), self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
         self.simulation_results.state = results.state
         self.signal.time_properties.time_coarse = results.time
         self.simulation_results.time_evolution = results.time_evolution
@@ -532,26 +627,26 @@ class Simulation:
     def get_frequency_amplitude_from_projection(self):
         self.simulation_results.sensed_frequency_amplitude = self.simulation_results.spin[self.simulation_results.spin.shape[0] - 1, 2]
         # print(self.simulation_results.sensed_frequency_amplitude)
-        self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal.time_properties.time_end_points[1] - self.signal.time_properties.time_end_points[0]))
+        # self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal.time_properties.time_end_points[1] - self.signal.time_properties.time_end_points[0]))
 
         if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
             self.simulation_results.sensed_frequency_amplitude *= 2
 
-    def get_frequency_amplitude_from_demodulation(self, demodulationTime_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
+    def get_frequency_amplitude_from_demodulation(self, demodulation_time_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
         """
         Uses demodulation of the Faraday signal to find the measured Fourier coefficient.
 
         Parameters
         ----------
-        demodulationTime_end_points : :class:`numpy.ndarray` of :class:`numpy.float64` (start time (0) or end time (1)), optional
+        demodulation_time_end_points : :class:`numpy.ndarray` of :class:`numpy.float64` (start time (0) or end time (1)), optional
             The bounds of the interval where Faraday demodulation is used to acquire the measured frequency amplitude (Fourier coefficient) required for reconstruction
         do_plot_spin : :obj:`bool`, optional
             If :obj:`True`, plot the full time series for the expected spin of the system.
         """
 
         # Look at the end of the signal only to find the displacement
-        demodulationTime_end_points = np.asarray(demodulationTime_end_points)
-        demodulationTime_index_endpoints = np.floor(demodulationTime_end_points / self.signal.time_properties.time_step_coarse)
+        demodulation_time_end_points = np.asarray(demodulation_time_end_points)
+        demodulationTime_index_endpoints = np.floor(demodulation_time_end_points / self.signal.time_properties.time_step_coarse)
         time_coarse = 1*np.ascontiguousarray(self.signal.time_properties.time_coarse[int(demodulationTime_index_endpoints[0]):int(demodulationTime_index_endpoints[1])])
         spin = 1*np.ascontiguousarray(self.simulation_results.spin[int(demodulationTime_index_endpoints[0]):int(demodulationTime_index_endpoints[1]), 0])
         spin_demodulated = np.empty_like(spin)
@@ -778,6 +873,26 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                                 )
             if field_sample.size > 3:
                 field_sample[3] = source_quadratic_shift
+    elif measurement_method == MeasurementMethod.HARD_PULSE_ROTATING:
+        def evaluate_dressing(time_sample, rabi_frequency, field_sample):
+            field_sample[0] = 0
+            field_sample[1] = 0
+            field_sample[2] = 0
+            for source_index in range(source_index_max):
+                for spacial_index in range(field_sample.size - 1):
+                    if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
+                        amplitude = source_amplitude[source_index, spacial_index]
+                        if source_index == 0 and (spacial_index == 0 or spacial_index == 1):
+                            amplitude = rabi_frequency
+                        field_sample[spacial_index] += \
+                            amplitude*\
+                            math.sin(\
+                                math.tau*source_frequency[source_index, spacial_index]*\
+                                (time_sample - source_time_end_points[source_index, 0]) +\
+                                source_phase[source_index, spacial_index]\
+                            )
+            if field_sample.size > 3:
+                field_sample[3] = source_quadratic_shift
     else:
         def evaluate_dressing(time_sample, rabi_frequency, field_sample):
             field_sample[0] = 0
@@ -883,3 +998,11 @@ class ExperimentResults:
         archive_group_experiment_results = archive.archive_file.require_group("experiment_results")
         archive_group_experiment_results["frequency"] = self.frequency
         archive_group_experiment_results["frequency_amplitude"] = self.frequency_amplitude
+
+def correct_bloch_siegert_shift_frequency(frequency_resonant, frequency_bias):
+    """
+    Chooses a dressing frequency :math:`f_d` to produce a resonant frequency :math:`f_m`, using a bias field of :math:`f_b`.
+    .. math::
+        f_d = \\sqrt{4f_b(\\sqrt{4f_b^2 + f_m^2} - 2f_b)}
+    """
+    return np.sqrt(4*frequency_bias*(np.sqrt(4*frequency_bias**2 + frequency_resonant**2) - 2*frequency_bias))
