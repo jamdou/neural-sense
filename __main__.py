@@ -43,8 +43,8 @@ if __name__ == "__main__":
             [],
             # [test_signal.NeuralPulse(0.02333333, 1.0, 1000), test_signal.NeuralPulse(0.0444444444, 1.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            # [],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties
         )
         signal.write_to_file(archive.archive_file)
@@ -94,9 +94,10 @@ if __name__ == "__main__":
         
         # Run simulations
         # frequency = np.arange(70, 3071, 30)
-        # frequency = np.arange(250, 3251, 3)
-        frequency = np.arange(250, 3251, 460e3/1e5)
-        # frequency = np.arange(999, 1001, 0.02)
+        frequency = np.arange(250, 2251, 3)
+        # frequency = np.arange(250, 2251, 50)
+        # frequency = np.arange(250, 2251, 460e3/1e5)
+        # frequency = np.arange(990, 1010, 0.2)
         # frequency = np.arange(253, 3251, 30)
         # frequency = np.arange(1000, 1003, 1)
         simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)

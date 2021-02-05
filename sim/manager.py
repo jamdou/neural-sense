@@ -116,9 +116,10 @@ class SimulationManager:
                             simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
                         else:
                             simulation.get_frequency_amplitude_from_projection()
-                            # plt.figure()
-                            # plt.plot(simulation.simulation_results.spin)
-                            # plt.show()
+                            if do_plot:
+                                plt.figure()
+                                plt.plot(simulation.simulation_results.spin)
+                                plt.show()
                         # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
                         simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
                         self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
@@ -311,7 +312,9 @@ class SourceProperties:
             #Dressing
             readout_amplitude = 1e4
             # cycle_period = 1/(2*bias_amplitude)
-            cycle_period = 1/(bias_amplitude)
+            # cycle_period = 1/(4*bias_amplitude)
+            cycle_period = 1/50
+            # readout_amplitude = 1/(math.floor((1/readout_amplitude)/cycle_period)*cycle_period)
             dressing_end_buffer = (1/readout_amplitude)
 
             source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
@@ -324,10 +327,16 @@ class SourceProperties:
             source_phase[0, 0] = math.pi/2
 
             source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
+            source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period))*cycle_period
             source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
-            source_amplitude[1, 0] = 2*correct_bloch_siegert_shift_frequency(readout_amplitude, bias_amplitude)
-            source_frequency[1, 0] = bias_amplitude
+            # source_time_end_points[1, 1] = (math.floor(source_time_end_points[1, 1]/cycle_period))*cycle_period
+            # source_time_end_points[1, 0] = source_time_end_points[1, 1] - 1/(4*readout_amplitude)
+            source_amplitude[1, 0] = 2*readout_amplitude
+            source_frequency[1, 0] = bias_amplitude + 3*((readout_amplitude**2)/bias_amplitude)/4
             source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+            # source_amplitude[1, 1] = readout_amplitude
+            # source_frequency[1, 1] = bias_amplitude# - (readout_amplitude**2/bias_amplitude)/4
+            # source_phase[1, 1] = math.tau*math.fmod(0.25 + bias_amplitude*(source_time_end_points[1, 0]), 1)
 
             source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
             source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
@@ -368,10 +377,10 @@ class SourceProperties:
             source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
             source_amplitude[1, 0] = readout_amplitude
             source_frequency[1, 0] = bias_amplitude
-            source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+            source_phase[1, 0] = -math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
             source_amplitude[1, 1] = readout_amplitude
             source_frequency[1, 1] = bias_amplitude
-            source_phase[1, 1] = math.tau*math.fmod(0.25 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+            source_phase[1, 1] = -math.tau*math.fmod(0.75 + bias_amplitude*(source_time_end_points[1, 0]), 1)
 
             source_time_end_points[2, 0] = signal.time_properties.time_end_points[0]
             source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
@@ -618,7 +627,7 @@ class Simulation:
         rabi_frequency : :obj:`float`
             A value that modifies the field sampling in a simulation. Used to make rabi frequency sweeps.
         """
-        results = self.simulator.evaluate(correct_bloch_siegert_shift_frequency(rabi_frequency, bias_amplitude), self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
+        results = self.simulator.evaluate(rabi_frequency, self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
         self.simulation_results.state = results.state
         self.signal.time_properties.time_coarse = results.time
         self.simulation_results.time_evolution = results.time_evolution
@@ -893,6 +902,22 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                             )
             if field_sample.size > 3:
                 field_sample[3] = source_quadratic_shift
+    elif measurement_method == MeasurementMethod.HARD_PULSE:
+        def evaluate_dressing(time_sample, rabi_frequency, field_sample):
+            field_sample[0] = 0
+            field_sample[1] = 0
+            field_sample[2] = 0
+            for source_index in range(source_index_max):
+                for spacial_index in range(3):
+                    if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
+                        amplitude = source_amplitude[source_index, spacial_index]
+                        frequency = source_frequency[source_index, spacial_index]
+                        if source_index == 0 and spacial_index == 0:
+                            amplitude = 2*rabi_frequency
+                            # frequency += 3*((rabi_frequency**2)/frequency)/4
+                        field_sample[spacial_index] += amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
+            if field_sample.size > 3:
+                field_sample[3] = source_quadratic_shift
     else:
         def evaluate_dressing(time_sample, rabi_frequency, field_sample):
             field_sample[0] = 0
@@ -1006,3 +1031,6 @@ def correct_bloch_siegert_shift_frequency(frequency_resonant, frequency_bias):
         f_d = \\sqrt{4f_b(\\sqrt{4f_b^2 + f_m^2} - 2f_b)}
     """
     return np.sqrt(4*frequency_bias*(np.sqrt(4*frequency_bias**2 + frequency_resonant**2) - 2*frequency_bias))
+
+def calculate_bloch_siegert_shift(frequency_dressing, frequency_rotating):
+    return 0.25*(frequency_dressing**2)/frequency_rotating
