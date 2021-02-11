@@ -21,6 +21,7 @@ class MeasurementMethod(enum.Enum):
     FARADAY_DEMODULATION = "faraday demodulation"
     HARD_PULSE = "hard pulse"
     HARD_PULSE_ROTATING = "hard pulse (rotating)"
+    HARD_PULSE_DETUNING_TEST = "hard pulse (detuning test)"
     ADIABATIC_DEMAPPING = "adiabatic demapping"
 
 class SimulationManager:
@@ -50,7 +51,7 @@ class SimulationManager:
     measurement_method : :obj:`MeasurementMethod`
         Method used to retrieve frequency amplitudes.
     """
-    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, trotter_cutoff = [28], device = None, execution_time_output = None, measurement_method = MeasurementMethod.HARD_PULSE):
+    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device = None, execution_time_output = None, measurement_method = MeasurementMethod.HARD_PULSE):
         """
         Parameters
         ----------
@@ -64,6 +65,8 @@ class SimulationManager:
             The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
         state_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
             An optional :obj:`list` to directly write the state of the simulation to. Used for benchmarks.
+        spin_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
+            An optional :obj:`list` to directly write the spin of the simulation to. Used for benchmarks.
         trotter_cutoff : :obj:`list` of :obj:`int`, optional
             A list of the number of squares to be used in the matrix exponentiation algorithm during the simulation. :func:`evaluate()` will run simulations for all of these values.
         device : :obj:`spinsim.Device`
@@ -87,6 +90,7 @@ class SimulationManager:
         self.state_properties = state_properties
         self.execution_time_output = execution_time_output
         self.measurement_method = measurement_method
+        self.spin_output = spin_output
 
     def evaluate(self, do_plot = False, do_write_everything = False):
         """
@@ -125,11 +129,13 @@ class SimulationManager:
                         self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
                         if self.state_output is not None:
                             self.state_output += [simulation.simulation_results.state.copy()]
+                        if self.spin_output is not None:
+                            self.spin_output += [simulation.simulation_results.spin.copy()]
                         if self.execution_time_output is not None:
                             self.execution_time_output += [tm.time() - execution_time_end_points[1]]
-                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
+                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]), end = "\r")
                         execution_time_end_points[1] = tm.time()
-        print("\033[32mDone!\033[0m")
+        print("\n\033[32mDone!\033[0m\a")
 
 #===============================================================#
 
@@ -247,7 +253,7 @@ class SourceProperties:
             The strength of the dc bias field in Hz. Also the frequency of the dressing.
             If one wants to add detuning, one can do that via detuning noise in :class:`test_signal.SinusoidalNoise.new_detuning_noise()`.
         """
-        if self.measurement_method == MeasurementMethod.HARD_PULSE:
+        if self.measurement_method == MeasurementMethod.HARD_PULSE or self.measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
             # # Initialise
             # source_amplitude = np.zeros([3, 3])
             # source_phase = np.zeros([3, 3])
@@ -316,11 +322,12 @@ class SourceProperties:
             cycle_period = 1/50
             # readout_amplitude = 1/(math.floor((1/readout_amplitude)/cycle_period)*cycle_period)
             dressing_end_buffer = (1/readout_amplitude)
+            # readout_amplitude = 0
 
             source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
-            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - 2*dressing_end_buffer
+            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1]# - 1/(4*readout_amplitude) - 2*dressing_end_buffer
             # print(source_time_end_points[0, 1])
-            source_time_end_points[0, 1] = math.floor(source_time_end_points[0, 1]/cycle_period)*cycle_period
+            # source_time_end_points[0, 1] = math.floor(source_time_end_points[0, 1]/cycle_period)*cycle_period
             # print(source_time_end_points[0, 1])
             source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
             source_frequency[0, 0] = bias_amplitude
@@ -331,7 +338,7 @@ class SourceProperties:
             source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
             # source_time_end_points[1, 1] = (math.floor(source_time_end_points[1, 1]/cycle_period))*cycle_period
             # source_time_end_points[1, 0] = source_time_end_points[1, 1] - 1/(4*readout_amplitude)
-            source_amplitude[1, 0] = 2*readout_amplitude
+            source_amplitude[1, 0] = 0#2*readout_amplitude
             source_frequency[1, 0] = bias_amplitude + 3*((readout_amplitude**2)/bias_amplitude)/4
             source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
             # source_amplitude[1, 1] = readout_amplitude
@@ -915,6 +922,22 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                         if source_index == 0 and spacial_index == 0:
                             amplitude = 2*rabi_frequency
                             # frequency += 3*((rabi_frequency**2)/frequency)/4
+                        field_sample[spacial_index] += amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
+            if field_sample.size > 3:
+                field_sample[3] = source_quadratic_shift
+    elif measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
+        def evaluate_dressing(time_sample, detuning, field_sample):
+            field_sample[0] = 0
+            field_sample[1] = 0
+            field_sample[2] = 0
+            for source_index in range(source_index_max):
+                for spacial_index in range(3):
+                    if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
+                        amplitude = source_amplitude[source_index, spacial_index]
+                        frequency = source_frequency[source_index, spacial_index]
+                        if source_index == 0 and spacial_index == 0:
+                            amplitude = 20000
+                            frequency += detuning
                         field_sample[spacial_index] += amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
             if field_sample.size > 3:
                 field_sample[3] = source_quadratic_shift

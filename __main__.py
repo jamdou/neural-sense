@@ -12,8 +12,8 @@ from archive import handle_arguments
 import test_signal                  # The properties of the magnetic signal, used for simulations and reconstructions
 import spinsim                      # Main simulation package
 import reconstruction as recon      # Uses compressive sensing to reconstruct the a magnetic signal
-
 import sim
+import util
 
 if __name__ == "__main__":
     # This will be recorded in the HDF5 file to give context for what was being tested
@@ -38,13 +38,14 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # Make signal
-        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+        time_properties = test_signal.TimeProperties(5e-8, 1e-8, 1e-8, [0, 0.01])
+        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
         signal = test_signal.TestSignal(
             [],
             # [test_signal.NeuralPulse(0.02333333, 1.0, 1000), test_signal.NeuralPulse(0.0444444444, 1.0, 1000)],
             # [NeuralPulse(0.02333333, 10.0, 1000)],
-            # [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            [],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties
         )
         signal.write_to_file(archive.archive_file)
@@ -66,6 +67,11 @@ if __name__ == "__main__":
         # frequency = np.asarray([1000], dtype = np.float64)
         # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 10))
         # sim.benchmark.new_benchmark_scipy(archive, signal, frequency, time_step_fine, state_properties)
+
+        frequency = np.logspace(2.3, 5.3, 50)*0 + 10000
+        # util.fit_frequency_shift(archive, signal, frequency, state_properties)
+        detuning = np.linspace(-25, -15, frequency.size)
+        util.fit_frequency_detuning(archive, signal, frequency, detuning, state_properties)
 
         # # Time test
         # frequency = np.arange(50, 3051, 1000)
@@ -92,20 +98,20 @@ if __name__ == "__main__":
         # # frequency = np.arange(50, 3051, 30)
         # # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
         
-        # Run simulations
-        # frequency = np.arange(70, 3071, 30)
-        frequency = np.arange(250, 2251, 3)
-        # frequency = np.arange(250, 2251, 50)
-        # frequency = np.arange(250, 2251, 460e3/1e5)
-        # frequency = np.arange(990, 1010, 0.2)
-        # frequency = np.arange(253, 3251, 30)
+        # # Run simulations
+        # # frequency = np.arange(70, 3071, 30)
+        # # frequency = np.arange(250, 2251, 3)
+        # # frequency = np.arange(250, 2251, 50)
+        # # frequency = np.arange(250, 2251, 460e3/1e5)
+        # # frequency = np.arange(990, 1010, 0.2)
+        # # frequency = np.arange(253, 3251, 30)
         # frequency = np.arange(1000, 1003, 1)
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
-        simulation_manager.evaluate(False, False)
-        # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        experiment_results.write_to_archive(archive)
-        experiment_results.plot(archive, signal)
+        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties)
+        # simulation_manager.evaluate(True, False)
+        # # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
+        # experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        # experiment_results.write_to_archive(archive)
+        # experiment_results.plot(archive, signal)
 
         # # Make reconstructions
         # reconstruction = recon.Reconstruction(signal.time_properties)

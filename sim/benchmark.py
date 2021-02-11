@@ -11,7 +11,6 @@ import subprocess
 import textwrap
 
 from . import manager
-# from spinsim import utilities
 import spinsim
 from archive import *
 import test_signal
