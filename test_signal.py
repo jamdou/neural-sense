@@ -127,7 +127,7 @@ class SinusoidalNoise:
     type : :obj:`str`
         A label for the kind of noise this represents. For archival purposes.
     """
-    def __init__(self, amplitude = [0, 0, 0], frequency = [50, 50, 50], phase = [math.pi/2, math.pi/2, math.pi/2], type = "SinusoidalNoise"):
+    def __init__(self, amplitude = [0, 0, 0], frequency = [50, 50, 50], phase = [math.pi/2, math.pi/2, math.pi/2], type = "sinusoidal_noise"):
         """
         Parameters
         ----------
@@ -174,7 +174,7 @@ class SinusoidalNoise:
         sinusoidal_noise : :class:`SinusoidalNoise`
             A parametrisation of the detuning noise.
         """
-        return SinusoidalNoise([0, 0, -z_amplitude], [0, 0, 0], [math.pi/2, math.pi/2, math.pi/2], "Detuning_noise")
+        return SinusoidalNoise([0, 0, -z_amplitude], [0, 0, 0], [math.pi/2, math.pi/2, math.pi/2], "detuning_noise")
 
     @staticmethod
     def new_line_noise(amplitude = [0.0, 0.0, 500.0], phase = [0.0, 0.0, 0.0]):
@@ -196,7 +196,7 @@ class SinusoidalNoise:
         sinusoidal_noise : :class:`SinusoidalNoise`
             A parametrisation of the line noise.
         """
-        return SinusoidalNoise(amplitude, [50, 50, 50], phase, "Line_noise")
+        return SinusoidalNoise(amplitude, [50.0, 50.0, 50.0], phase, "line_noise")
 
     def write_to_file(self, archive):
         """

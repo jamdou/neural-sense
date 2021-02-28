@@ -77,7 +77,8 @@ class Reconstruction():
         blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
-        iteration_max = 15
+        # iteration_max = 15
+        iteration_max = 100
         scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
@@ -93,7 +94,7 @@ class Reconstruction():
 
         for iteration_index in range(iteration_max):
             evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
-            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 1/(3 + 20*(iteration_index/iteration_max)), 0.25*scale)
+            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 100/(3 + 20*(iteration_index/iteration_max)), 0.25*scale)
 
         self.amplitude = amplitude.copy_to_host()
 
@@ -182,7 +183,7 @@ def evaluate_next_iteration_fista(amplitude, amplitude_previous, frequency_ampli
         else:
             amplitude[time_index] = 0
 
-        amplitude[time_index] = amplitude[time_index] + ((fast_step_size_previous - 1)/fast_step_size)*(amplitude[time_index] - amplitude_previous[time_index])
+        amplitude[time_index] += ((fast_step_size_previous - 1)/fast_step_size)*(amplitude[time_index] - amplitude_previous[time_index])
 
 #     def evaluate_ista_complete(self):
 #         """
