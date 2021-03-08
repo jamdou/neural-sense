@@ -208,10 +208,10 @@ class Spectrogram():
         ]
         self.bin_start = np.asarray(self.bin_start, np.uint64)
 
-        threads_per_block = (8, 8)
+        threads_per_block = (16, 8)
         blocks_per_grid = (
-            (self.time.size + (threads_per_block[0] - 1)) // threads_per_block[0],
-            (int((self.frequency_range[1] - self.frequency_range[0])//bin_size[1]) + (threads_per_block[1] - 1)) // threads_per_block[1],
+            (self.stft.shape[0] + (threads_per_block[0] - 1)) // threads_per_block[0],
+            (self.stft.shape[1] + (threads_per_block[1] - 1)) // threads_per_block[1],
         )
 
         get_stft[blocks_per_grid, threads_per_block](self.time, self.signal, self.bin_start, self.bin_size, self.stft)
@@ -228,6 +228,8 @@ class Spectrogram():
             extent = (self.time[0], self.time[self.time.size - 1], self.frequency_range[0], self.frequency_range[1]),
             origin = "lower"
         )
+        plt.xlabel("Time (s)")
+        plt.ylabel("Frequency (Hz)")
         plt.show()
 
     def write_to_file(self, archive):
@@ -241,10 +243,12 @@ def get_stft(time, signal, bin_start, bin_size, stft):
         frequency = bin_start[1] + frequency_index*bin_size[1]
         time_sample_index = time_index*bin_size[0]
         stft[time_index, frequency_index, 0] = 0
-        for time_fine_index in range(bin_size[0]):
-            stft[time_index, frequency_index, 0] += signal[time_sample_index + time_fine_index]*(math.cos(math.tau*frequency*time[time_sample_index + time_fine_index]) - 1j*math.sin(math.tau*frequency*time[time_sample_index + time_fine_index]))*math.exp(-1e14*(time[time_sample_index + int(bin_size[0]/2)] - time[time_sample_index + time_fine_index])**2)
-        stft[time_index, frequency_index, 0] = (stft[time_index, frequency_index, 0].real**2 + stft[time_index, frequency_index, 0].imag**2)/(frequency**2)
+        for time_fine_index in range(-25*bin_size[0], 26*bin_size[0]):
+            if time_sample_index + time_fine_index >= 0 and time_sample_index + time_fine_index < time.size:
+                stft[time_index, frequency_index, 0] += signal[time_sample_index + time_fine_index]*(math.cos(math.tau*frequency*time[time_sample_index + time_fine_index]) - 1j*math.sin(math.tau*frequency*time[time_sample_index + time_fine_index]))*(1 + math.cos(math.tau*(time_fine_index + 0.5*bin_size[0])/(51*bin_size[0])))
+                # *math.exp(-1e14*(time[time_sample_index + int(bin_size[0]/2)] - time[time_sample_index + time_fine_index])**2)
+        stft[time_index, frequency_index, 0] = (stft[time_index, frequency_index, 0].real**2 + stft[time_index, frequency_index, 0].imag**2)#/(frequency**2)
 
-        stft[time_index, frequency_index, 0] = math.log(stft[time_index, frequency_index, 0].real + 1)
-        stft[time_index, frequency_index, 1] = 0#stft[time_index, frequency_index, 0]
-        stft[time_index, frequency_index, 2] = 0#stft[time_index, frequency_index, 0]
+        # stft[time_index, frequency_index, 0] = math.log(stft[time_index, frequency_index, 0].real + 0.001)
+        # stft[time_index, frequency_index, 1] = stft[time_index, frequency_index, 0]
+        # stft[time_index, frequency_index, 2] = stft[time_index, frequency_index, 0]
