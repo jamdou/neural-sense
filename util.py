@@ -200,13 +200,14 @@ class Spectrogram():
         time_step = (time[time.size - 1] - time[0])/time.size
         # print((int((time[time.size - 1] - time[0])//bin_size[0]), int((frequency_range[1] - frequency_range[0])//bin_size[1])))
         self.stft = np.empty((int(time.size//bin_size[0]), int((frequency_range[1] - frequency_range[0])//bin_size[1]), 3), np.complex128)
-        self.bin_size = np.asarray(bin_size, np.uint8)
-        self.bin_size[0] = int(self.bin_size[0]/time_step)
+        bin_size[0] = int(time.size/self.stft.shape[0])
+        self.bin_size = np.asarray(bin_size, np.int64)
+        # self.bin_size[0] = int(self.bin_size[0]/time_step)
         self.bin_start = [
             time[0],
             frequency_range[0]
         ]
-        self.bin_start = np.asarray(self.bin_start, np.uint64)
+        self.bin_start = np.asarray(self.bin_start, np.int64)
 
         threads_per_block = (16, 8)
         blocks_per_grid = (
