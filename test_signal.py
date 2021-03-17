@@ -323,7 +323,7 @@ class TestSignal:
             plt.title(archive.execution_time_string + "Fourier Transform Frequency Amplitude")
             plt.savefig(archive.plot_path + "fourierTransform_frequency_amplitude.pdf")
             plt.savefig(archive.plot_path + "fourierTransform_frequency_amplitude.png")
-        plt.show()
+        plt.draw()
         
     def write_to_file(self, archive):
         """

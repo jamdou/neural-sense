@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+# import matplotlib
+# matplotlib.use("tkagg")
 # import sys, getopt      # Command line arguments
 from numba import cuda  # GPU code
 import colorama         # Colourful terminal
@@ -64,23 +66,23 @@ if __name__ == "__main__":
         # frequency = np.arange(250, 2251, 50)
         # frequency = np.arange(250, 2251, 460e3/1e5)
         # frequency = np.arange(990, 1010, 0.02)
-        # frequency = np.arange(253, 3251, 30)
-        frequency = np.arange(1000, 1003, 1)
+        frequency = np.arange(253, 3251, 30)
+        # frequency = np.arange(1000, 1003, 1)
         simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE)
-        simulation_manager.evaluate(True, False)
+        simulation_manager.evaluate(False, False)
         # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
         experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
         experiment_results.write_to_archive(archive)
         experiment_results.plot(archive, signal)
 
-        # # === Make reconstructions ===
-        # reconstruction = recon.Reconstruction(signal.time_properties)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 100)
-        # # reconstruction.read_frequencies_from_test_signal(signal, number_of_samples = 200)
-        # reconstruction.evaluate_ista()
-        # # reconstruction.evaluateISTAComplete()
-        # reconstruction.plot(archive, signal)
-        # reconstruction.write_to_file(archive.archive_file)
+        # === Make reconstructions ===
+        reconstruction = recon.Reconstruction(signal.time_properties)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 100)
+        # reconstruction.read_frequencies_from_test_signal(signal, number_of_samples = 200)
+        reconstruction.evaluate_ista()
+        # reconstruction.evaluateISTAComplete()
+        reconstruction.plot(archive, signal)
+        reconstruction.write_to_file(archive.archive_file)
 
         # === ===                      === ===
         # === === Benchmarks and tests === ===
@@ -134,3 +136,4 @@ if __name__ == "__main__":
         archive.close_archive_file()
         cuda.profile_stop()
         cuda.close()
+        plt.show()

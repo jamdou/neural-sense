@@ -66,7 +66,7 @@ class Reconstruction():
         plt.title(archive.execution_time_string + "Reconstruction")
         plt.savefig(archive.plot_path + "reconstruction.pdf")
         plt.savefig(archive.plot_path + "reconstruction.png")
-        plt.show()
+        plt.draw()
 
     def evaluate_ista(self):
         execution_time_endpoints = np.zeros(2, np.float64)
@@ -281,7 +281,7 @@ def evaluate_next_iteration_fista(amplitude, amplitude_previous, frequency_ampli
 
 #         # plt.figure()
 #         # plt.plot(time_coarse, amplitude)
-#         # plt.show()
+#         # plt.draw()
 #         amplitude_previous = 0*self.amplitude
 #         while sum((self.amplitude - amplitude_previous)**2) > 1e0:
 #             # if iteration_index == 0:
@@ -305,13 +305,13 @@ def evaluate_next_iteration_fista(amplitude, amplitude_previous, frequency_ampli
 
 #             #     plt.figure()
 #             #     plt.plot(time_coarse, amplitude)
-#             #     plt.show()
+#             #     plt.draw()
 
 #         # time_coarse = time_coarse.copy_to_host()
 #         # amplitude = amplitude.copy_to_host()
 #         # plt.figure()
 #         # plt.plot(self.time_properties.time_coarse, self.amplitude)
-#         # plt.show()
+#         # plt.draw()
 
 # @cuda.jit()
 # def reconstruct_ista_complete(

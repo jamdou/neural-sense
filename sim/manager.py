@@ -129,7 +129,7 @@ class SimulationManager:
                                 plt.ylabel("Spin projection (hbar)")
                                 if self.archive:
                                     plt.title(f"{self.archive.execution_time_string}\nExpected spin projection over time")
-                                plt.show()
+                                plt.draw()
 
                                 spectrogram = util.Spectrogram(signal_instance.time_properties.time_coarse, simulation.simulation_results.spin[:, 0], [500, 10], [460e3 - 2e3, 460e3 + 2e3])
                                 # 
@@ -773,7 +773,7 @@ class Simulation:
                 plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".pdf")
                 plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".png")
             else:
-                plt.show()
+                plt.draw()
 
     def write_to_file(self, archive, do_write_everything = False):
         """
@@ -1097,7 +1097,7 @@ class ExperimentResults:
             plt.title(f"{archive.execution_time_string}\nMeasured Frequency Amplitude")
             plt.savefig(f"{archive.plot_path}measured_frequency_amplitude.pdf")
             plt.savefig(f"{archive.plot_path}measured_frequency_amplitude.png")
-        plt.show()
+        plt.draw()
 
     def write_to_archive(self, archive):
         """

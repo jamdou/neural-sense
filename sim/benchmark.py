@@ -194,7 +194,7 @@ class BenchmarkResults:
                 plt.title(archive.execution_time_string + "\n" + self.benchmark_type.title)
                 plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".pdf")
                 plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".png")
-            plt.show()
+            plt.draw()
 
 def plot_benchmark_comparison(archive, archive_times, legend, title):
     """
@@ -229,7 +229,7 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
         archive_group_benchmark_results["archive_times"] = np.asarray(archive_times, dtype='|S32')
         archive_group_benchmark_results["legend"] = np.asarray(legend, dtype='|S32')
         archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
-    plt.show()
+    plt.draw()
 
 def new_benchmark_scipy(archive, signal_template, frequency, time_step_fine, state_properties):
     """
@@ -401,7 +401,7 @@ def new_benchmark_device_aggregate(archive, archive_times):
         plt.title(archive.execution_time_string + "\nParallelisation speed for various devices")
         plt.savefig(archive.plot_path + "benchmark_device_aggregate.pdf")
         plt.savefig(archive.plot_path + "benchmark_device_aggregate.png")
-    plt.show()
+    plt.draw()
     
 
 def new_benchmark_device(archive, signal, frequency, state_properties):
@@ -484,7 +484,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
         plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices")
         plt.savefig(archive.plot_path + "benchmark_device.pdf")
         plt.savefig(archive.plot_path + "benchmark_device.png")
-    plt.show()
+    plt.draw()
 
     plt.figure()
     plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
@@ -497,7 +497,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
         plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices,\nfirst run")
         plt.savefig(archive.plot_path + "benchmark_device_first.pdf")
         plt.savefig(archive.plot_path + "benchmark_device_first.png")
-    plt.show()
+    plt.draw()
 
     return
 
