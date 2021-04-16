@@ -3,6 +3,7 @@ A class to handle archiving inputs and results, as well as an :class:`enum.Enum`
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 import time as tm
 import datetime as dtm
 import h5py
@@ -215,3 +216,12 @@ class Archive:
         """
         for profile_name in glob.glob(self.profile_local_path + "*"):
             shutil.copyfile(profile_name, profile_name.replace(self.profile_local_path, self.profile_path))
+
+    def write_plot(self, title, file_name):
+        plt.title(title)
+        plt.savefig(self.plot_path + file_name + "_publication.pdf")
+        plt.savefig(self.plot_path + file_name + "_publication.png")
+
+        plt.title(self.execution_time_string + "\n" + title)
+        plt.savefig(self.plot_path + file_name + ".pdf")
+        plt.savefig(self.plot_path + file_name + ".png")
