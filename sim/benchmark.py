@@ -192,9 +192,7 @@ class BenchmarkResults:
         plt.ylabel(self.benchmark_type.y_label)
         if do_show_plot:
             if archive:
-                plt.title(archive.execution_time_string + "\n" + self.benchmark_type.title)
-                plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".pdf")
-                plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".png")
+                archive.write_plot(self.benchmark_type.title, "benchmark_" + self.benchmark_type.value)
             plt.show()
 
 def plot_benchmark_comparison(archive, archive_times, legend, title):
@@ -222,9 +220,7 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
     plt.legend(legend)
 
     if archive:
-        plt.title(archive.execution_time_string + "\n" + title)
-        plt.savefig(archive.plot_path + "benchmark_comparison.pdf")
-        plt.savefig(archive.plot_path + "benchmark_comparison.png")
+        archive.write_plot(title, "benchmark_comparison")
 
         archive_group_benchmark_results = archive.archive_file.require_group("benchmark_results/benchmark_comparison")
         archive_group_benchmark_results["archive_times"] = np.asarray(archive_times, dtype='|S32')
@@ -388,7 +384,7 @@ def new_benchmark_device_aggregate(archive, archive_times):
         else:
             colour += ["r"]
 
-    plt.figure()
+    plt.figure(figsize = [6.4, 8.0])
     plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
     plt.barh(range(len(device_label)), execution_frequency, tick_label = device_label, color = colour)
     for device_index in range(len(device_label)):
@@ -399,9 +395,7 @@ def new_benchmark_device_aggregate(archive, archive_times):
 
     plt.xlabel("Execution speed (simulations per second)")
     if archive:
-        plt.title(archive.execution_time_string + "\nParallelisation speed for various devices")
-        plt.savefig(archive.plot_path + "benchmark_device_aggregate.pdf")
-        plt.savefig(archive.plot_path + "benchmark_device_aggregate.png")
+        archive.write_plot("Parallelisation speed for various devices", "benchmark_device_aggregate")
     plt.show()
     
 
@@ -428,7 +422,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
         spinsim.Device.CUDA
     ]
 
-    cpu_name = "\n".join(textwrap.wrap(subprocess.check_output(["wmic","cpu","get", "name"]).strip().decode('utf-8').split("\n")[1], width = 24))
+    cpu_name = "\n".join(textwrap.wrap(subprocess.check_output(["wmic","cpu","get", "name"]).strip().decode('utf-8').split("\n")[1], width = 23))
 
     gpu_name = cuda.list_devices()[0].name.decode('UTF-8')
     device_label = [
@@ -482,9 +476,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
-        plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices")
-        plt.savefig(archive.plot_path + "benchmark_device.pdf")
-        plt.savefig(archive.plot_path + "benchmark_device.png")
+        archive.write_plot("Parallelisation speed up for various devices", "benchmark_device")
     plt.show()
 
     plt.figure()
@@ -495,9 +487,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     plt.text(speed_up_first[2], 2, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up_first[2], execution_time_first[2]*1e3), ha = "right", va = "center", color = "w")
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
-        plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices,\nfirst run")
-        plt.savefig(archive.plot_path + "benchmark_device_first.pdf")
-        plt.savefig(archive.plot_path + "benchmark_device_first.png")
+        archive.write_plot("Parallelisation speed up for various devices,\nfirst run", "benchmark_device_first")
     plt.show()
 
     return
