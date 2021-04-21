@@ -77,35 +77,37 @@ if __name__ == "__main__":
             time_properties_reconstruction
         )
 
-        # === Make state ===
-        # [0.5, 1/np.sqrt(2), 0.5]
-        state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        # # === Make state ===
+        # # [0.5, 1/np.sqrt(2), 0.5]
+        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
 
-        cuda.profile_start()
+        # cuda.profile_start()
         
-        # === Run simulations ===
-        # frequency = np.arange(70, 3071, 30)
-        # frequency = np.arange(250, 2251, 3)
-        # frequency = np.arange(250, 2000, 10.0)
-        # frequency = np.arange(250, 2251, 50)
-        # frequency = np.arange(250, 2251, 460e3/1e5)
-        # frequency = np.arange(990, 1010, 0.02)
-        # frequency = np.arange(253, 3251, 30)
-        # frequency = np.arange(1000, 1003, 1)
-        # frequency = np.arange(1000, 1001, 1)
-        # frequency = np.arange(0, 1000000, 1)
-        frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step)
+        # # === Run simulations ===
+        # # frequency = np.arange(70, 3071, 30)
+        # # frequency = np.arange(250, 2251, 3)
+        # # frequency = np.arange(250, 2000, 10.0)
+        # # frequency = np.arange(250, 2251, 50)
+        # # frequency = np.arange(250, 2251, 460e3/1e5)
+        # # frequency = np.arange(990, 1010, 0.02)
+        # # frequency = np.arange(253, 3251, 30)
+        # # frequency = np.arange(1000, 1003, 1)
+        # # frequency = np.arange(1000, 1001, 1)
+        # # frequency = np.arange(0, 1000000, 1)
+        # frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step)
 
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-        simulation_manager.evaluate(False, False)
-        # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
-        experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+        # simulation_manager.evaluate(False, False)
+
+        # === Experiment results ===
+        # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, "20210421T174119")
         experiment_results.write_to_archive(archive)
         experiment_results.plot(archive, signal_reconstruction)
 
         # === Make reconstructions ===
         reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(24, experiment_results.frequency.size))
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size))
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
         reconstruction.evaluate_ista()
         # reconstruction.evaluateISTAComplete()

@@ -12,6 +12,8 @@ import glob
 import shutil
 import sys, getopt
 from enum import Enum, auto
+# from sim.manager import SimulationManager
+from test_signal import TestSignal
 
 class ProfileState(Enum):
     """
@@ -136,24 +138,24 @@ class Archive:
         # Set up profile directories
         self.profile_state = profile_state
         self.source_path = ".\\"
-        self.profile_local_path = self.source_path + "profile\\"
+        self.profile_local_path = f"{self.source_path}profile\\"
         if profile_state == ProfileState.ARCHIVE:
-            profile_flag_file = open(self.profile_local_path + "profile_flag", "r")
+            profile_flag_file = open(f"{self.profile_local_path}profile_flag", "r")
             self.execution_time_string = profile_flag_file.read()
             profile_flag_file.close()
-            os.remove(self.profile_local_path + "profile_flag")
+            os.remove(f"{self.profile_local_path}profile_flag")
         else:
             self.execution_time_string = dtm.datetime.now().strftime("%Y%m%dT%H%M%S")
         
         # Set up archive directories
-        self.archive_path = archive_path + self.execution_time_string[:8] + "\\" + self.execution_time_string + "\\"
-        self.profile_path = self.archive_path + "profile\\"
-        self.plot_path = self.archive_path + "plots\\"
+        self.archive_path = f"{archive_path}{self.execution_time_string[:8]}\\{self.execution_time_string}\\"
+        self.profile_path = f"{self.archive_path}profile\\"
+        self.plot_path = f"{self.archive_path}plots\\"
         self.description_of_test = description_of_test
         self.archive_file = None
 
         if profile_state == ProfileState.ARCHIVE:
-            self.archive_file = h5py.File(self.archive_path + "archive.hdf5", "a")
+            self.archive_file = h5py.File(f"{self.archive_path}archive.hdf5", "a")
             self.write_profiles()
         else:
             if not os.path.exists(self.plot_path):
@@ -166,7 +168,7 @@ class Archive:
         """
         Makes a new hdf5 file at the archive path.
         """
-        self.archive_file = h5py.File(self.archive_path + "archive.hdf5", "w")
+        self.archive_file = h5py.File(f"{self.archive_path}archive.hdf5", "w")
 
     def open_archive_file(self, old_execution_time_string):
         """
@@ -177,7 +179,7 @@ class Archive:
         old_execution_time_string : :obj:`str`
             The time identity of the archive to be opened.
         """
-        self.archive_file = h5py.File(self.archive_path[:-25] + old_execution_time_string[:8] + "\\" + old_execution_time_string + "\\archive.hdf5", "r")
+        self.archive_file = h5py.File(f"{self.archive_path[:-25]}{old_execution_time_string[:8]}\\{old_execution_time_string}\\archive.hdf5", "r")
 
     def close_archive_file(self, do_save_source = True):
         """
@@ -193,7 +195,7 @@ class Archive:
                 self.write_code_source()
             self.archive_file.close()
             if self.profile_state == ProfileState.TIME_LINE:
-                profile_flag_file = open(self.profile_local_path + "profile_flag", "w")
+                profile_flag_file = open(f"{self.profile_local_path}profile_flag", "w")
                 profile_flag_file.write(self.execution_time_string)
                 profile_flag_file.close()
         else:
@@ -203,9 +205,9 @@ class Archive:
         """
         Save source code to the hdf5 file.
         """
-        archive_group_code_source = self.archive_file.require_group("code_source" + self.execution_time_string)
+        archive_group_code_source = self.archive_file.require_group(f"code_source{self.execution_time_string}")
         archive_group_code_source["description_of_test"] = np.asarray([self.description_of_test], dtype = "|S512")
-        for code_source_name in glob.glob(self.source_path + "**\\*.py", recursive = True) + glob.glob(self.source_path + "**\\*.bat", recursive = True):
+        for code_source_name in glob.glob(f"{self.source_path}**\\*.py", recursive = True) + glob.glob(f"{self.source_path}**\\*.bat", recursive = True):
             code_source = open(code_source_name, "r")
             archive_group_code_source[code_source_name.replace(self.source_path, "")] = code_source.read()
             code_source.close()
@@ -214,7 +216,7 @@ class Archive:
         """
         Organise the generated profile files to the `profile_path`.
         """
-        for profile_name in glob.glob(self.profile_local_path + "*"):
+        for profile_name in glob.glob(f"{self.profile_local_path}*"):
             shutil.copyfile(profile_name, profile_name.replace(self.profile_local_path, self.profile_path))
 
     def write_plot(self, title, file_name):
@@ -242,3 +244,114 @@ class Archive:
         plt.title(f"{self.execution_time_string}\n{title}")
         plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.pdf")
         plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.png")
+
+class ExperimentResults:
+    """
+    A class that contains information from the results of a complete experiment, whether it was done via simulations, or in the lab.
+
+    Attributes
+    ----------
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
+        The dressing Rabi frequencies at which the experiments were run. In units of Hz.
+    frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`
+        The Fourier sine coefficient of the signal being measured, as determined by the experiment. In units of Hz.
+    """
+    def __init__(self, frequency = None, frequency_amplitude = None, archive_time = None, experiment_type = "unknown"):
+        """
+        Parameters
+        ----------
+        frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, optional
+            The dressing Rabi frequencies at which the experiments were run. In units of Hz.
+        frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`, optional
+            The Fourier sine coefficient of the signal being measured, as determined by the experiment. In units of Hz.
+        archive_time : :class:`numpy.ndarray` of :class:`str`, optional
+            The time the original archive was taken from
+        """
+        self.frequency = frequency
+        self.frequency_amplitude = frequency_amplitude
+        self.archive_time = archive_time
+        self.experiment_type = experiment_type
+
+    @staticmethod
+    def new_from_simulation_manager(simulation_manager):
+        """
+        A constructor that creates a new :class:`ExperimentResults` object from an already evaluated :class:`SimulationManager` object. That is, make an experiment results object based off of simulation results.
+
+        Parameters
+        ----------
+        simulation_manager : :class:`SimulationManager`
+            The simulation manager object to read the results of.
+
+        Returns
+        -------
+        experiment_results : :class:`ExperimentResults`
+            A new object containing the results of `simulation_manager`.
+        """
+        frequency = 1*simulation_manager.frequency
+        frequency_amplitude = 1*simulation_manager.frequency_amplitude[:frequency.size]
+
+        return ExperimentResults(frequency, frequency_amplitude, experiment_type = "simulation")
+
+    def plot(self, archive:Archive = None, test_signal:TestSignal = None):
+        """
+        Plots the experiment results contained in the object. Optionally saves the plots, as well as compares the results to numerically calculated values.
+
+        Parameters
+        ----------
+        archive : :class:`archive.Archive`, optional
+            If specified, will save the generated plot to the archive's :attr:`archive.Archive.plot_path`.
+        test_signal : :class:`test_signal:TestSignal`, optional
+            The signal that was being measured during the experiment. If specified, this function will plot the sine Fourier transform of the signal behind the measured coefficients of the experiment results.
+        """
+        plt.figure()
+        if test_signal:
+            plt.plot(test_signal.frequency, test_signal.frequency_amplitude, "-k")
+        plt.plot(self.frequency, self.frequency_amplitude, "xr")
+        if test_signal:
+            plt.legend(["Fourier Transform", "Measured"])
+        plt.xlabel("Frequency (Hz)")
+        plt.ylabel("Amplitude (Hz)")
+        plt.xlim([0, np.max(self.frequency)])
+        # plt.ylim([-0.08, 0.08])
+        plt.grid()
+        if archive:
+            archive.write_plot("Measured Frequency Amplitude", "measured_frequency_amplitude")
+        plt.draw()
+
+    def write_to_archive(self, archive:Archive):
+        """
+        Saves the contents of the experiment results to an archive.
+
+        Parameters
+        ----------
+        archive : :class:`archive.archive`
+            The archive object to save the results to.
+        """
+        archive_group_experiment_results = archive.archive_file.require_group("experiment_results")
+        archive_group_experiment_results["frequency"] = self.frequency
+        archive_group_experiment_results["frequency_amplitude"] = self.frequency_amplitude
+        if self.archive_time:
+            archive_group_experiment_results["archive_time"] = self.archive_time
+        if self.experiment_type:
+            archive_group_experiment_results["experiment_type"] = self.experiment_type
+    
+    @staticmethod
+    def new_from_archive_time(archive:Archive, archive_time):
+        archive_previous = Archive(archive.archive_path[:-25], "")
+        archive_previous.open_archive_file(archive_time)
+        archive_group_experiment_results = archive_previous.archive_file.require_group("experiment_results")
+
+        frequency = np.asarray(archive_group_experiment_results["frequency"])
+        frequency_amplitude = np.asarray(archive_group_experiment_results["frequency_amplitude"])
+        if "archive_time" in archive_group_experiment_results:
+            archive_time_real = np.asarray(archive_group_experiment_results["archive_time"])
+        else:
+            archive_time_real = archive_time
+        if "experiment_type" in archive_group_experiment_results:
+            experiment_type = np.asarray(archive_group_experiment_results["experiment_type"])
+        else:
+            experiment_type = "unknown"
+
+        archive_previous.close_archive_file(False)
+
+        return ExperimentResults(frequency, frequency_amplitude, archive_time = archive_time_real, experiment_type = experiment_type)
