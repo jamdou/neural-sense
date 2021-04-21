@@ -14,6 +14,7 @@ from . import manager
 import spinsim
 from archive import *
 import test_signal
+import sim.manager
 
 class BenchmarkType(Enum):
     """
@@ -95,6 +96,25 @@ class BenchmarkType(Enum):
     The results of :func:`benchmark.manager.new_benchmark_time_step_fine()`.
     """
 
+    TIME_STEP_FINE_MM = (
+        "time_step_fine_mm",
+        "Fine time step (s)",
+        "Error",
+        "Effect of fine time step size on error (Mathematica)",
+        "log"
+    )
+
+    TIME_STEP_FINE_EXECUTION_TIME_MM = (
+        "time_step_fine_execution_time_mm",
+        "Fine time step (s)",
+        "Execution time (s)",
+        "Effect of fine time step size on execution time (Mathematica)",
+        "log"
+    )
+    """
+    The results of :func:`benchmark.manager.new_benchmark_time_step_fine()`.
+    """
+
     TIME_STEP_FINE_FREQUENCY_DRIFT = (
         "time_step_fine_frequency_drift",
         "Fine time step (s)",
@@ -155,7 +175,7 @@ class BenchmarkResults:
                 )
                 return benchmark_results
 
-    def write_to_archive(self, archive):
+    def write_to_archive(self, archive:Archive):
         """
         Save a benchmark to a hdf5 file.
 
@@ -194,7 +214,7 @@ class BenchmarkResults:
                 archive.write_plot(self.benchmark_type.title, "benchmark_" + self.benchmark_type.value)
             plt.show()
 
-def plot_benchmark_comparison(archive, archive_times, legend, title):
+def plot_benchmark_comparison(archive:Archive, archive_times, legend, title):
     """
     Plots multiple benchmarks on one plot from previous archives.
 
@@ -227,7 +247,7 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
         archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
     plt.draw()
 
-def new_benchmark_scipy(archive, signal_template, frequency, time_step_fine, state_properties):
+def new_benchmark_scipy(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
@@ -344,7 +364,7 @@ def new_benchmark_scipy(archive, signal_template, frequency, time_step_fine, sta
 
     return benchmark_results
 
-def new_benchmark_device_aggregate(archive, archive_times):
+def new_benchmark_device_aggregate(archive:Archive, archive_times):
     """
     Collects results for multiple runs of :func:`new_benchmark_device()`, and combines them into a single bar chart.
 
@@ -398,7 +418,7 @@ def new_benchmark_device_aggregate(archive, archive_times):
     plt.show()
     
 
-def new_benchmark_device(archive, signal, frequency, state_properties):
+def new_benchmark_device(archive:Archive, signal:test_signal.TestSignal, frequency, state_properties:sim.manager.StateProperties):
     """
     Runs a benchmark to compare (single and multicore) CPU performance to GPU performance.
 
@@ -491,7 +511,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
 
     return
 
-def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.0):
+def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bound = 1.0):
     """
     Runs a benchmark for the trotter exponentiator :func:`utilities.matrixExponential_lie_trotter()` using arbitrary matrices. Uses :func:`benchmark_trotter_cutoff_matrix()` to execute the matrix exponentials.
 
@@ -581,7 +601,7 @@ def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.
 
     return benchmark_results
 
-def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
+def new_benchmark_trotter_cutoff(archive:Archive, signal:test_signal.TestSignal, frequency, trotter_cutoff):
     """
     Runs a benchmark for the trotter exponentiator using the integrator.
 
@@ -630,7 +650,7 @@ def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
 
     return benchmark_results
 
-def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_fine, state_properties):
+def new_benchmark_time_step_fine(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
@@ -688,7 +708,7 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
 
     return benchmark_results
 
-def new_benchmark_time_step_source(archive, signal_template, frequency, state_properties, time_step_source):
+def new_benchmark_time_step_source(archive:Archive, signal_template:test_signal.TestSignal, frequency, state_properties:sim.manager.StateProperties, time_step_source):
     """
     **(benchmark for obsolete interpolation mode, might be useful to keep if such a mode is re-added in the future)**
 
@@ -747,7 +767,7 @@ def new_benchmark_time_step_source(archive, signal_template, frequency, state_pr
 
     return benchmark_results
 
-def new_benchmark_time_step_fine_frequency_drift(archive, signal_template, time_step_fines, dressing_frequency):
+def new_benchmark_time_step_fine_frequency_drift(archive:Archive, signal_template:test_signal.TestSignal, time_step_fines, dressing_frequency):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing measured frequency coefficients.
 
@@ -786,3 +806,12 @@ def new_benchmark_time_step_fine_frequency_drift(archive, signal_template, time_
     benchmark_results.plot(archive)
 
     return benchmark_results
+
+def new_benchmark_mathematica(archive:Archive, time_step_fines, errors, execution_times):
+    benchmark_results = BenchmarkResults(BenchmarkType.TIME_STEP_FINE_MM, np.asarray(time_step_fines), errors)
+    benchmark_results.write_to_archive(archive)
+    benchmark_results.plot(archive)
+
+    benchmark_results_execution_time = BenchmarkResults(BenchmarkType.TIME_STEP_FINE_EXECUTION_TIME_MM, np.asarray(time_step_fines), execution_times)
+    benchmark_results_execution_time.write_to_archive(archive)
+    benchmark_results_execution_time.plot(archive)

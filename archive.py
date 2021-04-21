@@ -218,10 +218,27 @@ class Archive:
             shutil.copyfile(profile_name, profile_name.replace(self.profile_local_path, self.profile_path))
 
     def write_plot(self, title, file_name):
-        plt.title(title)
-        plt.savefig(self.plot_path + file_name + "_publication.pdf")
-        plt.savefig(self.plot_path + file_name + "_publication.png")
+        """
+        Writes plots to the archive file path in both png and pdf formats both with and without time labels.
 
-        plt.title(self.execution_time_string + "\n" + title)
-        plt.savefig(self.plot_path + file_name + ".pdf")
-        plt.savefig(self.plot_path + file_name + ".png")
+        Parameters
+        ----------
+        title : :obj:`str`
+            The title to be drawn on the plot.
+        file_name : :obj:`str`
+            The path that the plot is written to.
+        """
+        archive_index_text = ""
+        if os.path.isfile(f"{self.plot_path}{file_name}.png"):
+            archive_index = 1
+            while os.path.isfile(f"{self.plot_path}{file_name}.png"):
+                archive_index += 1
+            archive_index_text = f"_{archive_index}"
+
+        plt.title(title)
+        plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}_publication.pdf")
+        plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}_publication.png")
+
+        plt.title(f"{self.execution_time_string}\n{title}")
+        plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.pdf")
+        plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.png")

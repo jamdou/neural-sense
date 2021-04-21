@@ -250,7 +250,7 @@ class TestSignal:
     frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.double` (frequency_index)
         The sine Fourier transform of the pulse sequence. In units of Hz. Only evaluated when :func:`get_frequency_amplitude()` is called. See :math:`s(f)` above.
     """
-    def __init__(self, neural_pulses = [NeuralPulse()], sinusoidal_noises = [], time_properties = TimeProperties(), do_evaluate = True):
+    def __init__(self, neural_pulses = [NeuralPulse()], sinusoidal_noises = [], time_properties:TimeProperties = TimeProperties(), do_evaluate = True):
         """
         Parameters
         ----------
@@ -412,7 +412,8 @@ def get_frequency_amplitude(time_end_points, time_coarse, time_step_coarse, time
 
     frequency_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x # The frequency array index the current thread is working on
     if frequency_index < frequency_amplitude.size:                        # Check we haven't overflowed the array
-        frequency_step = 0.125/(time_end_points[1] - time_end_points[0])
+        # frequency_step = 0.125/(time_end_points[1] - time_end_points[0])
+        frequency_step = 0.5/(time_end_points[1] - time_end_points[0])
         frequency[frequency_index] = frequency_step*frequency_index        # The frequency this thread is calculating the coefficient for
         frequency_amplitude_temporary = 0                                 # It's apparently more optimal to repeatedly write to a register (this) than the output array in memory. Though honestly can't see the improvement
         frequency_temporary = frequency[frequency_index]                  # And read from a register rather than memory

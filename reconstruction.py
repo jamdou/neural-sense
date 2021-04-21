@@ -1,3 +1,5 @@
+import h5py
+from archive import Archive
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -11,7 +13,7 @@ class Reconstruction():
     """
     Controls a reconstruction of the signal from Fourier sine coefficients using compressive sensing
     """
-    def __init__(self, time_properties, step_size_sparse = 0.1, step_size_manifold = 100000):
+    def __init__(self, time_properties:TimeProperties, step_size_sparse = 0.1, step_size_manifold = 100000):
         self.time_properties = time_properties
         self.frequency = None
         self.frequency_amplitude = None
@@ -20,7 +22,7 @@ class Reconstruction():
         self.step_size_sparse = step_size_sparse
         self.step_size_manifold = step_size_manifold
 
-    def read_frequencies_directly(self, frequency, frequency_amplitude, number_of_samples = 100, frequency_cutoff = 3000):
+    def read_frequencies_directly(self, frequency, frequency_amplitude, number_of_samples = 100, frequency_cutoff = 7500):
         """
         Import arbitrary frequency values for reconstruction
         """
@@ -34,13 +36,13 @@ class Reconstruction():
         """
         self.read_frequencies_directly(experiment_results.frequency, experiment_results.frequency_amplitude, number_of_samples, frequency_cutoff)
 
-    def read_frequencies_from_test_signal(self, test_signal):
+    def read_frequencies_from_test_signal(self, test_signal:TestSignal, number_of_samples = 100):
         """
         Import frequency values from the dot product Fourier transform of a signal
         """
-        self.read_frequencies_directly(test_signal.frequency, test_signal.frequency_amplitude)
+        self.read_frequencies_directly(test_signal.frequency, test_signal.frequency_amplitude, number_of_samples)
 
-    def write_to_file(self, archive):
+    def write_to_file(self, archive:h5py.Group):
         """
         Save the reconstruction results to a hdf5 file
         """
@@ -50,7 +52,7 @@ class Reconstruction():
         archive_group_reconstruction["frequency_amplitude"] = self.frequency_amplitude
         archive_group_reconstruction["amplitude"] = self.amplitude
 
-    def plot(self, archive, test_signal):
+    def plot(self, archive:Archive, test_signal:TestSignal):
         """
         Plot the reconstruction signal, possibly against a template test signal
         """
@@ -60,15 +62,32 @@ class Reconstruction():
         plt.plot(self.time_properties.time_coarse, self.amplitude, "-r")
         if test_signal is not None:
             plt.legend(["Original", "Reconstruction"])
+            plt.xlim(test_signal.time_properties.time_end_points)
         plt.xlabel("Time (s)")
         plt.ylabel("Amplitude (Hz)")
         plt.grid()
-        plt.title(archive.execution_time_string + "Reconstruction")
-        plt.savefig(archive.plot_path + "reconstruction.pdf")
-        plt.savefig(archive.plot_path + "reconstruction.png")
+        if archive:
+            archive.write_plot("Reconstruction", "reconstruction")
         plt.draw()
 
+        if test_signal.neural_pulses:
+            plt.figure()
+            if test_signal is not None:
+                plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude, "-k")
+            plt.plot(self.time_properties.time_coarse, self.amplitude, "-xr")
+            if test_signal is not None:
+                plt.legend(["Original", "Reconstruction"])
+            plt.xlabel("Time (s)")
+            plt.ylabel("Amplitude (Hz)")
+            plt.grid()
+            neural_pulse = test_signal.neural_pulses[0]
+            plt.xlim([neural_pulse.time_start - 0.5/neural_pulse.frequency, neural_pulse.time_start + 1.5/neural_pulse.frequency])
+            if archive:
+                archive.write_plot("Reconstruction", "reconstruction_zoom")
+            plt.draw()
+
     def evaluate_ista(self):
+        print("\033[33mStarting reconstruction...\033[0m")
         execution_time_endpoints = np.zeros(2, np.float64)
 
         execution_time_endpoints[0] = tm.time()
@@ -78,7 +97,7 @@ class Reconstruction():
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
         # iteration_max = 15
-        iteration_max = 100
+        iteration_max = 1000
         scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
@@ -94,12 +113,16 @@ class Reconstruction():
 
         for iteration_index in range(iteration_max):
             evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
-            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 100/(3 + 20*(iteration_index/iteration_max)), 0.25*scale)
+            # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 100/(3 + 20*(iteration_index/iteration_max)), 0.25*scale)
+            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 2/(3 + 3*(iteration_index/iteration_max)), scale)
+            # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 1, scale)
 
         self.amplitude = amplitude.copy_to_host()
 
         execution_time_endpoints[1] = tm.time()
-        print(execution_time_endpoints[1] - execution_time_endpoints[0])
+        print(f"ReTm = {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
+
+        print("\033[32mDone!\033[0m")
 
     def evaluate_fista(self):
         execution_time_endpoints = np.zeros(2, np.float64)

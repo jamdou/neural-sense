@@ -39,19 +39,43 @@ if __name__ == "__main__":
     if profile_state != arch.ProfileState.ARCHIVE:
         archive.new_archive_file()
 
+        # === Scaled protocol ===
+        scaled_frequency = 5000
+        scaled_density = 1/25
+        scaled_samples = 10
+        scaled_amplitude = 800
+        scaled_sweep = [1003, 7500]
+        scaled_time_step = 1/(scaled_frequency*scaled_samples)
+        # scaled_sweep = [0, scaled_samples*scaled_density/2]
+
+        scaled_time_end = 1/(scaled_frequency*scaled_density)
+        scaled_pulse_time = 0.2333333*scaled_time_end
+        scaled_frequency_step = scaled_density*scaled_frequency/2
+
         # === Make signal ===
         # time_properties = test_signal.TimeProperties(5e-8, 1e-8, 1e-8, [0, 0.01])
         # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
-        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.11])
+        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.11])
+        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
+        time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
         signal = test_signal.TestSignal(
             # [],
-            [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            # [],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties
         )
-        signal.write_to_file(archive.archive_file)
+        signal_reconstruction = test_signal.TestSignal(
+            # [],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+            [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            [],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            time_properties_reconstruction
+        )
 
         # === Make state ===
         # [0.5, 1/np.sqrt(2), 0.5]
@@ -66,22 +90,26 @@ if __name__ == "__main__":
         # frequency = np.arange(250, 2251, 50)
         # frequency = np.arange(250, 2251, 460e3/1e5)
         # frequency = np.arange(990, 1010, 0.02)
-        frequency = np.arange(253, 3251, 30)
+        # frequency = np.arange(253, 3251, 30)
         # frequency = np.arange(1000, 1003, 1)
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE)
+        # frequency = np.arange(1000, 1001, 1)
+        # frequency = np.arange(0, 1000000, 1)
+        frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step)
+
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
         simulation_manager.evaluate(False, False)
         # experiment_results = ExperimentResults(simulation_manager.frequency, simulation_manager.frequency_amplitude)
         experiment_results = sim.manager.ExperimentResults.new_from_simulation_manager(simulation_manager)
         experiment_results.write_to_archive(archive)
-        experiment_results.plot(archive, signal)
+        experiment_results.plot(archive, signal_reconstruction)
 
         # === Make reconstructions ===
-        reconstruction = recon.Reconstruction(signal.time_properties)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 100)
-        # reconstruction.read_frequencies_from_test_signal(signal, number_of_samples = 200)
+        reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(24, experiment_results.frequency.size))
+        # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
         reconstruction.evaluate_ista()
         # reconstruction.evaluateISTAComplete()
-        reconstruction.plot(archive, signal)
+        reconstruction.plot(archive, signal_reconstruction)
         reconstruction.write_to_file(archive.archive_file)
 
         # === ===                      === ===
@@ -124,13 +152,19 @@ if __name__ == "__main__":
 
         # sim.benchmark.plot_benchmark_comparison(archive, ["20201116T110647", "20201116T111313", "20201116T111851", "20201116T112430", "20201116T112932", "20201116T113330"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, lie trotter)")
 
-        sim.benchmark.plot_benchmark_comparison(archive, ["20201119T181459", "20201119T181809", "20201119T182040", "20201119T182334", "20201119T182612", "20201119T182817"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, analytic)")
+        # sim.benchmark.plot_benchmark_comparison(archive, ["20201119T181459", "20201119T181809", "20201119T182040", "20201119T182334", "20201119T182612", "20201119T182817"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, analytic)")
 
-        # # === Trotter Test ===
+        # # === Trotter test ===
         # sim.benchmark.new_benchmark_trotter_cutoff_matrix(archive, np.arange(80, 0, -4), 1e1)
         # # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(50, 3051, 30)
         # # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
+
+        # # === Mathematica Benchmark ===
+        # time_step_fines = [1.e-9, 1.26896e-9, 1.61026e-9, 2.04336e-9, 2.59294e-9, 3.29034e-9, 4.17532e-9, 5.29832e-9, 6.72336e-9, 8.53168e-9, 1.08264e-8, 1.37382e-8, 1.74333e-8, 2.21222e-8, 2.80722e-8, 3.56225e-8, 4.52035e-8, 5.73615e-8, 7.27895e-8, 9.23671e-8, 1.1721e-7, 1.48735e-7, 1.88739e-7, 2.39503e-7, 3.0392e-7, 3.85662e-7, 4.8939e-7, 6.21017e-7, 7.88046e-7, 1.e-6]
+        # errors = [0, 1.27648e-7, 1.71067e-7, 3.52869e-7, 1.10268e-7, 4.21367e-7, 4.86085e-7, 2.79164e-7, 2.02119e-6, 1.54471e-6, 1.62444e-6, 3.49334e-6, 0.0000156213, 0.0000836096, 0.000454502, 0.00249248, 0.00503788, 0.00503797, 0.00510717, 0.0051067, 0.00510602, 0.00510511, 0.00510396, 0.00510275, 0.0051019, 0.0051023, 0.00510479, 0.00510821, 0.00510659, 0.00510244]
+        # execution_times = [631.373, 810.259, 553.893, 394.797, 290.008, 216.053, 163.82, 145.432, 115.548, 90.8332, 72.04, 56.8771, 44.3481, 35.5904, 28.4812, 22.2169, 20.1843, 20.2888, 20.1585, 20.2421, 20.1293, 20.0051, 20.0887, 20.2273, 20.0593, 20.1271, 20.2015, 20.1939, 20.1278, 20.1355]
+        # sim.benchmark.new_benchmark_mathematica(archive, time_step_fines, errors, execution_times)
 
         # === Clean up ===
         archive.close_archive_file()
