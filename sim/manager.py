@@ -236,7 +236,7 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 1e5
+            readout_amplitude = 1e4
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
             # cycle_period = 1/100
@@ -250,8 +250,8 @@ class SourceProperties:
             source_time_end_points[0, 1] = signal_reconstruction.time_properties.time_end_points[1]
             # print(source_time_end_points[0, 1])
             if cycle_period:
-                # source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]/cycle_period))*cycle_period
-                source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]/cycle_period) + 1)*cycle_period
+                source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]/cycle_period))*cycle_period
+                # source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]/cycle_period) + 1)*cycle_period
                 # source_time_end_points[0, 1] = (math.ceil(source_time_end_points[0, 1]/cycle_period))*cycle_period
             # print(source_time_end_points[0, 1])
 
@@ -261,8 +261,8 @@ class SourceProperties:
 
             source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
             if cycle_period:
-                # source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period))*cycle_period
-                source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period + 1))*cycle_period
+                source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period))*cycle_period
+                # source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period + 1))*cycle_period
                 # source_time_end_points[1, 0] = (math.ceil(source_time_end_points[1, 0]/cycle_period))*cycle_period
             source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
             # if cycle_period:
@@ -550,7 +550,7 @@ class SimulationManager:
     measurement_method : :obj:`MeasurementMethod`
         Method used to retrieve frequency amplitudes.
     """
-    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None):
+    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3):
         """
         Parameters
         ----------
@@ -575,6 +575,7 @@ class SimulationManager:
         measurement_method : :obj:`MeasurementMethod`
             Method used to retrieve frequency amplitudes.
         """
+        self.bias_amplitude = bias_amplitude
         self.signal = signal
         if not isinstance(self.signal, list):
             self.signal = [self.signal]
@@ -616,7 +617,7 @@ class SimulationManager:
         for device_index, device_instance in enumerate(self.device):
             for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
                 for signal_index, (signal_instance, signal_reconstruction_instance) in enumerate(zip(self.signal, self.signal_reconstruction)):
-                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance)
+                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance, bias_amplitude = self.bias_amplitude)
                     for frequency_index in range(self.frequency.size):
                         simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
                         frequency_value = self.frequency[frequency_index]
@@ -681,7 +682,7 @@ class Simulation:
     trotter_cutoff : :obj:`int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, trotter_cutoff = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None):
+    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, trotter_cutoff = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None, bias_amplitude = 840e3):
         """
         Parameters
         ----------
@@ -696,6 +697,7 @@ class Simulation:
         device : :obj:`spinsim.Device`
             The target device that the simulation is to be run on.
         """
+        self.bias_amplitude = bias_amplitude
         self.signal = signal
         self.signal_reconstruction = signal_reconstruction
         if not self.signal_reconstruction:
@@ -703,7 +705,7 @@ class Simulation:
         self.state_properties = state_properties
         if not self.state_properties:
             self.state_properties = StateProperties()
-        self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, measurement_method = measurement_method, signal_reconstruction = self.signal_reconstruction)
+        self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, measurement_method = measurement_method, signal_reconstruction = self.signal_reconstruction, bias_amplitude = self.bias_amplitude)
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
         self.trotter_cutoff = trotter_cutoff
         self.device = device
@@ -726,7 +728,7 @@ class Simulation:
         self.simulation_results.time_evolution = results.time_evolution
         self.simulation_results.spin = results.spin
 
-        self.source_properties = SourceProperties(self.signal, self.state_properties, rabi_frequency, 0.0, measurement_method = self.source_properties.measurement_method, signal_reconstruction = self.signal_reconstruction)
+        self.source_properties = SourceProperties(self.signal, self.state_properties, rabi_frequency, 0.0, measurement_method = self.source_properties.measurement_method, signal_reconstruction = self.signal_reconstruction, bias_amplitude = self.bias_amplitude)
 
     def get_frequency_amplitude_from_projection(self):
         self.simulation_results.sensed_frequency_amplitude = self.simulation_results.spin[self.simulation_results.spin.shape[0] - 1, 2]
