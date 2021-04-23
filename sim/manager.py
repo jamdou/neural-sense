@@ -131,7 +131,8 @@ class SimulationManager:
                                     plt.title(f"{self.archive.execution_time_string}\nExpected spin projection over time")
                                 plt.show()
 
-                                spectrogram = util.Spectrogram(signal_instance.time_properties.time_coarse, simulation.simulation_results.spin[:, 0], [500, 10], [460e3 - 2e3, 460e3 + 2e3])
+                                time_show = (signal_instance.time_properties.time_coarse < 1.1)
+                                spectrogram = util.Spectrogram(signal_instance.time_properties.time_coarse[time_show], simulation.simulation_results.spin[time_show, 0], [2e-4, 6], 3e-3, [460e3 - 25e3, 460e3 + 25e3])
                                 # 
                                 spectrogram.plot()
                         # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)

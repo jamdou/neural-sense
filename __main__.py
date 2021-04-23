@@ -41,12 +41,14 @@ if __name__ == "__main__":
         # time_properties = test_signal.TimeProperties(5e-8, 1e-8, 1e-8, [0, 0.01])
         # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
         time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.11])
+        # time_properties = test_signal.TimeProperties(5e-6, 1e-7, 1e-8, [0, 0.21])
+        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 1.01])
         signal = test_signal.TestSignal(
             # [],
             [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            # [],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties
         )
         signal.write_to_file(archive.archive_file)
