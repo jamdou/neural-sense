@@ -155,7 +155,7 @@ class BenchmarkResults:
         self.error = error
 
     @staticmethod
-    def read_from_archive(archive):
+    def read_from_archive(archive, benchmark_type = None):
         """
         A constructor that reads a new benchmark result from a hdf5 file.
 
@@ -165,13 +165,23 @@ class BenchmarkResults:
             The archive object to read the benchmark from.
         """
         archive_group_benchmark = archive.archive_file["benchmark_results"]
-        for benchmark_type in BenchmarkType:
+        if not benchmark_type:
+            for benchmark_type_scan in BenchmarkType:
+                if benchmark_type_scan.value in archive_group_benchmark.keys():
+                    archive_group_benchmark_results = archive_group_benchmark[benchmark_type_scan.value]
+                    benchmark_results = BenchmarkResults(
+                        benchmark_type_scan,
+                        np.asarray(archive_group_benchmark_results[benchmark_type_scan.value]),
+                        np.asarray(archive_group_benchmark_results["error"])
+                    )
+                    return benchmark_results
+        else:
             if benchmark_type.value in archive_group_benchmark.keys():
                 archive_group_benchmark_results = archive_group_benchmark[benchmark_type.value]
                 benchmark_results = BenchmarkResults(
                     benchmark_type,
-                    archive_group_benchmark_results[benchmark_type.value],
-                    archive_group_benchmark_results["error"]
+                    np.asarray(archive_group_benchmark_results[benchmark_type.value]),
+                    np.asarray(archive_group_benchmark_results["error"])
                 )
                 return benchmark_results
 
@@ -904,3 +914,50 @@ def new_benchmark_spinsim(archive:Archive, signal_template:test_signal.TestSigna
     benchmark_results_execution_time_error.plot(archive)
 
     return benchmark_results
+
+def plot_benchmark_comparison(archive:Archive, archive_times, legend, title):
+    """
+    Plots multiple benchmarks on one plot from previous archives.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies the path to save the plot to.
+    archive_times : :obj:`list` of :obj:`str`
+        The identifiers of the archvies containing the benchmark results to be compared.
+    legend : :obj:`list` of :obj:`str`
+        Labels that describe what each of the benchmark result curves respresent.
+    title : :obj:`str`
+        What this comparison is trying to compare.
+    """
+    for benchmark_type in [BenchmarkType.TIME_STEP_FINE, BenchmarkType.TIME_STEP_FINE_EXECUTION_TIME, BenchmarkType.EXECUTION_TIME_ERROR]:
+        plt.figure()
+        for archive_index, archive_time in enumerate(archive_times):
+            archive_previous = Archive(archive.archive_path[:-25], "")
+            archive_previous.open_archive_file(archive_time)
+            benchmark_results = BenchmarkResults.read_from_archive(archive_previous, benchmark_type = benchmark_type)
+            benchmark_results.plot(None, False)
+            archive_previous.close_archive_file(False)
+
+            if archive_index != 0:
+                if benchmark_type == BenchmarkType.TIME_STEP_FINE_EXECUTION_TIME:
+                    benchmark_results.error /= 8
+                    benchmark_results.plot(None, False)
+                if benchmark_type == BenchmarkType.EXECUTION_TIME_ERROR:
+                    benchmark_results.parameter /= 8
+                    benchmark_results.plot(None, False)
+        
+        if benchmark_type == BenchmarkType.TIME_STEP_FINE:
+            legend_real = [legend[0]] + legend[1::2]
+        else:
+            legend_real = legend
+        plt.legend(legend_real)
+
+        if archive:
+            archive.write_plot(title, f"benchmark_comparison_time_{benchmark_type._value_}")
+
+            archive_group_benchmark_results = archive.archive_file.require_group(f"benchmark_results/benchmark_comparison_time_{benchmark_type._value_}")
+            archive_group_benchmark_results["archive_times"] = np.asarray(archive_times, dtype='|S32')
+            archive_group_benchmark_results["legend"] = np.asarray(legend, dtype='|S32')
+            archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
+        plt.draw()

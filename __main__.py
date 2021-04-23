@@ -52,40 +52,40 @@ if __name__ == "__main__":
         # scaled_pulse_time = 0.2333333*scaled_time_end
         # scaled_frequency_step = scaled_density*scaled_frequency/2
 
-        # === Make signal ===
-        # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
-        # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
+        # # === Make signal ===
+        # # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
+        # # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
 
-        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
-        time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+        # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
 
-        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
-        # time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
+        # # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
+        # # time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
 
-        signal = test_signal.TestSignal(
-            # [],
-            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-            [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
-            time_properties
-        )
-        signal_reconstruction = test_signal.TestSignal(
-            # [],
-            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-            [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
-            time_properties_reconstruction
-        )
+        # signal = test_signal.TestSignal(
+        #     # [],
+        #     # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+        #     [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+        #     # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+        #     [],
+        #     # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+        #     time_properties
+        # )
+        # signal_reconstruction = test_signal.TestSignal(
+        #     # [],
+        #     # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+        #     [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+        #     # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+        #     [],
+        #     # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+        #     time_properties_reconstruction
+        # )
 
-        # === Make state ===
-        # [0.5, 1/np.sqrt(2), 0.5]
-        state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        # # === Make state ===
+        # # [0.5, 1/np.sqrt(2), 0.5]
+        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
 
-        cuda.profile_start()
+        # cuda.profile_start()
         
         # # === Run simulations ===
         # # frequency = np.arange(70, 3071, 30)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         # === === External benchmarks === ===
         # === ===                     === ===
 
-        time_step_fines = time_properties.time_step_coarse/np.floor(time_properties.time_step_coarse/np.asarray([1.e-9, 1.26896e-9, 1.61026e-9, 2.04336e-9, 2.59294e-9, 3.29034e-9, 4.17532e-9, 5.29832e-9, 6.72336e-9, 8.53168e-9, 1.08264e-8, 1.37382e-8, 1.74333e-8, 2.21222e-8, 2.80722e-8, 3.56225e-8, 4.52035e-8, 5.73615e-8, 7.27895e-8, 9.23671e-8, 1.1721e-7, 1.48735e-7, 1.88739e-7, 2.39503e-7, 3.0392e-7, 3.85662e-7, 4.8939e-7, 6.21017e-7, 7.88046e-7, 1.e-6]))
+        # time_step_fines = time_properties.time_step_coarse/np.floor(time_properties.time_step_coarse/np.asarray([1.e-9, 1.26896e-9, 1.61026e-9, 2.04336e-9, 2.59294e-9, 3.29034e-9, 4.17532e-9, 5.29832e-9, 6.72336e-9, 8.53168e-9, 1.08264e-8, 1.37382e-8, 1.74333e-8, 2.21222e-8, 2.80722e-8, 3.56225e-8, 4.52035e-8, 5.73615e-8, 7.27895e-8, 9.23671e-8, 1.1721e-7, 1.48735e-7, 1.88739e-7, 2.39503e-7, 3.0392e-7, 3.85662e-7, 4.8939e-7, 6.21017e-7, 7.88046e-7, 1.e-6]))
         # frequency = np.asarray([1000], dtype = np.float64)
 
         # # === SciPy Benchmark ===
@@ -180,10 +180,13 @@ if __name__ == "__main__":
         # execution_times = [631.373, 810.259, 553.893, 394.797, 290.008, 216.053, 163.82, 145.432, 115.548, 90.8332, 72.04, 56.8771, 44.3481, 35.5904, 28.4812, 22.2169, 20.1843, 20.2888, 20.1585, 20.2421, 20.1293, 20.0051, 20.0887, 20.2273, 20.0593, 20.1271, 20.2015, 20.1939, 20.1278, 20.1355]
         # sim.benchmark.new_benchmark_mathematica(archive, time_step_fines, errors, execution_times)
 
-        # === Spinsim Benchmark ===
-        frequency = np.asarray([1000, 1000], dtype = np.float64)
-        # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fines, state_properties)
-        sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
+        # # === Spinsim Benchmark ===
+        # frequency = np.asarray([1000, 1000], dtype = np.float64)
+        # # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fines, state_properties)
+        # sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
+
+        # === Comparison ===
+        sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
         # === Clean up ===
         archive.close_archive_file()
