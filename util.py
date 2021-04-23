@@ -51,7 +51,7 @@ def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = 
             plt.title(f"{archive.execution_time_string}\nFrequency shift diagnostics")
             plt.savefig(f"{archive.plot_path}diagnostics_frequency_shift.pdf")
             plt.savefig(f"{archive.plot_path}diagnostics_frequency_shift.png")
-        plt.show()
+        plt.draw()
     return
 
 def fit_frequency_detuning(archive, signal, frequency, detuning, state_properties, do_plot = True, do_plot_individuals = False):
@@ -94,7 +94,7 @@ def fit_frequency_detuning(archive, signal, frequency, detuning, state_propertie
             plt.title(f"{archive.execution_time_string}\nFrequency shift detuning diagnostics")
             plt.savefig(f"{archive.plot_path}diagnostics_frequency_shift_detuning.pdf")
             plt.savefig(f"{archive.plot_path}diagnostics_frequency_shift_detuning.png")
-        plt.show()
+        plt.draw()
 
     return
 
@@ -181,7 +181,7 @@ def fit_frequency(frequency_dressing, spin, time_coarse, do_plot = False):
         plt.figure()
         plt.plot(time_coarse, spin)
         plt.plot(time_coarse, amplitude_guess*np.cos(math.tau*frequency_guess*time_coarse + phase_guess) + dc_guess)
-        plt.show()
+        plt.draw()
     
     frequency_shift = frequency_guess - frequency_dressing
     # print("{:8d}\t{:1.7f}\t{:1.7f}\t{:1.7f}\t{:1.7f}\t{:1.7f}".format(step_index, difference, frequency_guess, phase_guess, dc_guess, amplitude_guess))
@@ -244,7 +244,7 @@ class Spectrogram():
         )
         plt.xlabel("Time (s)")
         plt.ylabel("Frequency (kHz)")
-        plt.show()
+        plt.draw()
 
     def write_to_file(self, archive):
         pass

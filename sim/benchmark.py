@@ -14,6 +14,7 @@ from . import manager
 import spinsim
 from archive import *
 import test_signal
+import sim.manager
 
 class BenchmarkType(Enum):
     """
@@ -95,6 +96,25 @@ class BenchmarkType(Enum):
     The results of :func:`benchmark.manager.new_benchmark_time_step_fine()`.
     """
 
+    EXECUTION_TIME_ERROR = (
+        "execution_time_error",
+        "Execution time (s)",
+        "Error",
+        "Effect of execution time on error",
+        "log"
+    )
+
+    TIME_STEP_FINE_EXECUTION_TIME = (
+        "time_step_fine_execution_time",
+        "Fine time step (s)",
+        "Execution time (s)",
+        "Effect of fine time step size on execution time",
+        "log"
+    )
+    """
+    The results of :func:`benchmark.manager.new_benchmark_time_step_fine()`.
+    """
+
     TIME_STEP_FINE_FREQUENCY_DRIFT = (
         "time_step_fine_frequency_drift",
         "Fine time step (s)",
@@ -155,7 +175,7 @@ class BenchmarkResults:
                 )
                 return benchmark_results
 
-    def write_to_archive(self, archive):
+    def write_to_archive(self, archive:Archive):
         """
         Save a benchmark to a hdf5 file.
 
@@ -191,12 +211,10 @@ class BenchmarkResults:
         plt.ylabel(self.benchmark_type.y_label)
         if do_show_plot:
             if archive:
-                plt.title(archive.execution_time_string + "\n" + self.benchmark_type.title)
-                plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".pdf")
-                plt.savefig(archive.plot_path + "benchmark_" + self.benchmark_type.value + ".png")
-            plt.show()
+                archive.write_plot(self.benchmark_type.title, "benchmark_" + self.benchmark_type.value)
+            plt.draw()
 
-def plot_benchmark_comparison(archive, archive_times, legend, title):
+def plot_benchmark_comparison(archive:Archive, archive_times, legend, title):
     """
     Plots multiple benchmarks on one plot from previous archives.
 
@@ -221,134 +239,15 @@ def plot_benchmark_comparison(archive, archive_times, legend, title):
     plt.legend(legend)
 
     if archive:
-        plt.title(archive.execution_time_string + "\n" + title)
-        plt.savefig(archive.plot_path + "benchmark_comparison.pdf")
-        plt.savefig(archive.plot_path + "benchmark_comparison.png")
+        archive.write_plot(title, "benchmark_comparison")
 
         archive_group_benchmark_results = archive.archive_file.require_group("benchmark_results/benchmark_comparison")
         archive_group_benchmark_results["archive_times"] = np.asarray(archive_times, dtype='|S32')
         archive_group_benchmark_results["legend"] = np.asarray(legend, dtype='|S32')
         archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
-    plt.show()
+    plt.draw()
 
-def new_benchmark_scipy(archive, signal_template, frequency, time_step_fine, state_properties):
-    """
-    Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
-
-    Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `time_step_fine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
-
-    .. math::
-        \\begin{align*}
-            e_{\\mathrm{d}t} &= \\frac{1}{\\#t\\#f}\\sum_{t,f,m} |(\\psi_{f,\\mathrm{d}t})_{m,t} - (\\psi_{f,\\mathrm{d}t_0})_{m,t}|,
-        \\end{align*}
-
-    where :math:`\\#t` is the number of coarse time samples, :math:`\\#f` is the length of `frequency`.
-
-    Parameters
-    ----------
-    archive : :class:`archive.Archive`
-        Specifies where to save results and plots.
-    signal_template : :class:`test_signal.TestSignal`
-        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
-    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
-        The dressing frequencies being simulated in the benchmark.
-    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
-        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
-
-    Returns
-    -------
-    benchmark_results : :class:`BenchmarkResults`
-        Contains the errors found by the benchmark.
-    """
-    Jx = (1/math.sqrt(2))*np.asarray(
-        [
-            [0, 1, 0],
-            [1, 0, 1],
-            [0, 1, 0]
-        ],
-        dtype = np.complex128
-    )
-    Jy = (1/math.sqrt(2))*np.asarray(
-        [
-            [ 0, -1j,   0],
-            [1j,   0, -1j],
-            [ 0,  1j,   0]
-        ],
-        dtype = np.complex128
-    )
-    Jz = np.asarray(
-        [
-            [1, 0,  0],
-            [0, 0,  0],
-            [0, 0, -1]
-        ],
-        dtype = np.complex128
-    )
-    Q = (1/3)*np.asarray(
-        [
-            [1,  0, 0],
-            [0, -2, 0],
-            [0,  0, 1]
-        ],
-        dtype = np.complex128
-    )
-
-
-    time_step_fine = np.asarray(time_step_fine)
-    state_output = []
-    error = []
-
-    signal = []
-    # source_properties = []
-
-    print("Idx\tCmp\tTm\tdTm")
-    execution_time_end_points = np.empty(2)
-    execution_time_end_points[0] = tm.time()
-    execution_time_end_points[1] = execution_time_end_points[0]
-    simulation_index = 0
-    time = np.arange(0e-3, 100e-3, 5e-7, dtype = np.float64)
-    for time_step_fine_instance in time_step_fine:
-        source_properties = manager.SourceProperties(signal_template, state_properties)
-
-        for frequency_instance in frequency:
-            def evaluate_dressing(time, dressing):
-                source_properties.evaluate_dressing(time, frequency_instance, dressing)
-
-            # def evaluate_dressing(time, dressing):
-            #     dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
-            #     dressing[1] = 0
-            #     dressing[2] = 700e3
-                
-            def derivative(time, state):
-                dressing = np.empty(4, np.float64)
-                evaluate_dressing(time, dressing)
-                matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz + dressing[3]*Q)
-                return np.matmul(matrix, state)
-
-            results = scipy.integrate.solve_ivp(derivative, [0e-3, 100e-3], state_properties.state_init, t_eval = time, max_step = time_step_fine_instance)
-            state_output += [np.transpose(results.y)]
-            
-            print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(len(frequency)*len(time_step_fine)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
-            simulation_index += 1
-            execution_time_end_points[1] = tm.time()
-
-    for time_step_fine_index in range(time_step_fine.size):
-        error_temp = 0
-        for frequency_index in range(frequency.size):
-            state_difference = state_output[frequency_index + time_step_fine_index*frequency.size] - state_output[frequency_index]
-
-            error_temp += np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
-        error += [error_temp/(frequency.size*state_output[0].size)]
-    
-    error = np.asarray(error)
-
-    benchmark_results = BenchmarkResults(BenchmarkType.TIME_STEP_FINE, time_step_fine, error)
-    benchmark_results.write_to_archive(archive)
-    benchmark_results.plot(archive)
-
-    return benchmark_results
-
-def new_benchmark_device_aggregate(archive, archive_times):
+def new_benchmark_device_aggregate(archive:Archive, archive_times):
     """
     Collects results for multiple runs of :func:`new_benchmark_device()`, and combines them into a single bar chart.
 
@@ -387,7 +286,7 @@ def new_benchmark_device_aggregate(archive, archive_times):
         else:
             colour += ["r"]
 
-    plt.figure()
+    plt.figure(figsize = [6.4, 8.0])
     plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
     plt.barh(range(len(device_label)), execution_frequency, tick_label = device_label, color = colour)
     for device_index in range(len(device_label)):
@@ -398,13 +297,11 @@ def new_benchmark_device_aggregate(archive, archive_times):
 
     plt.xlabel("Execution speed (simulations per second)")
     if archive:
-        plt.title(archive.execution_time_string + "\nParallelisation speed for various devices")
-        plt.savefig(archive.plot_path + "benchmark_device_aggregate.pdf")
-        plt.savefig(archive.plot_path + "benchmark_device_aggregate.png")
+        archive.write_plot("Parallelisation speed for various devices", "benchmark_device_aggregate")
     plt.show()
     
 
-def new_benchmark_device(archive, signal, frequency, state_properties):
+def new_benchmark_device(archive:Archive, signal:test_signal.TestSignal, frequency, state_properties:sim.manager.StateProperties):
     """
     Runs a benchmark to compare (single and multicore) CPU performance to GPU performance.
 
@@ -427,7 +324,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
         spinsim.Device.CUDA
     ]
 
-    cpu_name = "\n".join(textwrap.wrap(subprocess.check_output(["wmic","cpu","get", "name"]).strip().decode('utf-8').split("\n")[1], width = 24))
+    cpu_name = "\n".join(textwrap.wrap(subprocess.check_output(["wmic","cpu","get", "name"]).strip().decode('utf-8').split("\n")[1], width = 23))
 
     gpu_name = cuda.list_devices()[0].name.decode('UTF-8')
     device_label = [
@@ -481,9 +378,7 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
-        plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices")
-        plt.savefig(archive.plot_path + "benchmark_device.pdf")
-        plt.savefig(archive.plot_path + "benchmark_device.png")
+        archive.write_plot("Parallelisation speed up for various devices", "benchmark_device")
     plt.show()
 
     plt.figure()
@@ -494,14 +389,12 @@ def new_benchmark_device(archive, signal, frequency, state_properties):
     plt.text(speed_up_first[2], 2, " {:.1f}x speedup \n {:.1f}ms per sim ".format(speed_up_first[2], execution_time_first[2]*1e3), ha = "right", va = "center", color = "w")
     plt.xlabel("Speedup compared to single CPU thread")
     if archive:
-        plt.title(archive.execution_time_string + "\nParallelisation speed up for various devices,\nfirst run")
-        plt.savefig(archive.plot_path + "benchmark_device_first.pdf")
-        plt.savefig(archive.plot_path + "benchmark_device_first.png")
+        archive.write_plot("Parallelisation speed up for various devices,\nfirst run", "benchmark_device_first")
     plt.show()
 
     return
 
-def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.0):
+def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bound = 1.0):
     """
     Runs a benchmark for the trotter exponentiator :func:`utilities.matrixExponential_lie_trotter()` using arbitrary matrices. Uses :func:`benchmark_trotter_cutoff_matrix()` to execute the matrix exponentials.
 
@@ -591,7 +484,7 @@ def new_benchmark_trotter_cutoff_matrix(archive, trotter_cutoff, norm_bound = 1.
 
     return benchmark_results
 
-def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
+def new_benchmark_trotter_cutoff(archive:Archive, signal:test_signal.TestSignal, frequency, trotter_cutoff):
     """
     Runs a benchmark for the trotter exponentiator using the integrator.
 
@@ -640,7 +533,7 @@ def new_benchmark_trotter_cutoff(archive, signal, frequency, trotter_cutoff):
 
     return benchmark_results
 
-def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_fine, state_properties):
+def new_benchmark_time_step_fine(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
@@ -698,7 +591,7 @@ def new_benchmark_time_step_fine(archive, signal_template, frequency, time_step_
 
     return benchmark_results
 
-def new_benchmark_time_step_source(archive, signal_template, frequency, state_properties, time_step_source):
+def new_benchmark_time_step_source(archive:Archive, signal_template:test_signal.TestSignal, frequency, state_properties:sim.manager.StateProperties, time_step_source):
     """
     **(benchmark for obsolete interpolation mode, might be useful to keep if such a mode is re-added in the future)**
 
@@ -757,7 +650,7 @@ def new_benchmark_time_step_source(archive, signal_template, frequency, state_pr
 
     return benchmark_results
 
-def new_benchmark_time_step_fine_frequency_drift(archive, signal_template, time_step_fines, dressing_frequency):
+def new_benchmark_time_step_fine_frequency_drift(archive:Archive, signal_template:test_signal.TestSignal, time_step_fines, dressing_frequency):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing measured frequency coefficients.
 
@@ -794,5 +687,220 @@ def new_benchmark_time_step_fine_frequency_drift(archive, signal_template, time_
     benchmark_results = BenchmarkResults(BenchmarkType.TIME_STEP_FINE_FREQUENCY_DRIFT, np.asarray(time_step_fines), frequency_drift)
     benchmark_results.write_to_archive(archive)
     benchmark_results.plot(archive)
+
+    return benchmark_results
+
+def new_benchmark_mathematica(archive:Archive, time_step_fines, errors, execution_times):
+    benchmark_results = BenchmarkResults(BenchmarkType.TIME_STEP_FINE, np.asarray(time_step_fines), errors)
+    benchmark_results.write_to_archive(archive)
+    benchmark_results.plot(archive)
+
+    benchmark_results_execution_time = BenchmarkResults(BenchmarkType.TIME_STEP_FINE_EXECUTION_TIME, np.asarray(time_step_fines), execution_times)
+    benchmark_results_execution_time.write_to_archive(archive)
+    benchmark_results_execution_time.plot(archive)
+
+    benchmark_results_execution_time_error = BenchmarkResults(BenchmarkType.EXECUTION_TIME_ERROR, execution_times, errors)
+    benchmark_results_execution_time_error.write_to_archive(archive)
+    benchmark_results_execution_time_error.plot(archive)
+
+    return benchmark_results, benchmark_results_execution_time, benchmark_results_execution_time_error
+
+def new_benchmark_scipy(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
+    """
+    Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
+
+    Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `time_step_fine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
+
+    .. math::
+        \\begin{align*}
+            e_{\\mathrm{d}t} &= \\frac{1}{\\#t\\#f}\\sum_{t,f,m} |(\\psi_{f,\\mathrm{d}t})_{m,t} - (\\psi_{f,\\mathrm{d}t_0})_{m,t}|,
+        \\end{align*}
+
+    where :math:`\\#t` is the number of coarse time samples, :math:`\\#f` is the length of `frequency`.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies where to save results and plots.
+    signal_template : :class:`test_signal.TestSignal`
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
+        The dressing frequencies being simulated in the benchmark.
+    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
+        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
+
+    Returns
+    -------
+    benchmark_results : :class:`BenchmarkResults`
+        Contains the errors found by the benchmark.
+    """
+    Jx = (1/math.sqrt(2))*np.asarray(
+        [
+            [0, 1, 0],
+            [1, 0, 1],
+            [0, 1, 0]
+        ],
+        dtype = np.complex128
+    )
+    Jy = (1/math.sqrt(2))*np.asarray(
+        [
+            [ 0, -1j,   0],
+            [1j,   0, -1j],
+            [ 0,  1j,   0]
+        ],
+        dtype = np.complex128
+    )
+    Jz = np.asarray(
+        [
+            [1, 0,  0],
+            [0, 0,  0],
+            [0, 0, -1]
+        ],
+        dtype = np.complex128
+    )
+    Q = (1/3)*np.asarray(
+        [
+            [1,  0, 0],
+            [0, -2, 0],
+            [0,  0, 1]
+        ],
+        dtype = np.complex128
+    )
+
+
+    time_step_fine = np.asarray(time_step_fine)
+    state_output = []
+    error = []
+
+    signal = []
+    # source_properties = []
+
+    execution_time_output = []
+
+    print("Idx\tCmp\tTm\tdTm")
+    execution_time_end_points = np.empty(2)
+    execution_time_end_points[0] = tm.time()
+    execution_time_end_points[1] = execution_time_end_points[0]
+    simulation_index = 0
+    time = np.arange(0e-3, 1e-1, 5e-7, dtype = np.float64)
+    for time_step_fine_instance in time_step_fine:
+        source_properties = manager.SourceProperties(signal_template, state_properties)
+
+        for frequency_instance in frequency:
+            def evaluate_dressing(time, dressing):
+                source_properties.evaluate_dressing(time, frequency_instance, dressing)
+
+            # def evaluate_dressing(time, dressing):
+            #     dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
+            #     dressing[1] = 0
+            #     dressing[2] = 700e3
+                
+            def derivative(time, state):
+                dressing = np.empty(4, np.float64)
+                evaluate_dressing(time, dressing)
+                matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz + dressing[3]*Q)
+                return np.matmul(matrix, state)
+
+            results = scipy.integrate.solve_ivp(derivative, [0e-3, 1e-1], state_properties.state_init, t_eval = time, max_step = time_step_fine_instance)
+            state_output += [np.transpose(results.y)]
+            
+            print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(len(frequency)*len(time_step_fine)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
+
+            execution_time_output += [tm.time() - execution_time_end_points[1]]
+
+            simulation_index += 1
+            execution_time_end_points[1] = tm.time()
+
+    for time_step_fine_index in range(time_step_fine.size):
+        error_temp = 0
+        for frequency_index in range(frequency.size):
+            state_difference = state_output[frequency_index + time_step_fine_index*frequency.size] - state_output[frequency_index]
+
+            error_temp += np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
+        error += [error_temp/(frequency.size*state_output[0].size)]
+    
+    error = np.asarray(error)
+
+    benchmark_results = BenchmarkResults(BenchmarkType.TIME_STEP_FINE, time_step_fine, error)
+    benchmark_results.write_to_archive(archive)
+    benchmark_results.plot(archive)
+
+    benchmark_results_execution_time = BenchmarkResults(BenchmarkType.TIME_STEP_FINE_EXECUTION_TIME, np.asarray(time_step_fine), np.asarray(execution_time_output))
+    benchmark_results_execution_time.write_to_archive(archive)
+    benchmark_results_execution_time.plot(archive)
+
+    benchmark_results_execution_time_error = BenchmarkResults(BenchmarkType.EXECUTION_TIME_ERROR, np.asarray(execution_time_output), error)
+    benchmark_results_execution_time_error.write_to_archive(archive)
+    benchmark_results_execution_time_error.plot(archive)
+
+    
+
+    return benchmark_results, benchmark_results_execution_time, benchmark_results_execution_time_error
+
+def new_benchmark_spinsim(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
+    """
+    Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
+
+    Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `time_step_fine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
+
+    .. math::
+        \\begin{align*}
+            e_{\\mathrm{d}t} &= \\frac{1}{\\#t\\#f}\\sum_{t,f,m} |(\\psi_{f,\\mathrm{d}t})_{m,t} - (\\psi_{f,\\mathrm{d}t_0})_{m,t}|,
+        \\end{align*}
+
+    where :math:`\\#t` is the number of coarse time samples, :math:`\\#f` is the length of `frequency`.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies where to save results and plots.
+    signal_template : :class:`test_signal.TestSignal`
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
+        The dressing frequencies being simulated in the benchmark.
+    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
+        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
+
+    Returns
+    -------
+    benchmark_results : :class:`BenchmarkResults`
+        Contains the errors found by the benchmark.
+    """
+    time_step_fine = np.asarray(time_step_fine)
+    state_output = []
+    error = []
+
+    signal = []
+    execution_time_output = []
+    for time_step_fine_index in time_step_fine:
+        time_properties = test_signal.TimeProperties(signal_template.time_properties.time_step_coarse, time_step_fine_index, signal_template.time_properties.time_step_source)
+        signal_instance = test_signal.TestSignal(signal_template.neural_pulses, signal_template.sinusoidal_noises, time_properties, False)
+        signal += [signal_instance]
+
+    simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3)
+    simulation_manager.evaluate(False)
+
+    for time_step_fine_index in range(time_step_fine.size):
+        error_temp = 0
+        for frequency_index in range(frequency.size):
+            state_difference = state_output[frequency_index + time_step_fine_index*frequency.size] - state_output[frequency_index]
+
+            error_temp += np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
+        error += [error_temp/(frequency.size*state_output[0].size)]
+    
+    execution_time_output = execution_time_output[1::2]
+    error = np.asarray(error)
+
+    benchmark_results = BenchmarkResults(BenchmarkType.TIME_STEP_FINE, time_step_fine, error)
+    benchmark_results.write_to_archive(archive)
+    benchmark_results.plot(archive)
+
+    benchmark_results_execution_time = BenchmarkResults(BenchmarkType.TIME_STEP_FINE_EXECUTION_TIME, np.asarray(time_step_fine), np.asarray(execution_time_output))
+    benchmark_results_execution_time.write_to_archive(archive)
+    benchmark_results_execution_time.plot(archive)
+
+    benchmark_results_execution_time_error = BenchmarkResults(BenchmarkType.EXECUTION_TIME_ERROR, np.asarray(execution_time_output), error)
+    benchmark_results_execution_time_error.write_to_archive(archive)
+    benchmark_results_execution_time_error.plot(archive)
 
     return benchmark_results

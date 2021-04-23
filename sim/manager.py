@@ -15,6 +15,7 @@ import os
 from test_signal import *
 import enum
 import util
+from archive import Archive
 
 # from .benchmark.results import *
 
@@ -25,140 +26,45 @@ class MeasurementMethod(enum.Enum):
     HARD_PULSE_DETUNING_TEST = "hard pulse (detuning test)"
     ADIABATIC_DEMAPPING = "adiabatic demapping"
 
-class SimulationManager:
+class StateProperties:
     """
-    Controls a set of simulations running for different dressing parameters.
+    The initial state fed into the simulation code.
 
     Attributes
     ----------
-    signal : :obj:`list` of :class:`test_signal.TestSignal`
-        A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
-    trotter_cutoff : :obj:`list` of :obj:`int`
-        A list of the number of squares to be used in the matrix exponentiation algorithm :func:`simulation_utilities.matrix_exponential_lie_trotter()` during the simulation. :func:`evaluate()` will run simulations for all of these values.
-    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, (frequency_index)
-        A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
-    frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`, (simulation_index)
-        The Fourier coefficient of the signal as measured from the simulation `simulation_index`. Filled in after the simulation `simulation_index` has been completed.
-    archive : :class:`archive.Archive`
-        The archive object to save the simulation results and parameters to.
-    state_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index))
-        An optional :obj:`list` to directly write the state of the simulation to. Used for benchmarks. Reference can be optionally passed in on construction.
-    state_properties : :class:`StateProperties`
-            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
-    device : :obj:`spinsim.Device`
-        The target device (hardware) that the simulation is to be run on.
-    execution_time_output : :obj:`list` of :obj:`float`
-        If not :obj:`None`, the execution times for each full simulation will be appended to this.
-    measurement_method : :obj:`MeasurementMethod`
-        Method used to retrieve frequency amplitudes.
+    spin_quantum_number: :class:`spinsim.SpinQuantumNumber(Enum)`
+        The spin quantum number of the system being simulated. Determines the dimension of the hilbert space of the state, the algorithms used in the simulation, etc.
+    state_init : :class:`numpy.ndarray` of :class:`numpy.complex128` (state_index)
+        The state (spin wavefunction) of the system at the start of the simulation.
     """
-    def __init__(self, signal, frequency, archive, state_properties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device = None, execution_time_output = None, measurement_method = MeasurementMethod.HARD_PULSE):
+    def __init__(self, spin_quantum_number = spinsim.SpinQuantumNumber.HALF, state_init = None):
         """
         Parameters
         ----------
-        signal : :class:`test_signal.TestSignal` or :obj:`list` of :class:`test_signal.TestSignal`
-            A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
-        frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, (frequency_index)
-            A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
-        archive : :class:`archive.Archive`
-            The archive object to save the simulation results and parameters to.
-        state_properties : :class:`StateProperties`
-            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
-        state_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
-            An optional :obj:`list` to directly write the state of the simulation to. Used for benchmarks.
-        spin_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
-            An optional :obj:`list` to directly write the spin of the simulation to. Used for benchmarks.
-        trotter_cutoff : :obj:`list` of :obj:`int`, optional
-            A list of the number of squares to be used in the matrix exponentiation algorithm during the simulation. :func:`evaluate()` will run simulations for all of these values.
-        device : :obj:`spinsim.Device`
-            The target device (hardware) that the simulation is to be run on.
-        execution_time_output : :obj:`list` of :obj:`float`
-            If not :obj:`None`, the execution times for each full simulation will be appended to this.
-        measurement_method : :obj:`MeasurementMethod`
-            Method used to retrieve frequency amplitudes.
+        spin_quantum_number: :class:`spinsim.SpinQuantumNumber(Enum)`
+            The spin quantum number of the system being simulated. Determines the dimension of the hilbert space of the state, the algorithms used in the simulation, etc.
+        state_init : :class:`numpy.ndarray` of :class:`numpy.complex128`
+            The state (spin wavefunction) of the system at the start of the simulation.
         """
-        self.signal = signal
-        if not isinstance(self.signal, list):
-            self.signal = [self.signal]
-        self.device = device
-        if not isinstance(self.device, list):
-            self.device = [self.device]
-        self.trotter_cutoff = np.asarray(trotter_cutoff)
-        self.frequency = np.asarray(frequency, dtype = np.float64)
-        self.frequency_amplitude = np.empty(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device), dtype = np.float64)
-        self.archive = archive
-        self.state_output = state_output
-        self.state_properties = state_properties
-        self.execution_time_output = execution_time_output
-        self.measurement_method = measurement_method
-        self.spin_output = spin_output
+        self.spin_quantum_number = spin_quantum_number
+        if state_init:
+            self.state_init = np.asarray(state_init, np.complex128)
+        else:
+            if self.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
+                self.state_init = np.asarray([1, 0], np.complex128)
+            else:
+                self.state_init = np.asarray([1, 0, 0], np.complex128)
 
-    def evaluate(self, do_plot = False, do_write_everything = False):
+    def write_to_file(self, archive):
         """
-        Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequency_amplitude`. The simulation `simulation_index` will be run with the frequency given by `frequency_index` mod :attr:`frequency.size`, the signal given by floor(`signal_index` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signal_index` / `frequency.size` / `trotter_cutoff.size`).
         Parameters
         ----------
-        do_plot : :obj:`bool`, optional
-            If :obj:`True`, plots time series of the expected spin values in each direction during execution.
-        do_write_everything : :obj:`bool`, optional
-            If :obj:`True`, then save all time series data to file as well as parametric data. Defaults to :obj:`False` to reduce archive file size.
+        archive : :class:`h5py.Group`
+            The HDF5 archive to write to.
         """
-        print("\033[33mStarting simulations...\033[0m")
-        execution_time_end_points = np.empty(2)
-        execution_time_end_points[0] = tm.time()
-        execution_time_end_points[1] = execution_time_end_points[0]
-        print("Idx\tCmp\tTm\tdTm")
-        archive_group_simulations = self.archive.archive_file.require_group("simulations")
-        for device_index, device_instance in enumerate(self.device):
-            for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
-                for signal_index, signal_instance in enumerate(self.signal):
-                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method)
-                    for frequency_index in range(self.frequency.size):
-                        simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
-                        frequency_value = self.frequency[frequency_index]
-                        simulation.evaluate(frequency_value)
-                        if self.measurement_method == MeasurementMethod.FARADAY_DEMODULATION:
-                            simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
-                        else:
-                            simulation.get_frequency_amplitude_from_projection()
-                            if do_plot:
-                                plt.figure()
-                                plt.plot(simulation.signal.time_properties.time_coarse, simulation.simulation_results.spin)
-                                plt.legend(["x", "y", "x"])
-                                plt.xlabel("Time (s)")
-                                plt.ylabel("Spin projection (hbar)")
-                                if self.archive:
-                                    plt.title(f"{self.archive.execution_time_string}\nExpected spin projection over time")
-                                plt.show()
-
-                                time_show = (signal_instance.time_properties.time_coarse < 1.1)
-                                spectrogram = util.Spectrogram(signal_instance.time_properties.time_coarse[time_show], simulation.simulation_results.spin[time_show, 0], [2e-4, 6], 3e-3, [460e3 - 25e3, 460e3 + 25e3])
-                                # 
-                                spectrogram.plot()
-                        # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
-                        simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
-                        self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
-                        if self.state_output is not None:
-                            self.state_output += [simulation.simulation_results.state.copy()]
-                        if self.spin_output is not None:
-                            self.spin_output += [simulation.simulation_results.spin.copy()]
-                        if self.execution_time_output is not None:
-                            self.execution_time_output += [tm.time() - execution_time_end_points[1]]
-                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]), end = "\r")
-                        execution_time_end_points[1] = tm.time()
-        print("\n\033[32mDone!\033[0m\a")
-
-#===============================================================#
-
-# Important constants
-cuda_debug = False
-sqrt2 = math.sqrt(2)
-sqrt3 = math.sqrt(3)
-exp_precision = 5                                # Where to cut off the exp Taylor series
-machine_epsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
-# trotter_cutoff = 52
-
-# interpolate = utilities.interpolate_source_cubic
+        archive_group = archive.require_group("state_properties")
+        archive_group["state_init"] = self.state_init
+        archive_group["spin_quantum_number"] = np.asarray(self.spin_quantum_number.label, dtype='|S32')
 
 class SourceProperties:
     """
@@ -193,7 +99,7 @@ class SourceProperties:
     evaluate_dressing : :obj:`callable`
         The dressing function fed into the intergator.
     """
-    def __init__(self, signal, state_properties, dressing_rabi_frequency = 1000.0, quadratic_shift = 0.0, measurement_method = MeasurementMethod.FARADAY_DEMODULATION):
+    def __init__(self, signal:TestSignal, state_properties:StateProperties, dressing_rabi_frequency = 1000.0, quadratic_shift = 0.0, measurement_method = MeasurementMethod.FARADAY_DEMODULATION, bias_amplitude = 840e3, signal_reconstruction:TestSignal = None):
         """
         Parameters
         ----------
@@ -218,7 +124,7 @@ class SourceProperties:
 
         # Construct the signal from the dressing information and pulse description.
         if signal:
-            self.add_dressing(signal)
+            self.add_dressing(signal, bias_amplitude, signal_reconstruction = signal_reconstruction)
             for neural_pulse in signal.neural_pulses:
                 self.add_neural_pulse(neural_pulse)
                 # self.add_neural_pulse(neural_pulse.time_start, neural_pulse.amplitude, neural_pulse.frequency)
@@ -252,7 +158,7 @@ class SourceProperties:
         archive_group["source_index_max"] = np.asarray([self.source_index_max])
         archive_group["source_quadratic_shift"] = np.asarray([self.source_quadratic_shift])
 
-    def add_dressing(self, signal, bias_amplitude = 460e3):
+    def add_dressing(self, signal:TestSignal, bias_amplitude = 460e3, signal_reconstruction:TestSignal = None):
         """
         Adds a specified bias field and dressing field to the list of sources.
 
@@ -264,6 +170,9 @@ class SourceProperties:
             The strength of the dc bias field in Hz. Also the frequency of the dressing.
             If one wants to add detuning, one can do that via detuning noise in :class:`test_signal.SinusoidalNoise.new_detuning_noise()`.
         """
+        if not signal_reconstruction:
+            signal_reconstruction = signal
+
         if self.measurement_method == MeasurementMethod.HARD_PULSE:
             # # Initialise
             # source_amplitude = np.zeros([3, 3])
@@ -330,16 +239,21 @@ class SourceProperties:
             readout_amplitude = 1e4
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
-            cycle_period = 1/100
-            # cycle_period = None
+            # cycle_period = 1/100
+            cycle_period = None
             # readout_amplitude = 1/(math.floor((1/readout_amplitude)/cycle_period)*cycle_period)
-            dressing_end_buffer = (1/readout_amplitude)
+            dressing_end_buffer = (2/readout_amplitude)
             # readout_amplitude = 0
 
             source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
-            source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - 2*dressing_end_buffer
+            # source_time_end_points[0, 1] = signal.time_properties.time_end_points[1] - 1/(4*readout_amplitude) - 2*dressing_end_buffer
+            source_time_end_points[0, 1] = signal_reconstruction.time_properties.time_end_points[1]
+            # print(source_time_end_points[0, 1])
             if cycle_period:
                 source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]/cycle_period))*cycle_period
+                # source_time_end_points[0, 1] = (math.floor(source_time_end_points[0, 1]/cycle_period) + 1)*cycle_period
+                # source_time_end_points[0, 1] = (math.ceil(source_time_end_points[0, 1]/cycle_period))*cycle_period
+            # print(source_time_end_points[0, 1])
 
             source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
             source_frequency[0, 0] = bias_amplitude
@@ -348,6 +262,8 @@ class SourceProperties:
             source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
             if cycle_period:
                 source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period))*cycle_period
+                # source_time_end_points[1, 0] = (math.floor(source_time_end_points[1, 0]/cycle_period + 1))*cycle_period
+                # source_time_end_points[1, 0] = (math.ceil(source_time_end_points[1, 0]/cycle_period))*cycle_period
             source_time_end_points[1, 1] = source_time_end_points[1, 0] + 1/(4*readout_amplitude)
             # if cycle_period:
             #     source_time_end_points[1, 1] = (math.floor(source_time_end_points[1, 1]/cycle_period))*cycle_period
@@ -556,46 +472,6 @@ class SourceProperties:
         self.source_type = np.concatenate((self.source_type, source_type))
         self.source_index_max += 1
 
-class StateProperties:
-    """
-    The initial state fed into the simulation code.
-
-    Attributes
-    ----------
-    spin_quantum_number: :class:`spinsim.SpinQuantumNumber(Enum)`
-        The spin quantum number of the system being simulated. Determines the dimension of the hilbert space of the state, the algorithms used in the simulation, etc.
-    state_init : :class:`numpy.ndarray` of :class:`numpy.complex128` (state_index)
-        The state (spin wavefunction) of the system at the start of the simulation.
-    """
-    def __init__(self, spin_quantum_number = spinsim.SpinQuantumNumber.HALF, state_init = None):
-        """
-        Parameters
-        ----------
-        spin_quantum_number: :class:`spinsim.SpinQuantumNumber(Enum)`
-            The spin quantum number of the system being simulated. Determines the dimension of the hilbert space of the state, the algorithms used in the simulation, etc.
-        state_init : :class:`numpy.ndarray` of :class:`numpy.complex128`
-            The state (spin wavefunction) of the system at the start of the simulation.
-        """
-        self.spin_quantum_number = spin_quantum_number
-        if state_init:
-            self.state_init = np.asarray(state_init, np.complex128)
-        else:
-            if self.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
-                self.state_init = np.asarray([1, 0], np.complex128)
-            else:
-                self.state_init = np.asarray([1, 0, 0], np.complex128)
-
-    def write_to_file(self, archive):
-        """
-        Parameters
-        ----------
-        archive : :class:`h5py.Group`
-            The HDF5 archive to write to.
-        """
-        archive_group = archive.require_group("state_properties")
-        archive_group["state_init"] = self.state_init
-        archive_group["spin_quantum_number"] = np.asarray(self.spin_quantum_number.label, dtype='|S32')
-
 class SimulationResults:
     """
     The output of the simulation code.
@@ -613,7 +489,7 @@ class SimulationResults:
     sensed_frequency_amplitude_method : :obj:`str`
         The method used to find the measured Fourier coefficient (for archival purposes).
     """
-    def __init__(self, signal, state_properties):
+    def __init__(self, signal:TestSignal, state_properties:StateProperties):
         """
         Parameters
         ----------
@@ -628,7 +504,7 @@ class SimulationResults:
         self.sensed_frequency_amplitude = 0.0
         self.sensed_frequency_amplitude_method = "none"
 
-    def write_to_file(self, archive, do_write_everything = False):
+    def write_to_file(self, archive:Archive, do_write_everything = False):
         """
         Saves results to the hdf5 file.
 
@@ -647,6 +523,148 @@ class SimulationResults:
         archive_group["sensed_frequency_amplitude"] = self.sensed_frequency_amplitude
         archive_group["sensed_frequency_amplitude"].attrs["method"] = self.sensed_frequency_amplitude_method
 
+class SimulationManager:
+    """
+    Controls a set of simulations running for different dressing parameters.
+
+    Attributes
+    ----------
+    signal : :obj:`list` of :class:`test_signal.TestSignal`
+        A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
+    trotter_cutoff : :obj:`list` of :obj:`int`
+        A list of the number of squares to be used in the matrix exponentiation algorithm :func:`simulation_utilities.matrix_exponential_lie_trotter()` during the simulation. :func:`evaluate()` will run simulations for all of these values.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, (frequency_index)
+        A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
+    frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`, (simulation_index)
+        The Fourier coefficient of the signal as measured from the simulation `simulation_index`. Filled in after the simulation `simulation_index` has been completed.
+    archive : :class:`archive.Archive`
+        The archive object to save the simulation results and parameters to.
+    state_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index))
+        An optional :obj:`list` to directly write the state of the simulation to. Used for benchmarks. Reference can be optionally passed in on construction.
+    state_properties : :class:`StateProperties`
+            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
+    device : :obj:`spinsim.Device`
+        The target device (hardware) that the simulation is to be run on.
+    execution_time_output : :obj:`list` of :obj:`float`
+        If not :obj:`None`, the execution times for each full simulation will be appended to this.
+    measurement_method : :obj:`MeasurementMethod`
+        Method used to retrieve frequency amplitudes.
+    """
+    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3):
+        """
+        Parameters
+        ----------
+        signal : :class:`test_signal.TestSignal` or :obj:`list` of :class:`test_signal.TestSignal`
+            A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
+        frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, (frequency_index)
+            A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
+        archive : :class:`archive.Archive`
+            The archive object to save the simulation results and parameters to.
+        state_properties : :class:`StateProperties`
+            The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
+        state_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
+            An optional :obj:`list` to directly write the state of the simulation to. Used for benchmarks.
+        spin_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
+            An optional :obj:`list` to directly write the spin of the simulation to. Used for benchmarks.
+        trotter_cutoff : :obj:`list` of :obj:`int`, optional
+            A list of the number of squares to be used in the matrix exponentiation algorithm during the simulation. :func:`evaluate()` will run simulations for all of these values.
+        device : :obj:`spinsim.Device`
+            The target device (hardware) that the simulation is to be run on.
+        execution_time_output : :obj:`list` of :obj:`float`
+            If not :obj:`None`, the execution times for each full simulation will be appended to this.
+        measurement_method : :obj:`MeasurementMethod`
+            Method used to retrieve frequency amplitudes.
+        """
+        self.bias_amplitude = bias_amplitude
+        self.signal = signal
+        if not isinstance(self.signal, list):
+            self.signal = [self.signal]
+        self.signal_reconstruction = signal_reconstruction
+        if not self.signal_reconstruction:
+            self.signal_reconstruction = self.signal
+        if not isinstance(self.signal_reconstruction, list):
+            self.signal_reconstruction = [self.signal_reconstruction]
+
+        self.device = device
+        if not isinstance(self.device, list):
+            self.device = [self.device]
+        self.trotter_cutoff = np.asarray(trotter_cutoff)
+        self.frequency = np.asarray(frequency, dtype = np.float64)
+        self.frequency_amplitude = np.empty(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device), dtype = np.float64)
+        self.archive = archive
+        self.state_output = state_output
+        self.state_properties = state_properties
+        self.execution_time_output = execution_time_output
+        self.measurement_method = measurement_method
+        self.spin_output = spin_output
+
+    def evaluate(self, do_plot:bool = False, do_write_everything:bool = False):
+        """
+        Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequency_amplitude`. The simulation `simulation_index` will be run with the frequency given by `frequency_index` mod :attr:`frequency.size`, the signal given by floor(`signal_index` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signal_index` / `frequency.size` / `trotter_cutoff.size`).
+        Parameters
+        ----------
+        do_plot : :obj:`bool`, optional
+            If :obj:`True`, plots time series of the expected spin values in each direction during execution.
+        do_write_everything : :obj:`bool`, optional
+            If :obj:`True`, then save all time series data to file as well as parametric data. Defaults to :obj:`False` to reduce archive file size.
+        """
+        print("\033[33mStarting simulations...\033[0m")
+        execution_time_end_points = np.empty(2)
+        execution_time_end_points[0] = tm.time()
+        execution_time_end_points[1] = execution_time_end_points[0]
+        print("Idx\tCmp\tTm\tdTm")
+        archive_group_simulations = self.archive.archive_file.require_group("simulations")
+        for device_index, device_instance in enumerate(self.device):
+            for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
+                for signal_index, (signal_instance, signal_reconstruction_instance) in enumerate(zip(self.signal, self.signal_reconstruction)):
+                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance, bias_amplitude = self.bias_amplitude)
+                    for frequency_index in range(self.frequency.size):
+                        simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
+                        frequency_value = self.frequency[frequency_index]
+                        simulation.evaluate(frequency_value)
+                        if self.measurement_method == MeasurementMethod.FARADAY_DEMODULATION:
+                            simulation.get_frequency_amplitude_from_demodulation([signal_reconstruction_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], do_plot)
+                        else:
+                            simulation.get_frequency_amplitude_from_projection()
+                            if do_plot:
+                                plt.figure()
+                                plt.plot(simulation.signal.time_properties.time_coarse, simulation.simulation_results.spin)
+                                plt.legend(["x", "y", "z"])
+                                plt.xlabel("Time (s)")
+                                plt.ylabel("Spin projection (hbar)")
+                                if self.archive:
+                                    self.archive.write_plot("Expected spin projection over time", "simulation_projection")
+                                    plt.title(f"{self.archive.execution_time_string}\nExpected spin projection over time")
+                                plt.draw()
+
+                                # spectrogram = util.Spectrogram(signal_instance.time_properties.time_coarse, simulation.simulation_results.spin[:, 0], [500, 10], [460e3 - 2e3, 460e3 + 2e3])
+                                # # 
+                                # spectrogram.plot()
+                        # simulation.get_frequency_amplitude_from_demodulation([0.9*signal_instance.time_properties.time_end_points[1], signal_instance.time_properties.time_end_points[1]], frequency_value == 1000, self.archive)
+                        simulation.write_to_file(archive_group_simulations.require_group("simulation" + str(simulation_index)), do_write_everything)
+                        self.frequency_amplitude[simulation_index] = simulation.simulation_results.sensed_frequency_amplitude
+                        if self.state_output is not None:
+                            self.state_output += [simulation.simulation_results.state.copy()]
+                        if self.spin_output is not None:
+                            self.spin_output += [simulation.simulation_results.spin.copy()]
+                        if self.execution_time_output is not None:
+                            self.execution_time_output += [tm.time() - execution_time_end_points[1]]
+                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]), end = "\r")
+                        execution_time_end_points[1] = tm.time()
+        print("\n\033[32mDone!\033[0m\a")
+
+#===============================================================#
+
+# Important constants
+cuda_debug = False
+sqrt2 = math.sqrt(2)
+sqrt3 = math.sqrt(3)
+exp_precision = 5                                # Where to cut off the exp Taylor series
+machine_epsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
+# trotter_cutoff = 52
+
+# interpolate = utilities.interpolate_source_cubic
+
 class Simulation:
     """
     The data needed and algorithms to control an individual simulation.
@@ -664,7 +682,7 @@ class Simulation:
     trotter_cutoff : :obj:`int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal, dressing_rabi_frequency = 1e3, state_properties = None, trotter_cutoff = 28, device = spinsim.Device.CUDA, measurement_method = MeasurementMethod.FARADAY_DEMODULATION):
+    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, trotter_cutoff = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None, bias_amplitude = 840e3):
         """
         Parameters
         ----------
@@ -679,11 +697,15 @@ class Simulation:
         device : :obj:`spinsim.Device`
             The target device that the simulation is to be run on.
         """
+        self.bias_amplitude = bias_amplitude
         self.signal = signal
+        self.signal_reconstruction = signal_reconstruction
+        if not self.signal_reconstruction:
+            self.signal_reconstruction = self.signal
         self.state_properties = state_properties
         if not self.state_properties:
             self.state_properties = StateProperties()
-        self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, measurement_method = measurement_method)
+        self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, measurement_method = measurement_method, signal_reconstruction = self.signal_reconstruction, bias_amplitude = self.bias_amplitude)
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
         self.trotter_cutoff = trotter_cutoff
         self.device = device
@@ -691,7 +713,7 @@ class Simulation:
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
         self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
 
-    def evaluate(self, rabi_frequency, bias_amplitude = 460e3):
+    def evaluate(self, rabi_frequency):
         """
         Time evolves the system, and finds the spin at each coarse time step.
 
@@ -706,15 +728,17 @@ class Simulation:
         self.simulation_results.time_evolution = results.time_evolution
         self.simulation_results.spin = results.spin
 
+        self.source_properties = SourceProperties(self.signal, self.state_properties, rabi_frequency, 0.0, measurement_method = self.source_properties.measurement_method, signal_reconstruction = self.signal_reconstruction, bias_amplitude = self.bias_amplitude)
+
     def get_frequency_amplitude_from_projection(self):
         self.simulation_results.sensed_frequency_amplitude = self.simulation_results.spin[self.simulation_results.spin.shape[0] - 1, 2]
         # print(self.simulation_results.sensed_frequency_amplitude)
-        self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal.time_properties.time_end_points[1] - self.signal.time_properties.time_end_points[0]))
+        self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal_reconstruction.time_properties.time_end_points[1] - self.signal_reconstruction.time_properties.time_end_points[0]))
 
         if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
             self.simulation_results.sensed_frequency_amplitude *= 2
 
-    def get_frequency_amplitude_from_demodulation(self, demodulation_time_end_points = [0.09, 0.1], do_plot_spin = False, archive = None):
+    def get_frequency_amplitude_from_demodulation(self, demodulation_time_end_points = [0.09, 0.1], do_plot_spin = False, archive:Archive = None):
         """
         Uses demodulation of the Faraday signal to find the measured Fourier coefficient.
 
@@ -767,16 +791,17 @@ class Simulation:
             plt.xlabel("Time (s)")
             plt.ylabel("Spin projection (hbar)")
             if archive:
-                plt.title(archive.execution_time_string + "Spin projection")
+                # plt.title(archive.execution_time_string + "Spin projection")
                 archive_index = 0
-                while os.path.isfile(archive.plot_path + "spin_projection_" + str(archive_index) + ".png"):
-                    archive_index += 1
-                plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".pdf")
-                plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".png")
+                # while os.path.isfile(archive.plot_path + "spin_projection_" + str(archive_index) + ".png"):
+                #     archive_index += 1
+                # plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".pdf")
+                # plt.savefig(archive.plot_path + "spin_projection_" + str(archive_index) + ".png")
+                archive.write_plot("Spin projection", "spin_projection")
             else:
-                plt.show()
+                plt.draw()
 
-    def write_to_file(self, archive, do_write_everything = False):
+    def write_to_file(self, archive:Archive, do_write_everything = False):
         """
         Saves the simulation record to hdf5.
 
@@ -1028,90 +1053,6 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
             if field_sample.size > 2:
                 field_sample[3] = source_quadratic_shift
     return evaluate_dressing
-
-class ExperimentResults:
-    """
-    A class that contains information from the results of a complete experiment, whether it was done via simulations, or in the lab.
-
-    Attributes
-    ----------
-    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
-        The dressing Rabi frequencies at which the experiments were run. In units of Hz.
-    frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`
-        The Fourier sine coefficient of the signal being measured, as determined by the experiment. In units of Hz.
-    """
-    def __init__(self, frequency = None, frequency_amplitude = None):
-        """
-        Parameters
-        ----------
-        frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, optional
-            The dressing Rabi frequencies at which the experiments were run. In units of Hz.
-        frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`, optional
-            The Fourier sine coefficient of the signal being measured, as determined by the experiment. In units of Hz.
-        """
-        self.frequency = frequency
-        self.frequency_amplitude = frequency_amplitude
-
-    @staticmethod
-    def new_from_simulation_manager(simulation_manager):
-        """
-        A constructor that creates a new :class:`ExperimentResults` object from an already evaluated :class:`SimulationManager` object. That is, make an experiment results object based off of simulation results.
-
-        Parameters
-        ----------
-        simulation_manager : :class:`SimulationManager`
-            The simulation manager object to read the results of.
-
-        Returns
-        -------
-        experiment_results : :class:`ExperimentResults`
-            A new object containing the results of `simulation_manager`.
-        """
-        frequency = 1*simulation_manager.frequency
-        frequency_amplitude = 1*simulation_manager.frequency_amplitude[:frequency.size]
-
-        return ExperimentResults(frequency, frequency_amplitude)
-
-    def plot(self, archive = None, test_signal = None):
-        """
-        Plots the experiment results contained in the object. Optionally saves the plots, as well as compares the results to numerically calculated values.
-
-        Parameters
-        ----------
-        archive : :class:`archive.Archive`, optional
-            If specified, will save the generated plot to the archive's :attr:`archive.Archive.plot_path`.
-        test_signal : :class:`test_signal:TestSignal`, optional
-            The signal that was being measured during the experiment. If specified, this function will plot the sine Fourier transform of the signal behind the measured coefficients of the experiment results.
-        """
-        plt.figure()
-        if test_signal:
-            plt.plot(test_signal.frequency, test_signal.frequency_amplitude, "-k")
-        plt.plot(self.frequency, self.frequency_amplitude, "xr")
-        if test_signal:
-            plt.legend(["Fourier Transform", "Measured"])
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Amplitude (Hz)")
-        plt.xlim([0, 2000])
-        # plt.ylim([-0.08, 0.08])
-        plt.grid()
-        if archive:
-            plt.title(f"{archive.execution_time_string}\nMeasured Frequency Amplitude")
-            plt.savefig(f"{archive.plot_path}measured_frequency_amplitude.pdf")
-            plt.savefig(f"{archive.plot_path}measured_frequency_amplitude.png")
-        plt.show()
-
-    def write_to_archive(self, archive):
-        """
-        Saves the contents of the experiment results to an archive.
-
-        Parameters
-        ----------
-        archive : :class:`archive.archive`
-            The archive object to save the results to.
-        """
-        archive_group_experiment_results = archive.archive_file.require_group("experiment_results")
-        archive_group_experiment_results["frequency"] = self.frequency
-        archive_group_experiment_results["frequency_amplitude"] = self.frequency_amplitude
 
 def correct_bloch_siegert_shift_frequency(frequency_resonant, frequency_bias):
     """
