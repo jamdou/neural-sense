@@ -448,29 +448,56 @@ class SourceProperties:
         sinusoidal_noise : :class:`test_signal.SinusoidalNoise`
             The sinusoidal noise object to add to the list of sources.
         """
-        # Initialise
-        source_amplitude = np.zeros([1, 3])
-        source_phase = np.zeros([1, 3])
-        source_frequency = np.zeros([1, 3])
-        source_time_end_points = np.zeros([1, 2])
-        source_type = np.empty([1], dtype = object)
+        if isinstance(sinusoidal_noise, PeriodicNoise):
+            if sinusoidal_noise.shape == "sawtooth":
+                for harmonic in range(1, sinusoidal_noise.resolution + 1):
+                    # Initialise
+                    source_amplitude = np.zeros([1, 3])
+                    source_phase = np.zeros([1, 3])
+                    source_frequency = np.zeros([1, 3])
+                    source_time_end_points = np.zeros([1, 2])
+                    source_type = np.empty([1], dtype = object)
 
-        # Label
-        source_type[0] = sinusoidal_noise.type
+                    # Label
+                    source_type[0] = f"{sinusoidal_noise.type}_{sinusoidal_noise.shape}"
 
-        # Pulse
-        source_amplitude[0, :] = sinusoidal_noise.amplitude
-        source_frequency[0, :] = sinusoidal_noise.frequency
-        source_phase[0, :] = sinusoidal_noise.phase
-        source_time_end_points[0, :] = np.asarray([0.0, 1800.0])
+                    # Pulse
+                    source_amplitude[0, :] = ((-1)**harmonic)*2*sinusoidal_noise.amplitude/(harmonic*math.pi)
+                    source_frequency[0, :] = sinusoidal_noise.frequency*harmonic
+                    source_phase[0, :] = sinusoidal_noise.phase*harmonic
+                    source_time_end_points[0, :] = np.asarray([0.0, 1800.0])
 
-        # Add
-        self.source_amplitude = np.concatenate((self.source_amplitude, source_amplitude))
-        self.source_phase = np.concatenate((self.source_phase, source_phase))
-        self.source_frequency = np.concatenate((self.source_frequency, source_frequency))
-        self.source_time_end_points = np.concatenate((self.source_time_end_points, source_time_end_points))
-        self.source_type = np.concatenate((self.source_type, source_type))
-        self.source_index_max += 1
+                    # Add
+                    self.source_amplitude = np.concatenate((self.source_amplitude, source_amplitude))
+                    self.source_phase = np.concatenate((self.source_phase, source_phase))
+                    self.source_frequency = np.concatenate((self.source_frequency, source_frequency))
+                    self.source_time_end_points = np.concatenate((self.source_time_end_points, source_time_end_points))
+                    self.source_type = np.concatenate((self.source_type, source_type))
+                    self.source_index_max += 1
+        else:
+            # Initialise
+            source_amplitude = np.zeros([1, 3])
+            source_phase = np.zeros([1, 3])
+            source_frequency = np.zeros([1, 3])
+            source_time_end_points = np.zeros([1, 2])
+            source_type = np.empty([1], dtype = object)
+
+            # Label
+            source_type[0] = sinusoidal_noise.type
+
+            # Pulse
+            source_amplitude[0, :] = sinusoidal_noise.amplitude
+            source_frequency[0, :] = sinusoidal_noise.frequency
+            source_phase[0, :] = sinusoidal_noise.phase
+            source_time_end_points[0, :] = np.asarray([0.0, 1800.0])
+
+            # Add
+            self.source_amplitude = np.concatenate((self.source_amplitude, source_amplitude))
+            self.source_phase = np.concatenate((self.source_phase, source_phase))
+            self.source_frequency = np.concatenate((self.source_frequency, source_frequency))
+            self.source_time_end_points = np.concatenate((self.source_time_end_points, source_time_end_points))
+            self.source_type = np.concatenate((self.source_type, source_type))
+            self.source_index_max += 1
 
 class SimulationResults:
     """

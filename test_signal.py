@@ -212,6 +212,27 @@ class SinusoidalNoise:
         archive["phase"] = self.phase
         archive["type"] = np.asarray(self.type, dtype='|S32')
         
+class PeriodicNoise:
+    def __init__(self, amplitude = [0, 0, 0], frequency = [50, 50, 50], phase = [0, 0, 0], shape = "sawtooth", type = "periodic_noise", resolution = 20):
+        self.amplitude = np.asarray(amplitude, np.double)
+        self.frequency = np.asarray(frequency, np.double)
+        self.phase = np.asarray(phase, np.double)
+        self.shape = shape
+        self.type = type
+        self.resolution = resolution
+
+    @staticmethod
+    def new_line_noise_sawtooth(amplitude = [0.0, 0.0, 500.0], phase = [0.0, 0.0, 0.0], resolution = 20):
+        return PeriodicNoise(amplitude, [50, 50, 50], phase, "sawtooth", "line_noise", resolution)
+
+    def write_toFile(self, archive):
+        archive["amplitude"] = self.amplitude
+        archive["frequency"] = self.frequency
+        archive["phase"] = self.phase
+        archive["resolution"] = self.resolution
+        archive["shape"] = np.asarray(self.shape, dtype='|S32')
+        archive["type"] = np.asarray(self.type, dtype='|S32')
+
 class TestSignal:
     """
     Details for a simulated neural pulse sequence and noise (no control signals).

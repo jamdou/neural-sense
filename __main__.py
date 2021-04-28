@@ -39,84 +39,88 @@ if __name__ == "__main__":
     if profile_state != arch.ProfileState.ARCHIVE:
         archive.new_archive_file()
 
-        # # === Scaled protocol ===
-        # scaled_frequency = 5000
-        # scaled_density = 1/25
-        # scaled_samples = 10
-        # scaled_amplitude = 800
-        # scaled_sweep = [1003, 7500]
-        # scaled_time_step = 1/(scaled_frequency*scaled_samples)
-        # # scaled_sweep = [0, scaled_samples*scaled_density/2]
+        # === Scaled protocol ===
+        scaled_frequency = 5025
+        scaled_density = 1/25
+        scaled_samples = 10
+        scaled_amplitude = 800
+        scaled_sweep = [scaled_frequency/5, 14000]
+        scaled_time_step = 1/(scaled_frequency*scaled_samples)
+        # scaled_sweep = [0, scaled_samples*scaled_density/2]
 
-        # scaled_time_end = 1/(scaled_frequency*scaled_density)
-        # scaled_pulse_time = 0.2333333*scaled_time_end
-        # scaled_frequency_step = scaled_density*scaled_frequency/2
+        scaled_time_end = 1/(scaled_frequency*scaled_density)
+        scaled_pulse_time = 0.2333333*scaled_time_end
+        scaled_frequency_step = scaled_density*scaled_frequency/2
 
-        # # === Make signal ===
-        # # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
-        # # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
+        print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
+        print(f"{scaled_frequency:10.4e} {1/scaled_frequency:10.4e} {scaled_pulse_time:10.4e} {scaled_density:10.4e} {scaled_samples:10.4e} {scaled_sweep[0]:10.4e} {scaled_sweep[1]:10.4e} {scaled_frequency_step:10.4e} {scaled_time_end:10.4e}")
+
+        # === Make signal ===
+        # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
+        # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
 
         # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
         # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
 
-        # # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
-        # # time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
+        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
+        time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
 
-        # signal = test_signal.TestSignal(
-        #     # [],
-        #     # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-        #     [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-        #     # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
-        #     [],
-        #     # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
-        #     time_properties
-        # )
-        # signal_reconstruction = test_signal.TestSignal(
-        #     # [],
-        #     # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-        #     [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-        #     # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
-        #     [],
-        #     # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
-        #     time_properties_reconstruction
-        # )
+        signal = test_signal.TestSignal(
+            # [],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+            [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            # [],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 200)],
+            time_properties
+        )
+        signal_reconstruction = test_signal.TestSignal(
+            # [],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+            # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+            [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            [],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+            time_properties_reconstruction
+        )
 
-        # # === Make state ===
-        # # [0.5, 1/np.sqrt(2), 0.5]
-        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        # === Make state ===
+        # [0.5, 1/np.sqrt(2), 0.5]
+        state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
 
-        # cuda.profile_start()
+        cuda.profile_start()
         
-        # # === Run simulations ===
-        # # frequency = np.arange(70, 3071, 30)
-        # # frequency = np.arange(250, 2251, 3)
-        # # frequency = np.arange(250, 2000, 10.0)
-        # # frequency = np.arange(250, 2251, 50)
-        # # frequency = np.arange(250, 2251, 460e3/1e5)
-        # # frequency = np.arange(990, 1010, 0.02)
-        # # frequency = np.arange(253, 3251, 30)
+        # === Run simulations ===
+        # frequency = np.arange(70, 3071, 30)
+        # frequency = np.arange(250, 2251, 3)
+        # frequency = np.arange(250, 2000, 10.0)
+        # frequency = np.arange(250, 2251, 50)
+        # frequency = np.arange(250, 2251, 460e3/1e5)
+        # frequency = np.arange(990, 1010, 0.02)
+        # frequency = np.arange(253, 3251, 30)
         # frequency = np.arange(1000, 1003, 1)
-        # # frequency = np.arange(1000, 1001, 1)
-        # # frequency = np.arange(0, 1000000, 1)
-        # # frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step)
+        # frequency = np.arange(1000, 1001, 1)
+        # frequency = np.arange(0, 1000000, 1)
+        frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step)
 
-        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-        # simulation_manager.evaluate(True, False)
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+        simulation_manager.evaluate(False, False)
 
-        # # === Experiment results ===
-        # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        # # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, "20210421T174119")
-        # experiment_results.write_to_archive(archive)
-        # experiment_results.plot(archive, signal_reconstruction)
+        # === Experiment results ===
+        experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, "20210421T174119")
+        experiment_results.write_to_archive(archive)
+        experiment_results.plot(archive, signal_reconstruction)
 
-        # # === Make reconstructions ===
-        # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size))
-        # # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
-        # reconstruction.evaluate_ista()
-        # # reconstruction.evaluateISTAComplete()
-        # reconstruction.plot(archive, signal_reconstruction)
-        # reconstruction.write_to_file(archive.archive_file)
+        # === Make reconstructions ===
+        reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size))
+        # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
+        reconstruction.evaluate_ista()
+        # reconstruction.evaluateISTAComplete()
+        reconstruction.plot(archive, signal_reconstruction)
+        reconstruction.write_to_file(archive.archive_file)
 
         # === ===                      === ===
         # === === Benchmarks and tests === ===
@@ -186,7 +190,7 @@ if __name__ == "__main__":
         # sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
 
         # === Comparison ===
-        sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
+        # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
         # === Clean up ===
         archive.close_archive_file()
