@@ -22,19 +22,19 @@ class Reconstruction():
         self.step_size_sparse = step_size_sparse
         self.step_size_manifold = step_size_manifold
 
-    def read_frequencies_directly(self, frequency, frequency_amplitude, number_of_samples = 100, frequency_cutoff = 7500):
+    def read_frequencies_directly(self, frequency, frequency_amplitude, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 7500):
         """
         Import arbitrary frequency values for reconstruction
         """
-        permutation = np.random.choice(range(np.sum(frequency < frequency_cutoff)), number_of_samples)
+        permutation = np.random.choice(range(np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))), number_of_samples)
         self.frequency = np.ascontiguousarray(frequency[permutation])
         self.frequency_amplitude = np.ascontiguousarray(frequency_amplitude[permutation])
 
-    def read_frequencies_from_experiment_results(self, experiment_results, number_of_samples = 100, frequency_cutoff = 100000):
+    def read_frequencies_from_experiment_results(self, experiment_results, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 100000):
         """
         Import frequency values from an experimental results object
         """
-        self.read_frequencies_directly(experiment_results.frequency, experiment_results.frequency_amplitude, number_of_samples, frequency_cutoff)
+        self.read_frequencies_directly(experiment_results.frequency, experiment_results.frequency_amplitude, number_of_samples, frequency_cutoff_low, frequency_cutoff_high)
 
     def read_frequencies_from_test_signal(self, test_signal:TestSignal, number_of_samples = 100):
         """
@@ -96,8 +96,8 @@ class Reconstruction():
         blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
-        # iteration_max = 15
-        iteration_max = 1000
+        # iteration_max = 50
+        iteration_max = 20000
         scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
@@ -114,8 +114,10 @@ class Reconstruction():
         for iteration_index in range(iteration_max):
             evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 100/(3 + 20*(iteration_index/iteration_max)), 0.25*scale)
-            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 2/(3 + 3*(iteration_index/iteration_max)), scale)
+            # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 2/(3 + 3*(iteration_index/iteration_max)), scale)
+            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 0.6/(3 + 500*(iteration_index/iteration_max)), 10000*scale)
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 1, scale)
+            # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 20, scale)
 
         self.amplitude = amplitude.copy_to_host()
 

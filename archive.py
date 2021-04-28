@@ -331,9 +331,9 @@ class ExperimentResults:
         archive_group_experiment_results["frequency"] = self.frequency
         archive_group_experiment_results["frequency_amplitude"] = self.frequency_amplitude
         if self.archive_time:
-            archive_group_experiment_results["archive_time"] = self.archive_time
+            archive_group_experiment_results.attrs["archive_time"] = self.archive_time
         if self.experiment_type:
-            archive_group_experiment_results["experiment_type"] = self.experiment_type
+            archive_group_experiment_results.attrs["experiment_type"] = self.experiment_type
     
     @staticmethod
     def new_from_archive_time(archive:Archive, archive_time):
@@ -343,12 +343,12 @@ class ExperimentResults:
 
         frequency = np.asarray(archive_group_experiment_results["frequency"])
         frequency_amplitude = np.asarray(archive_group_experiment_results["frequency_amplitude"])
-        if "archive_time" in archive_group_experiment_results:
-            archive_time_real = np.asarray(archive_group_experiment_results["archive_time"])
+        if "archive_time" in archive_group_experiment_results.attrs:
+            archive_time_real = archive_group_experiment_results.attrs["archive_time"]
         else:
             archive_time_real = archive_time
-        if "experiment_type" in archive_group_experiment_results:
-            experiment_type = np.asarray(archive_group_experiment_results["experiment_type"])
+        if "experiment_type" in archive_group_experiment_results.attrs:
+            experiment_type = archive_group_experiment_results.attrs["experiment_type"]
         else:
             experiment_type = "unknown"
 
