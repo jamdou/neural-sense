@@ -109,15 +109,16 @@ if __name__ == "__main__":
 
         # === Experiment results ===
         # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, "20210428T153925")
+        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, "20210430T162501")
         experiment_results.write_to_archive(archive)
         experiment_results.plot(archive, signal_reconstruction)
 
         # === Make reconstructions ===
         reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(100000, experiment_results.frequency.size), frequency_cutoff_low = 2000, frequency_cutoff_high = 9000)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(100000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
         reconstruction.evaluate_ista()
+        # reconstruction.evaluate_fista()
         # reconstruction.evaluateISTAComplete()
         reconstruction.plot(archive, signal_reconstruction)
         reconstruction.write_to_file(archive.archive_file)

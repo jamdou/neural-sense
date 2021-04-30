@@ -352,6 +352,6 @@ class ExperimentResults:
         else:
             experiment_type = "unknown"
 
-        archive_previous.close_archive_file(False)
+        # archive_previous.close_archive_file(False)
 
         return ExperimentResults(frequency, frequency_amplitude, archive_time = archive_time_real, experiment_type = experiment_type)
