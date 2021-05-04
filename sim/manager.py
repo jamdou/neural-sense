@@ -867,7 +867,7 @@ def get_frequency_amplitude_from_demodulation_multiply(time, spin, spin_demodula
 def get_frequency_amplitude_from_demodulation_low_pass(time_end_points, spin, sensed_frequency_amplitude):
     """
     Average the multiplied spin to find the DC value (ie apply a low pass filter).
-
+    
     Parameters
     ----------
     time_end_points : :class:`numpy.ndarray` of :class:`numpy.float64` (start time (0) or end time (1))

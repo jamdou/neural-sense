@@ -814,7 +814,7 @@ def new_benchmark_scipy(archive:Archive, signal_template:test_signal.TestSignal,
             results = scipy.integrate.solve_ivp(derivative, [0e-3, 1e-1], state_properties.state_init, t_eval = time, max_step = time_step_fine_instance)
             state_output += [np.transpose(results.y)]
             
-            print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(len(frequency)*len(time_step_fine)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]))
+            print(f"{simulation_index:4d}\t{100*(simulation_index + 1)/(len(frequency)*len(time_step_fine)):3.0f}%\t{tm.time() - execution_time_end_points[0]:3.0f}s\t{tm.time() - execution_time_end_points[0]:2.3f}s")
 
             execution_time_output += [tm.time() - execution_time_end_points[1]]
 
