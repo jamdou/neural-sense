@@ -219,7 +219,7 @@ class Archive:
         for profile_name in glob.glob(f"{self.profile_local_path}*"):
             shutil.copyfile(profile_name, profile_name.replace(self.profile_local_path, self.profile_path))
 
-    def write_plot(self, title, file_name):
+    def write_plot(self, title:str, file_name:str):
         """
         Writes plots to the archive file path in both png and pdf formats both with and without time labels.
 

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import time as tm
+from numba.core import errors
 import numpy as np
 import numba as nb
 from numba import cuda
@@ -794,7 +795,7 @@ def new_benchmark_scipy(archive:Archive, signal_template:test_signal.TestSignal,
     simulation_index = 0
     time = np.arange(0e-3, 1e-1, 5e-7, dtype = np.float64)
     for time_step_fine_instance in time_step_fine:
-        source_properties = manager.SourceProperties(signal_template, state_properties)
+        source_properties = manager.SourceProperties(signal_template, state_properties, bias_amplitude = 700e3)
 
         for frequency_instance in frequency:
             def evaluate_dressing(time, dressing):
@@ -961,3 +962,296 @@ def plot_benchmark_comparison(archive:Archive, archive_times, legend, title):
             archive_group_benchmark_results["legend"] = np.asarray(legend, dtype='|S32')
             archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
         plt.draw()
+
+def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
+    """
+    Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
+
+    Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `time_step_fine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
+
+    .. math::
+        \\begin{align*}
+            e_{\\mathrm{d}t} &= \\frac{1}{\\#t\\#f}\\sum_{t,f,m} |(\\psi_{f,\\mathrm{d}t})_{m,t} - (\\psi_{f,\\mathrm{d}t_0})_{m,t}|,
+        \\end{align*}
+
+    where :math:`\\#t` is the number of coarse time samples, :math:`\\#f` is the length of `frequency`.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies where to save results and plots.
+    signal_template : :class:`test_signal.TestSignal`
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
+        The dressing frequencies being simulated in the benchmark.
+    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
+        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
+
+    Returns
+    -------
+    benchmark_results : :class:`BenchmarkResults`
+        Contains the errors found by the benchmark.
+    """
+    time_step_fine = np.asarray(time_step_fine)
+    state_output = []
+
+    signal = []
+    execution_time_output = []
+    for time_step_fine_index in time_step_fine:
+        time_properties = test_signal.TimeProperties(signal_template.time_properties.time_step_coarse, time_step_fine_index, signal_template.time_properties.time_step_source)
+        signal_instance = test_signal.TestSignal(signal_template.neural_pulses, signal_template.sinusoidal_noises, time_properties, False)
+        signal += [signal_instance]
+
+    simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3)
+    simulation_manager.evaluate(False)
+
+    archive_group = archive.archive_file.require_group("benchmark_results/benchmark_external")
+    archive_group.attrs["name"] = "spinsim"
+    for state_index, state in enumerate(state_output):
+        if (state_index % 2) == 1:
+            archive_group[f"state{int(np.floor(state_index/2)):d}"] = state
+            archive_group[f"state{int(np.floor(state_index/2)):d}"].attrs["time_step_fine"] = time_step_fine[int(np.floor(state_index/2))]
+            archive_group[f"state{int(np.floor(state_index/2)):d}"].attrs["execution_time"] = execution_time_output[int(np.floor(state_index/2))]
+
+def new_benchmark_external_scipy(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
+    """
+    Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
+
+    Specifically, let :math:`(\\psi_{f,\\mathrm{d}t})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a fine time step of :math:`\\mathrm{d}t`. Let :math:`\\mathrm{d}t_0` be the first such time step in `time_step_fine` (generally the smallest one). Then the error :math:`e_{\\mathrm{d}t}` calculated by this benchmark is
+
+    .. math::
+        \\begin{align*}
+            e_{\\mathrm{d}t} &= \\frac{1}{\\#t\\#f}\\sum_{t,f,m} |(\\psi_{f,\\mathrm{d}t})_{m,t} - (\\psi_{f,\\mathrm{d}t_0})_{m,t}|,
+        \\end{align*}
+
+    where :math:`\\#t` is the number of coarse time samples, :math:`\\#f` is the length of `frequency`.
+
+    Parameters
+    ----------
+    archive : :class:`archive.Archive`
+        Specifies where to save results and plots.
+    signal_template : :class:`test_signal.TestSignal`
+        A description of the signal to use for the environment during the simulation. For each entry in `time_step_fine`, this template is modified so that its :attr:`test_signal.TestSignal.time_properties.time_step_fine` is equal to that entry. All modified versions of the signal are then simulated for comparison.
+    frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
+        The dressing frequencies being simulated in the benchmark.
+    time_step_fine : :class:`numpy.ndarray` of :class:`numpy.float64`
+        An array of time steps to run the simulations with. The accuracy of the simulation output with each of these values are then compared.
+
+    Returns
+    -------
+    benchmark_results : :class:`BenchmarkResults`
+        Contains the errors found by the benchmark.
+    """
+    Jx = (1/math.sqrt(2))*np.asarray(
+        [
+            [0, 1, 0],
+            [1, 0, 1],
+            [0, 1, 0]
+        ],
+        dtype = np.complex128
+    )
+    Jy = (1/math.sqrt(2))*np.asarray(
+        [
+            [ 0, -1j,   0],
+            [1j,   0, -1j],
+            [ 0,  1j,   0]
+        ],
+        dtype = np.complex128
+    )
+    Jz = np.asarray(
+        [
+            [1, 0,  0],
+            [0, 0,  0],
+            [0, 0, -1]
+        ],
+        dtype = np.complex128
+    )
+    Q = (1/3)*np.asarray(
+        [
+            [1,  0, 0],
+            [0, -2, 0],
+            [0,  0, 1]
+        ],
+        dtype = np.complex128
+    )
+
+
+    time_step_fine = np.asarray(time_step_fine)
+    state_output = []
+    error = []
+
+    signal = []
+    # source_properties = []
+
+    execution_time_output = []
+
+    print("Idx\tCmp\tTm\tdTm")
+    execution_time_end_points = np.empty(2)
+    execution_time_end_points[0] = tm.time()
+    execution_time_end_points[1] = execution_time_end_points[0]
+    simulation_index = 0
+    time = np.arange(0e-3, 1e-1, 5e-7, dtype = np.float64)
+    for time_step_fine_instance in time_step_fine:
+        source_properties = manager.SourceProperties(signal_template, state_properties, bias_amplitude = 700e3)
+
+        for frequency_instance in frequency:
+            def evaluate_dressing(time, dressing):
+                source_properties.evaluate_dressing(time, frequency_instance, dressing)
+
+            # def evaluate_dressing(time, dressing):
+            #     dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
+            #     dressing[1] = 0
+            #     dressing[2] = 700e3
+                
+            def derivative(time, state):
+                dressing = np.empty(4, np.float64)
+                evaluate_dressing(time, dressing)
+                matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz + dressing[3]*Q)
+                return np.matmul(matrix, state)
+
+            results = scipy.integrate.solve_ivp(derivative, [0e-3, 1e-1], state_properties.state_init, t_eval = time, max_step = time_step_fine_instance)
+            state_output += [np.transpose(results.y)]
+            
+            print(f"{simulation_index:4d}\t{100*(simulation_index + 1)/(len(frequency)*len(time_step_fine)):3.0f}%\t{tm.time() - execution_time_end_points[0]:3.0f}s\t{tm.time() - execution_time_end_points[0]:2.3f}s")
+
+            execution_time_output += [tm.time() - execution_time_end_points[1]]
+
+            simulation_index += 1
+            execution_time_end_points[1] = tm.time()
+
+    archive_group = archive.archive_file.require_group("benchmark_results/benchmark_external")
+    archive_group.attrs["name"] = "SciPy"
+    for state_index, state in enumerate(state_output):
+        archive_group[f"state{state_index:d}"] = state
+        archive_group[f"state{state_index:d}"].attrs["time_step_fine"] = time_step_fine[state_index]
+        archive_group[f"state{state_index:d}"].attrs["execution_time"] = execution_time_output[state_index]
+
+def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_name:str = "Mathematica"):
+
+    # === Load external states ===
+    states = []
+    time_step_fines = []
+    execution_times = []
+    names = []
+
+    for archive_time in archive_times:
+        archive_previous = Archive(archive.archive_path[:-25], "")
+        archive_previous.open_archive_file(archive_time)
+        
+        archive_previous_group = archive_previous.archive_file.require_group("benchmark_results/benchmark_external")
+
+        name = archive_previous_group.attrs["name"]
+        names += [name]
+
+        external_states = []
+        external_time_step_fines = []
+        external_execution_times = []
+        
+        simulation_index = 0
+        while f"state{simulation_index}" in archive_previous_group:
+            state = np.asarray(archive_previous_group[f"state{simulation_index}"], np.cdouble)
+            external_states += [state]
+            time_step_fine = archive_previous_group[f"state{simulation_index}"].attrs["time_step_fine"]
+            external_time_step_fines += [time_step_fine]
+            execution_time = archive_previous_group[f"state{simulation_index}"].attrs["execution_time"]
+            external_execution_times += [execution_time]
+            simulation_index += 1
+
+        states += [external_states]
+        time_step_fines += [np.asarray(external_time_step_fines, np.double)]
+        execution_times += [np.asarray(external_execution_times, np.double)]
+
+        archive_previous.close_archive_file(False)
+
+    # === Find reference state ===
+    reference_index = 0
+    for name_index, name in enumerate(names):
+        if name == reference_name:
+            reference_index = name_index
+            break
+    state_reference = states[reference_index][0]
+
+    # === Calculate errors ===
+    errors = []
+    for external_states in states:
+        external_errors = []
+        for state in external_states:
+            state_difference = state - state_reference
+            error = np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
+            external_errors += [error]
+        errors += [np.asarray(external_errors, np.double)/external_states[0].size]
+
+    # === Save to file ===
+    archive_group_external_evaluation = archive.archive_file.require_group("benchmark_results/benchmark_external_evaluation")
+    archive_group_external_evaluation.attrs["reference"] = archive_times[reference_index]
+    archive_group_external_evaluation.attrs["reference_name"] = reference_name
+    for name, external_time_step_fines, external_execution_times, external_errors, archive_time in zip(names, time_step_fines, execution_times, errors, archive_times):
+        archive_group_name = archive_group_external_evaluation.require_group(name)
+        archive_group_name["time_step_fine"] = external_time_step_fines
+        archive_group_name["execution_time"] = external_execution_times
+        archive_group_name["errors"] = external_errors
+        archive_group_name.attrs["archive"] = archive_time
+
+    # === Plot legends ===
+    legend_legend = {
+        "spinsim" : "ss",
+        "AtomicPy" : "ap",
+        "Mathematica" : "mm",
+        "SciPy" : "sp"
+    }
+
+    colour_legend = {
+        "spinsim" : "k",
+        "AtomicPy" : "g",
+        "Mathematica" : "r",
+        "SciPy" : "b"
+    }
+
+    # === Plot time step vs error ===
+    error_max = 0.1
+    legend = []
+    plt.figure()
+    for name, external_time_step_fines, external_errors in zip(names, time_step_fines, errors):
+        plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}x-")
+        legend += [legend_legend[name]]
+    plt.xlabel("Fine time step (s)")
+    plt.ylabel("Error")
+    plt.grid()
+    plt.legend(legend)
+    if archive:
+        archive.write_plot("Effect of fine time step on error", "benchmark_external_step_error")
+    plt.draw()
+
+    # === Plot time step vs execution time ===
+    legend = []
+    plt.figure()
+    for name, external_time_step_fines, external_execution_times, external_errors in zip(names, time_step_fines, execution_times, errors):
+        plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}x-")
+        legend += [legend_legend[name]]
+        if name != "spinsim":
+            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/8, f"{colour_legend[name]}+--")
+            legend += [f"{legend_legend[name]} (h)"]
+    plt.xlabel("Fine time step (s)")
+    plt.ylabel("Execution time (s)")
+    plt.grid()
+    plt.legend(legend)
+    if archive:
+        archive.write_plot("Effect of fine time step on execution time", "benchmark_external_step_execution")
+    plt.draw()
+
+    # === Execution time vs error ===
+    legend = []
+    plt.figure()
+    for name, external_execution_times, external_errors in zip(names, execution_times, errors):
+        plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}x-")
+        legend += [legend_legend[name]]
+        if name != "spinsim":
+            plt.loglog(external_execution_times[external_errors < error_max]/8, external_errors[external_errors < error_max], f"{colour_legend[name]}+--")
+            legend += [f"{legend_legend[name]} (h)"]
+    plt.xlabel("Execution time (s)")
+    plt.ylabel("Error")
+    plt.grid()
+    plt.legend(legend)
+    if archive:
+        archive.write_plot("Effect of execution time on error", "benchmark_external_execution_error")
+    plt.draw()
