@@ -39,23 +39,23 @@ if __name__ == "__main__":
     if profile_state != arch.ProfileState.ARCHIVE:
         archive.new_archive_file()
 
-        # === Scaled protocol ===
-        scaled_frequency = 5000
-        scaled_density = 1/100
-        scaled_samples = 10
-        scaled_amplitude = 800
-        # scaled_sweep = [scaled_frequency/5, 14000]
-        scaled_sweep = [2000, 7000]
-        scaled_time_step = 1/(scaled_frequency*scaled_samples)
-        # scaled_sweep = [0, scaled_samples*scaled_density/2]
+        # # === Scaled protocol ===
+        # scaled_frequency = 5000
+        # scaled_density = 1/100
+        # scaled_samples = 10
+        # scaled_amplitude = 800
+        # # scaled_sweep = [scaled_frequency/5, 14000]
+        # scaled_sweep = [2000, 7000]
+        # scaled_time_step = 1/(scaled_frequency*scaled_samples)
+        # # scaled_sweep = [0, scaled_samples*scaled_density/2]
 
-        scaled_time_end = 1/(scaled_frequency*scaled_density)
-        scaled_pulse_time = 0.2333333*scaled_time_end
-        scaled_frequency_step = scaled_density*scaled_frequency/2
-        # scaled_frequency_step = scaled_density*scaled_frequency*2
+        # scaled_time_end = 1/(scaled_frequency*scaled_density)
+        # scaled_pulse_time = 0.2333333*scaled_time_end
+        # scaled_frequency_step = scaled_density*scaled_frequency/2
+        # # scaled_frequency_step = scaled_density*scaled_frequency*2
 
-        print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
-        print(f"{scaled_frequency:10.4e} {1/scaled_frequency:10.4e} {scaled_pulse_time:10.4e} {scaled_density:10.4e} {scaled_samples:10.4e} {scaled_sweep[0]:10.4e} {scaled_sweep[1]:10.4e} {scaled_frequency_step:10.4e} {scaled_time_end:10.4e}")
+        # print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
+        # print(f"{scaled_frequency:10.4e} {1/scaled_frequency:10.4e} {scaled_pulse_time:10.4e} {scaled_density:10.4e} {scaled_samples:10.4e} {scaled_sweep[0]:10.4e} {scaled_sweep[1]:10.4e} {scaled_frequency_step:10.4e} {scaled_time_end:10.4e}")
 
         # === Make signal ===
         # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
@@ -178,10 +178,10 @@ if __name__ == "__main__":
         time_step_fines = [1.00200401e-09, 1.26903553e-09, 1.61290323e-09, 2.04918033e-09, 2.60416667e-09, 3.31125828e-09, 4.20168067e-09, 5.31914894e-09, 6.75675676e-09, 8.62068966e-09, 1.08695652e-08, 1.38888889e-08, 1.78571429e-08, 2.27272727e-08, 2.94117647e-08, 3.57142857e-08, 4.54545455e-08, 6.25000000e-08, 8.33333333e-08, 1.00000000e-07, 1.25000000e-07, 1.66666667e-07, 2.50000000e-07]
         # frequency = np.asarray([1000], dtype = np.float64)
 
-        # === SciPy Benchmark ===
-        # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 20))
-        frequency = np.asarray([1000], dtype = np.float64)
-        sim.benchmark.new_benchmark_external_scipy(archive, signal, frequency, time_step_fines, state_properties)
+        # # === SciPy Benchmark ===
+        # # time_step_fine = time_properties.time_step_coarse/np.floor(np.logspace(np.log10(200), np.log10(1), 20))
+        # frequency = np.asarray([1000], dtype = np.float64)
+        # sim.benchmark.new_benchmark_external_scipy(archive, signal, frequency, time_step_fines, state_properties)
 
         # # === Mathematica Benchmark ===
         # time_step_fines = [1.e-9, 1.26896e-9, 1.61026e-9, 2.04336e-9, 2.59294e-9, 3.29034e-9, 4.17532e-9, 5.29832e-9, 6.72336e-9, 8.53168e-9, 1.08264e-8, 1.37382e-8, 1.74333e-8, 2.21222e-8, 2.80722e-8, 3.56225e-8, 4.52035e-8, 5.73615e-8, 7.27895e-8, 9.23671e-8, 1.1721e-7, 1.48735e-7, 1.88739e-7, 2.39503e-7, 3.0392e-7, 3.85662e-7, 4.8939e-7, 6.21017e-7, 7.88046e-7, 1.e-6]
@@ -196,7 +196,8 @@ if __name__ == "__main__":
         # # sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
 
         # === Comparison ===
-        # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
+        sim.benchmark.new_benchmark_external_evaluation(archive, ["20210505T181706", "20210507T140423", "20210504T175150", "20210507T124849"], reference_name = "SciPy")
+        # # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
         # === Clean up ===
         archive.close_archive_file()

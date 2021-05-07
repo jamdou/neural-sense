@@ -1011,7 +1011,7 @@ def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.
         if (state_index % 2) == 1:
             archive_group[f"state{int(np.floor(state_index/2)):d}"] = state
             archive_group[f"state{int(np.floor(state_index/2)):d}"].attrs["time_step_fine"] = time_step_fine[int(np.floor(state_index/2))]
-            archive_group[f"state{int(np.floor(state_index/2)):d}"].attrs["execution_time"] = execution_time_output[int(np.floor(state_index/2))]
+            archive_group[f"state{int(np.floor(state_index/2)):d}"].attrs["execution_time"] = execution_time_output[state_index]
 
 def new_benchmark_external_scipy(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
     """
@@ -1149,6 +1149,11 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
         
         simulation_index = 0
         while f"state{simulation_index}" in archive_previous_group:
+            if name == "Mathematica":
+                h5py.get_config().complex_names = ("Re", "Im")
+            else:
+                h5py.get_config().complex_names = ("r", "i")
+            
             state = np.asarray(archive_previous_group[f"state{simulation_index}"], np.cdouble)
             external_states += [state]
             time_step_fine = archive_previous_group[f"state{simulation_index}"].attrs["time_step_fine"]
@@ -1169,6 +1174,7 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
         if name == reference_name:
             reference_index = name_index
             break
+    # print(states[reference_index])
     state_reference = states[reference_index][0]
 
     # === Calculate errors ===
@@ -1176,10 +1182,10 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     for external_states in states:
         external_errors = []
         for state in external_states:
-            state_difference = state - state_reference
-            error = np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
+            state_difference = state[0:200000] - state_reference[0:200000]
+            error = np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))/(3*200000)
             external_errors += [error]
-        errors += [np.asarray(external_errors, np.double)/external_states[0].size]
+        errors += [np.asarray(external_errors, np.double)]
 
     # === Save to file ===
     archive_group_external_evaluation = archive.archive_file.require_group("benchmark_results/benchmark_external_evaluation")
@@ -1212,7 +1218,7 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     legend = []
     plt.figure()
     for name, external_time_step_fines, external_errors in zip(names, time_step_fines, errors):
-        plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}x-")
+        plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
         legend += [legend_legend[name]]
     plt.xlabel("Fine time step (s)")
     plt.ylabel("Error")
@@ -1226,11 +1232,13 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     legend = []
     plt.figure()
     for name, external_time_step_fines, external_execution_times, external_errors in zip(names, time_step_fines, execution_times, errors):
-        plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}x-")
+        plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}.-")
         legend += [legend_legend[name]]
         if name != "spinsim":
-            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/8, f"{colour_legend[name]}+--")
-            legend += [f"{legend_legend[name]} (h)"]
+            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/4, f"{colour_legend[name]}+")
+            legend += [f"{legend_legend[name]} (/4)"]
+            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/8, f"{colour_legend[name]}x")
+            legend += [f"{legend_legend[name]} (/8)"]
     plt.xlabel("Fine time step (s)")
     plt.ylabel("Execution time (s)")
     plt.grid()
@@ -1243,11 +1251,13 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     legend = []
     plt.figure()
     for name, external_execution_times, external_errors in zip(names, execution_times, errors):
-        plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}x-")
+        plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
         legend += [legend_legend[name]]
         if name != "spinsim":
-            plt.loglog(external_execution_times[external_errors < error_max]/8, external_errors[external_errors < error_max], f"{colour_legend[name]}+--")
-            legend += [f"{legend_legend[name]} (h)"]
+            plt.loglog(external_execution_times[external_errors < error_max]/4, external_errors[external_errors < error_max], f"{colour_legend[name]}+")
+            legend += [f"{legend_legend[name]} (/4)"]
+            plt.loglog(external_execution_times[external_errors < error_max]/8, external_errors[external_errors < error_max], f"{colour_legend[name]}x")
+            legend += [f"{legend_legend[name]} (/8)"]
     plt.xlabel("Execution time (s)")
     plt.ylabel("Error")
     plt.grid()
