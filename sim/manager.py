@@ -16,6 +16,7 @@ from test_signal import *
 import enum
 import util
 from archive import Archive
+import h5py
 
 # from .benchmark.results import *
 
@@ -406,7 +407,7 @@ class SourceProperties:
         self.source_time_end_points = np.concatenate((self.source_time_end_points, source_time_end_points))
         self.source_type = np.concatenate((self.source_type, source_type))
 
-    def add_neural_pulse(self, neural_pulse):
+    def add_neural_pulse(self, neural_pulse:NeuralPulse):
         """
         Adds a neural pulse signal to the list of sources from a :class:`test_signal.NeuralPulse` object.
 
@@ -439,7 +440,7 @@ class SourceProperties:
         self.source_type = np.concatenate((self.source_type, source_type))
         self.source_index_max += 1
 
-    def add_sinusoidal_noise(self, sinusoidal_noise):
+    def add_sinusoidal_noise(self, sinusoidal_noise:SinusoidalNoise):
         """
         Adds sinusoidal noise from a :class:`test_signal.SinusoidalNoise` object to the list of sources.
 
@@ -531,7 +532,7 @@ class SimulationResults:
         self.sensed_frequency_amplitude = 0.0
         self.sensed_frequency_amplitude_method = "none"
 
-    def write_to_file(self, archive:Archive, do_write_everything = False):
+    def write_to_file(self, archive:h5py.Group, do_write_everything = False):
         """
         Saves results to the hdf5 file.
 
@@ -577,7 +578,7 @@ class SimulationManager:
     measurement_method : :obj:`MeasurementMethod`
         Method used to retrieve frequency amplitudes.
     """
-    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3):
+    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
         """
         Parameters
         ----------
@@ -625,6 +626,9 @@ class SimulationManager:
         self.measurement_method = measurement_method
         self.spin_output = spin_output
 
+        self.integration_method = integration_method
+        self.use_rotating_frame = use_rotating_frame
+
     def evaluate(self, do_plot:bool = False, do_write_everything:bool = False):
         """
         Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequency_amplitude`. The simulation `simulation_index` will be run with the frequency given by `frequency_index` mod :attr:`frequency.size`, the signal given by floor(`signal_index` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signal_index` / `frequency.size` / `trotter_cutoff.size`).
@@ -644,7 +648,7 @@ class SimulationManager:
         for device_index, device_instance in enumerate(self.device):
             for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
                 for signal_index, (signal_instance, signal_reconstruction_instance) in enumerate(zip(self.signal, self.signal_reconstruction)):
-                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance, bias_amplitude = self.bias_amplitude)
+                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance, bias_amplitude = self.bias_amplitude, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
                     for frequency_index in range(self.frequency.size):
                         simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
                         frequency_value = self.frequency[frequency_index]
@@ -709,7 +713,7 @@ class Simulation:
     trotter_cutoff : :obj:`int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, trotter_cutoff = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None, bias_amplitude = 840e3):
+    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, trotter_cutoff = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
         """
         Parameters
         ----------
@@ -737,8 +741,12 @@ class Simulation:
         self.trotter_cutoff = trotter_cutoff
         self.device = device
 
+        self.integration_method = integration_method
+        self.use_rotating_frame = use_rotating_frame
+
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
-        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
+        # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
+        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
 
     def evaluate(self, rabi_frequency):
         """
@@ -765,7 +773,7 @@ class Simulation:
         if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
             self.simulation_results.sensed_frequency_amplitude *= 2
 
-    def get_frequency_amplitude_from_demodulation(self, demodulation_time_end_points = [0.09, 0.1], do_plot_spin = False, archive:Archive = None):
+    def get_frequency_amplitude_from_demodulation(self, demodulation_time_end_points = [0.09, 0.1], do_plot_spin:bool = False, archive:Archive = None):
         """
         Uses demodulation of the Faraday signal to find the measured Fourier coefficient.
 
@@ -885,7 +893,7 @@ def get_frequency_amplitude_from_demodulation_low_pass(time_end_points, spin, se
     return sensed_frequency_amplitude
 
 @cuda.jit(debug = cuda_debug)
-def get_frequency_amplitude_from_demodulation(time, spin, spin_demodulated, bias_amplitude):
+def get_frequency_amplitude_from_demodulation(time:np.ndarray, spin:np.ndarray, spin_demodulated:np.ndarray, bias_amplitude:float):
     """
     Demodulate a spin timeseries with a basic block low pass filter.
 

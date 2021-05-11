@@ -212,9 +212,9 @@ class BenchmarkResults:
         """
         if do_show_plot:
             plt.figure()
-            plt.plot(self.parameter[1:], self.error[1:], "rx--")
+            plt.plot(self.parameter[1:], self.error[1:], "k.-")
         else:
-            plt.plot(self.parameter[1:], self.error[1:], "x--")
+            plt.plot(self.parameter[1:], self.error[1:], ".-")
         plt.grid()
         plt.yscale("log")
         plt.xscale(self.benchmark_type.x_scale)
@@ -442,7 +442,7 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
     benchmark_results : :class:`BenchmarkResults`
         Contains the errors found by the benchmark.
     """
-    print("\033[33m_starting benchmark...\033[0m")
+    print("\033[33mStarting benchmark...\033[0m")
 
     threads_per_block = 64
     utilities = spinsim.Utilities(spinsim.SpinQuantumNumber.ONE, spinsim.Device.CUDA, threads_per_block)
@@ -466,14 +466,14 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
 
         time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
         if time_index < result.shape[0]:
-            source_sample[0] = norm_bound*math.cos(1.0*time_index)/4
-            source_sample[1] = norm_bound*math.cos(2.0*time_index)/4
-            source_sample[2] = norm_bound*math.cos(4.0*time_index)/4
-            source_sample[3] = norm_bound*math.cos(8.0*time_index)/4
+            source_sample[0] = norm_bound*math.cos(1.1*time_index)/4
+            source_sample[1] = norm_bound*math.sin(1.9*time_index)/4
+            source_sample[2] = norm_bound*math.cos(4.1*time_index)/4
+            source_sample[3] = norm_bound*math.sin(8.9*time_index)/4
 
             matrix_exponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
 
-    time_index_max = 1000000
+    time_index_max = 10000000
     result = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     result_bench = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     trotter_cutoff = np.asarray(trotter_cutoff)
@@ -487,7 +487,7 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
         result_difference = (result - result_bench)
         error[trotter_cutoff_index] = np.sqrt(np.sum(np.real(result_difference*np.conj(result_difference))))/time_index_max
 
-    print("\033[32m_done!\033[0m")
+    print("\033[32mDone!\033[0m")
 
     benchmark_results = BenchmarkResults(BenchmarkType.TROTTER_CUTOFF_MATRIX, trotter_cutoff, error)
     benchmark_results.write_to_archive(archive)
@@ -963,7 +963,7 @@ def plot_benchmark_comparison(archive:Archive, archive_times, legend, title):
             archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
         plt.draw()
 
-def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties):
+def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties, integration_method:spinsim.IntegrationMethod = None, use_rotating_frame:bool = None, trotter_cutoff = None):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
@@ -1001,12 +1001,21 @@ def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.
         time_properties = test_signal.TimeProperties(signal_template.time_properties.time_step_coarse, time_step_fine_index, signal_template.time_properties.time_step_source)
         signal_instance = test_signal.TestSignal(signal_template.neural_pulses, signal_template.sinusoidal_noises, time_properties, False)
         signal += [signal_instance]
-
-    simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3)
+    if integration_method:
+        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, integration_method = integration_method, use_rotating_frame = use_rotating_frame)
+    elif trotter_cutoff:
+        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, trotter_cutoff = [trotter_cutoff])
+    else:
+        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, trotter_cutoff = [32])
     simulation_manager.evaluate(False)
 
     archive_group = archive.archive_file.require_group("benchmark_results/benchmark_external")
-    archive_group.attrs["name"] = "spinsim"
+    if integration_method:
+        archive_group.attrs["name"] = f"IM = {integration_method.name}, RF = {use_rotating_frame}"
+    elif trotter_cutoff:
+        archive_group.attrs["name"] = f"TC = {trotter_cutoff}"
+    else:
+        archive_group.attrs["name"] = "spinsim"
     for state_index, state in enumerate(state_output):
         if (state_index % 2) == 1:
             archive_group[f"state{int(np.floor(state_index/2)):d}"] = state
@@ -1042,38 +1051,61 @@ def new_benchmark_external_scipy(archive:Archive, signal_template:test_signal.Te
     benchmark_results : :class:`BenchmarkResults`
         Contains the errors found by the benchmark.
     """
-    Jx = (1/math.sqrt(2))*np.asarray(
-        [
-            [0, 1, 0],
-            [1, 0, 1],
-            [0, 1, 0]
-        ],
-        dtype = np.complex128
-    )
-    Jy = (1/math.sqrt(2))*np.asarray(
-        [
-            [ 0, -1j,   0],
-            [1j,   0, -1j],
-            [ 0,  1j,   0]
-        ],
-        dtype = np.complex128
-    )
-    Jz = np.asarray(
-        [
-            [1, 0,  0],
-            [0, 0,  0],
-            [0, 0, -1]
-        ],
-        dtype = np.complex128
-    )
-    Q = (1/3)*np.asarray(
-        [
-            [1,  0, 0],
-            [0, -2, 0],
-            [0,  0, 1]
-        ],
-        dtype = np.complex128
-    )
+    if state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.ONE:
+        Jx = (1/math.sqrt(2))*np.asarray(
+            [
+                [0, 1, 0],
+                [1, 0, 1],
+                [0, 1, 0]
+            ],
+            dtype = np.complex128
+        )
+        Jy = (1/math.sqrt(2))*np.asarray(
+            [
+                [ 0, -1j,   0],
+                [1j,   0, -1j],
+                [ 0,  1j,   0]
+            ],
+            dtype = np.complex128
+        )
+        Jz = np.asarray(
+            [
+                [1, 0,  0],
+                [0, 0,  0],
+                [0, 0, -1]
+            ],
+            dtype = np.complex128
+        )
+        Q = (1/3)*np.asarray(
+            [
+                [1,  0, 0],
+                [0, -2, 0],
+                [0,  0, 1]
+            ],
+            dtype = np.complex128
+        )
+    else:
+        Jx = (1/2)*np.asarray(
+            [
+                [0, 1],
+                [1, 0]
+            ],
+            dtype = np.complex128
+        )
+        Jy = (1/2)*np.asarray(
+            [
+                [ 0, -1j],
+                [1j,   0]
+            ],
+            dtype = np.complex128
+        )
+        Jz = (1/2)*np.asarray(
+            [
+                [1,  0],
+                [0, -1]
+            ],
+            dtype = np.complex128
+        )
 
 
     time_step_fine = np.asarray(time_step_fine)
@@ -1102,12 +1134,19 @@ def new_benchmark_external_scipy(archive:Archive, signal_template:test_signal.Te
             #     dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
             #     dressing[1] = 0
             #     dressing[2] = 700e3
-                
-            def derivative(time, state):
-                dressing = np.empty(4, np.float64)
-                evaluate_dressing(time, dressing)
-                matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz + dressing[3]*Q)
-                return np.matmul(matrix, state)
+            
+            if state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.ONE:
+                def derivative(time, state):
+                    dressing = np.empty(4, np.float64)
+                    evaluate_dressing(time, dressing)
+                    matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz + dressing[3]*Q)
+                    return np.matmul(matrix, state)
+            else:
+                def derivative(time, state):
+                    dressing = np.empty(4, np.float64)
+                    evaluate_dressing(time, dressing)
+                    matrix = -1j*math.tau*(dressing[0]*Jx + dressing[1]*Jy + dressing[2]*Jz)
+                    return np.matmul(matrix, state)
 
             results = scipy.integrate.solve_ivp(derivative, [0e-3, 1e-1], state_properties.state_init, t_eval = time, max_step = time_step_fine_instance)
             state_output += [np.transpose(results.y)]
@@ -1126,7 +1165,7 @@ def new_benchmark_external_scipy(archive:Archive, signal_template:test_signal.Te
         archive_group[f"state{state_index:d}"].attrs["time_step_fine"] = time_step_fine[state_index]
         archive_group[f"state{state_index:d}"].attrs["execution_time"] = execution_time_output[state_index]
 
-def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_name:str = "Mathematica"):
+def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_name:str = "SciPy", is_external:bool = True, is_trotter = False, title:str = None):
 
     # === Load external states ===
     states = []
@@ -1183,7 +1222,8 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
         external_errors = []
         for state in external_states:
             state_difference = state[0:200000] - state_reference[0:200000]
-            error = np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))/(3*200000)
+            # error = np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))/(3*200000)
+            error = np.sqrt(np.sum(np.real(np.conj(state_difference)*state_difference)))/(200000)
             external_errors += [error]
         errors += [np.asarray(external_errors, np.double)]
 
@@ -1203,65 +1243,150 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
         "spinsim" : "ss",
         "AtomicPy" : "ap",
         "Mathematica" : "mm",
-        "SciPy" : "sp"
+        "SciPy" : "sp",
+
+        "IM = MAGNUS_CF4, RF = True" : "CF4 (RF)",
+        "IM = MAGNUS_CF4, RF = False" : "CF4 (LF)",
+        "IM = MIDPOINT_SAMPLE, RF = True" : "MP (RF)",
+        "IM = MIDPOINT_SAMPLE, RF = False" : "MP (LF)",
+        "IM = HALF_STEP, RF = True" : "HS (RF)",
+        "IM = HALF_STEP, RF = False" : "HS (LF)",
+
+        "TC = 4" : "4",
+        "TC = 8" : "8",
+        "TC = 12" : "12",
+        "TC = 16" : "16",
+        "TC = 20" : "20",
+        "TC = 24" : "24",
+        "TC = 28" : "28",
+        "TC = 32" : "32",
+        "TC = 36" : "36",
+        "TC = 40" : "40",
+        "TC = 44" : "44",
+        "TC = 48" : "48",
+        "TC = 52" : "52",
+        "TC = 56" : "56",
+        "TC = 60" : "60",
+        "TC = 64" : "64"
     }
 
     colour_legend = {
         "spinsim" : "k",
         "AtomicPy" : "g",
         "Mathematica" : "r",
-        "SciPy" : "b"
+        "SciPy" : "b",
+
+        "IM = MAGNUS_CF4, RF = True" : "k.",
+        "IM = MAGNUS_CF4, RF = False" : "ko",
+        "IM = MIDPOINT_SAMPLE, RF = True" : "r.",
+        "IM = MIDPOINT_SAMPLE, RF = False" : "ro",
+        "IM = HALF_STEP, RF = True" : "b.",
+        "IM = HALF_STEP, RF = False" : "bo",
+
+        "TC = 4" : ".-",
+        "TC = 8" : ".-",
+        "TC = 12" : ".-",
+        "TC = 16" : ".-",
+        "TC = 20" : ".-",
+        "TC = 24" : ".-",
+        "TC = 28" : ".-",
+        "TC = 32" : ".-",
+        "TC = 36" : ".-",
+        "TC = 40" : ".-",
+        "TC = 44" : ".-",
+        "TC = 48" : ".-",
+        "TC = 52" : ".-",
+        "TC = 56" : ".-",
+        "TC = 60" : ".-",
+        "TC = 64" : ".-"
     }
 
+    if title:
+        title = f"{title}:\n"
+    else:
+        title = ""
+
     # === Plot time step vs error ===
-    error_max = 0.1
+    error_max = 1e-3
     legend = []
     plt.figure()
     for name, external_time_step_fines, external_errors in zip(names, time_step_fines, errors):
-        plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
-        legend += [legend_legend[name]]
+        if is_external:
+            plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
+            legend += [legend_legend[name]]
+        else:
+            if name != reference_name:
+                plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}-")
+                legend += [legend_legend[name]]
     plt.xlabel("Fine time step (s)")
     plt.ylabel("Error")
     plt.grid()
     plt.legend(legend)
     if archive:
-        archive.write_plot("Effect of fine time step on error", "benchmark_external_step_error")
+        archive.write_plot(f"{title}Effect of fine time step on error", "benchmark_external_step_error")
     plt.draw()
 
     # === Plot time step vs execution time ===
     legend = []
     plt.figure()
     for name, external_time_step_fines, external_execution_times, external_errors in zip(names, time_step_fines, execution_times, errors):
-        plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}.-")
-        legend += [legend_legend[name]]
-        if name != "spinsim":
-            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/4, f"{colour_legend[name]}+")
-            legend += [f"{legend_legend[name]} (/4)"]
-            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/8, f"{colour_legend[name]}x")
-            legend += [f"{legend_legend[name]} (/8)"]
+        if is_external:
+            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}.-")
+            legend += [legend_legend[name]]
+            if name != "spinsim":
+                plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/4, f"{colour_legend[name]}+")
+                legend += [f"{legend_legend[name]} (/4)"]
+                plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/8, f"{colour_legend[name]}x")
+                legend += [f"{legend_legend[name]} (/8)"]
+        else:
+            if name != reference_name:
+                plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}-")
+                legend += [legend_legend[name]]
     plt.xlabel("Fine time step (s)")
     plt.ylabel("Execution time (s)")
     plt.grid()
     plt.legend(legend)
     if archive:
-        archive.write_plot("Effect of fine time step on execution time", "benchmark_external_step_execution")
+        archive.write_plot(f"{title}Effect of fine time step on execution time", "benchmark_external_step_execution")
     plt.draw()
 
     # === Execution time vs error ===
     legend = []
     plt.figure()
     for name, external_execution_times, external_errors in zip(names, execution_times, errors):
-        plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
-        legend += [legend_legend[name]]
-        if name != "spinsim":
-            plt.loglog(external_execution_times[external_errors < error_max]/4, external_errors[external_errors < error_max], f"{colour_legend[name]}+")
-            legend += [f"{legend_legend[name]} (/4)"]
-            plt.loglog(external_execution_times[external_errors < error_max]/8, external_errors[external_errors < error_max], f"{colour_legend[name]}x")
-            legend += [f"{legend_legend[name]} (/8)"]
+        if is_external:
+            plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
+            legend += [legend_legend[name]]
+            if name != "spinsim":
+                plt.loglog(external_execution_times[external_errors < error_max]/4, external_errors[external_errors < error_max], f"{colour_legend[name]}+")
+                legend += [f"{legend_legend[name]} (/4)"]
+                plt.loglog(external_execution_times[external_errors < error_max]/8, external_errors[external_errors < error_max], f"{colour_legend[name]}x")
+                legend += [f"{legend_legend[name]} (/8)"]
+        else:
+            if name != reference_name:
+                plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}-")
+                legend += [legend_legend[name]]
     plt.xlabel("Execution time (s)")
     plt.ylabel("Error")
     plt.grid()
     plt.legend(legend)
     if archive:
-        archive.write_plot("Effect of execution time on error", "benchmark_external_execution_error")
+        archive.write_plot(f"{title}Effect of execution time on error", "benchmark_external_execution_error")
     plt.draw()
+
+def new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_properties):
+    for integration_method in [spinsim.IntegrationMethod.MAGNUS_CF4, spinsim.IntegrationMethod.HALF_STEP, spinsim.IntegrationMethod.MIDPOINT_SAMPLE]:
+        for use_rotating_frame in [True, False]:
+            profile_state, archive_path = handle_arguments()
+            archive = Archive(archive_path, "spinsim internal", profile_state)
+            archive.new_archive_file()
+            new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties, integration_method = integration_method, use_rotating_frame = use_rotating_frame)
+            archive.close_archive_file()
+
+def new_benchmark_internal_trotter_spinsim(signal, frequency, time_step_fines, state_properties):
+    for trotter_cutoff in range(4, 68, 4):
+        profile_state, archive_path = handle_arguments()
+        archive = Archive(archive_path, "spinsim internal trotter", profile_state)
+        archive.new_archive_file()
+        new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties, trotter_cutoff = trotter_cutoff)
+        archive.close_archive_file()
