@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
         # # === Scaled protocol ===
         # scaled_frequency = 5000
-        # scaled_density = 1/100
+        # scaled_density = 1/25
         # scaled_samples = 10
         # scaled_amplitude = 800
         # # scaled_sweep = [scaled_frequency/5, 14000]
@@ -61,17 +61,17 @@ if __name__ == "__main__":
         # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
         # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
 
-        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
-        time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1]) # ---- Benchmark
+        time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1]) # ---- Benchmark
 
-        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
-        # time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
+        # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02]) # ---- Scaled
+        # time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])# ---- Scaled
 
         signal = test_signal.TestSignal(
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-            [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            [test_signal.NeuralPulse(0.02333333, 70.0, 1000)], # ---- Benchmark
+            # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)], # ---- Scaled
             [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 200)],
@@ -80,8 +80,8 @@ if __name__ == "__main__":
         signal_reconstruction = test_signal.TestSignal(
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-            [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            [test_signal.NeuralPulse(0.02333333, 70.0, 1000)], # ---- Benchmark
+            # [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)], # ---- Scaled
             [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties_reconstruction
@@ -92,19 +92,19 @@ if __name__ == "__main__":
         state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
         # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
-        # cuda.profile_start()
-        # # === Run simulations ===
-        # # frequency = np.arange(70, 3071, 30)
-        # # frequency = np.arange(250, 2251, 3)
-        # # frequency = np.arange(250, 2000, 10.0)
-        # # frequency = np.arange(250, 2251, 50)
-        # # frequency = np.arange(250, 2251, 460e3/1e5)
-        # # frequency = np.arange(990, 1010, 0.02)
+        cuda.profile_start()
+        # === Run simulations ===
+        # frequency = np.arange(70, 3071, 30)
+        # frequency = np.arange(250, 2251, 3)
+        # frequency = np.arange(250, 2000, 10.0)
+        # frequency = np.arange(250, 2251, 50)
+        # frequency = np.arange(250, 2251, 460e3/1e5)
+        # frequency = np.arange(990, 1010, 0.02)
         # frequency = np.arange(253, 3251, 30)
-        # # frequency = np.arange(1000, 1003, 1)
-        # # frequency = np.arange(1000, 1001, 1)
-        # # frequency = np.arange(0, 1000000, 1)
-        # # frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step)
+        # frequency = np.arange(1000, 1003, 1)
+        # frequency = np.arange(1000, 1001, 1)
+        # frequency = np.arange(0, 1000000, 1)
+        # frequency = np.arange(scaled_sweep[0], min(max(scaled_sweep[1], 0), scaled_samples*scaled_frequency/2), scaled_frequency_step) # ---- Scaled
 
         # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
         # simulation_manager.evaluate(False, False)
@@ -122,6 +122,7 @@ if __name__ == "__main__":
         # reconstruction.evaluate_ista()
         # # reconstruction.evaluate_fista()
         # # reconstruction.evaluateISTAComplete()
+        # reconstruction.evaluate_frequency_amplitude(signal_reconstruction)
         # reconstruction.plot(archive, signal_reconstruction)
         # reconstruction.write_to_file(archive.archive_file)
 
@@ -165,7 +166,7 @@ if __name__ == "__main__":
         # sim.benchmark.plot_benchmark_comparison(archive, ["20201119T181459", "20201119T181809", "20201119T182040", "20201119T182334", "20201119T182612", "20201119T182817"], ["CF4 RF", "CF4 LF", "HS RF", "HS LF", "MP RF", "MP LF"], "Effect of integration method on fine timestep benchmark\n(spin half, analytic)")
 
         # # === Trotter test ===
-        # sim.benchmark.new_benchmark_trotter_cutoff_matrix(archive, np.arange(80, 0, -2), 1e1)
+        # sim.benchmark.new_benchmark_trotter_cutoff_matrix(archive, np.arange(50, 0, -2), 1e1)
         # # frequency = np.arange(50, 3051, 300)
         # # frequency = np.arange(50, 3051, 30)
         # # newBenchmark_trotter_cutoff(archive, signal, frequency, np.arange(60, 0, -4))
@@ -192,25 +193,28 @@ if __name__ == "__main__":
 
         # # === Spinsim Benchmark ===
         # frequency = np.asarray([1000, 1000], dtype = np.float64)
-        # sim.benchmark.new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties)
-        # # sim.benchmark.new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_properties)
+        # # sim.benchmark.new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties)
+        # sim.benchmark.new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_properties)
         # # sim.benchmark.new_benchmark_internal_trotter_spinsim(signal, frequency, time_step_fines, state_properties)
         # # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fines, state_properties)
         # # sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
 
         # === Comparison ===
-        # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210511T172348", "20210507T140423", "20210504T175150", "20210507T124849"], reference_name = "SciPy", title = "Comparison to alternative software")
+        # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210514T154307", "20210507T140423", "20210504T175150", "20210507T124849"], reference_name = "SciPy", title = "Comparison to alternative software")
+        # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210513T164432", "20210507T140423", "20210504T175150", "20210507T124849"], reference_name = "SciPy", title = "Comparison to alternative software")
         # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210511T172348", "20210507T140423", "20210504T175150"], reference_name = "SciPy", title = "Comparison to alternative software")
-        # # ---- Trotter test ----:
+        # ---- Trotter test ----:
         # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210510T152208", "20210510T152349", "20210510T152537", "20210510T152730", "20210510T152930", "20210510T153133", "20210510T153342", "20210510T153554", "20210510T153811", "20210510T154034", "20210510T154302", "20210510T154531", "20210510T154807", "20210510T155046", "20210510T155330", "20210510T155620", "20210504T175150"], reference_name = "SciPy", is_external = False)
-        # # ---- Spin one ----:
+        # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210517T085605", "20210517T085748", "20210517T085937", "20210517T090134", "20210517T090335", "20210517T090540", "20210517T090750", "20210517T091004", "20210517T091225", "20210517T091448", "20210504T175150"], reference_name = "SciPy", is_external = False)
+        # ---- Spin one ----:
         # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210507T165913", "20210507T170105", "20210507T170256", "20210507T170456", "20210507T170646", "20210507T170822", "20210504T175150"], reference_name = "SciPy", is_external = False, title = "Spin one spinsim options")
+        sim.benchmark.new_benchmark_external_evaluation(archive, ["20210517T101352", "20210517T101603", "20210517T101806", "20210517T102019", "20210517T102224", "20210517T102407", "20210504T175150"], reference_name = "SciPy", is_external = False, title = "Spin one spinsim options")
         # # ---- Spin half (analytic) ----
         # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210511T164640", "20210511T164722", "20210511T164757", "20210511T164838", "20210511T164912", "20210511T164949", "20210511T115900"], reference_name = "SciPy", is_external = False, title = "Spin half spinsim options (analytic exponentiator)")
-        # ---- Spin half (trotter) ----
-        sim.benchmark.new_benchmark_external_evaluation(archive, ["20210511T111713", "20210511T111817", "20210511T111912", "20210511T112017", "20210511T112112", "20210511T112206"], reference_name = "SciPy", is_external = False, title = "Spin half spinsim options (Lie Trotter exponentiator)")
-        # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210507T165913", "20210507T170105", "20210507T170256", "20210507T170456", "20210507T170646", "20210507T170822", "20210504T175150"], reference_name = "SciPy", is_external = False)
-        # # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
+        # # ---- Spin half (trotter) ----
+        # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210511T111713", "20210511T111817", "20210511T111912", "20210511T112017", "20210511T112112", "20210511T112206", "20210511T115900"], reference_name = "SciPy", is_external = False, title = "Spin half spinsim options (Lie Trotter exponentiator)")
+        # # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210507T165913", "20210507T170105", "20210507T170256", "20210507T170456", "20210507T170646", "20210507T170822", "20210504T175150"], reference_name = "SciPy", is_external = False)
+        # # # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
         # === Clean up ===
         archive.close_archive_file()

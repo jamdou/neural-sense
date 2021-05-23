@@ -473,7 +473,7 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
 
             matrix_exponential_lie_trotter(source_sample, result[time_index, :], trotter_cutoff)
 
-    time_index_max = 10000000
+    time_index_max = 1000000
     result = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     result_bench = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     trotter_cutoff = np.asarray(trotter_cutoff)
@@ -1271,17 +1271,17 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     }
 
     colour_legend = {
-        "spinsim" : "k",
-        "AtomicPy" : "g",
-        "Mathematica" : "r",
-        "SciPy" : "b",
+        "spinsim" : "ko",
+        "AtomicPy" : "c>",
+        "Mathematica" : "ms",
+        "SciPy" : "gP",
 
-        "IM = MAGNUS_CF4, RF = True" : "k.",
-        "IM = MAGNUS_CF4, RF = False" : "ko",
-        "IM = MIDPOINT_SAMPLE, RF = True" : "r.",
-        "IM = MIDPOINT_SAMPLE, RF = False" : "ro",
-        "IM = HALF_STEP, RF = True" : "b.",
-        "IM = HALF_STEP, RF = False" : "bo",
+        "IM = MAGNUS_CF4, RF = True" : "ko",
+        "IM = MAGNUS_CF4, RF = False" : "k.",
+        "IM = MIDPOINT_SAMPLE, RF = True" : "rD",
+        "IM = MIDPOINT_SAMPLE, RF = False" : "r.",
+        "IM = HALF_STEP, RF = True" : "b^",
+        "IM = HALF_STEP, RF = False" : "bv",
 
         "TC = 4" : ".-",
         "TC = 8" : ".-",
@@ -1308,22 +1308,31 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
 
     # === Plot time step vs error ===
     error_max = 1e-3
+    error_min = 5e-12
+    # np.logical_and(error_min < external_errors, external_errors < error_max) = np.logical_and(error_min < external_errors, external_errors < error_max)
     legend = []
     plt.figure()
     for name, external_time_step_fines, external_errors in zip(names, time_step_fines, errors):
         if is_external:
-            plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
+            plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
         else:
             if name != reference_name:
-                plt.loglog(external_time_step_fines[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}-")
+                plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
                 legend += [legend_legend[name]]
-    plt.xlabel("Fine time step (s)")
+    plt.xlabel("Integration time step (s)")
     plt.ylabel("Error")
+    ax = plt.gca()
+    ax.invert_xaxis()
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+    ax.spines["left"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    # plt.tick_params(axis='y', which='right', labelleft='off', labelright='on')
     plt.grid()
     plt.legend(legend)
     if archive:
-        archive.write_plot(f"{title}Effect of fine time step on error", "benchmark_external_step_error")
+        archive.write_plot(f"{title}Effect of integration time step on error", "benchmark_external_step_error")
     plt.draw()
 
     # === Plot time step vs execution time ===
@@ -1331,23 +1340,23 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     plt.figure()
     for name, external_time_step_fines, external_execution_times, external_errors in zip(names, time_step_fines, execution_times, errors):
         if is_external:
-            plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}.-")
+            plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
             if name != "spinsim":
-                plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/4, f"{colour_legend[name]}+")
+                plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/4, f"{colour_legend[name]}--", alpha = 0.25)
                 legend += [f"{legend_legend[name]} (/4)"]
-                plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max]/8, f"{colour_legend[name]}x")
+                plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/8, f"{colour_legend[name]}:", alpha = 0.25)
                 legend += [f"{legend_legend[name]} (/8)"]
         else:
             if name != reference_name:
-                plt.loglog(external_time_step_fines[external_errors < error_max], external_execution_times[external_errors < error_max], f"{colour_legend[name]}-")
+                plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
                 legend += [legend_legend[name]]
-    plt.xlabel("Fine time step (s)")
+    plt.xlabel("Integration time step (s)")
     plt.ylabel("Execution time (s)")
     plt.grid()
     plt.legend(legend)
     if archive:
-        archive.write_plot(f"{title}Effect of fine time step on execution time", "benchmark_external_step_execution")
+        archive.write_plot(f"{title}Effect of integration time step on execution time", "benchmark_external_step_execution")
     plt.draw()
 
     # === Execution time vs error ===
@@ -1355,16 +1364,16 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     plt.figure()
     for name, external_execution_times, external_errors in zip(names, execution_times, errors):
         if is_external:
-            plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}.-")
+            plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
             if name != "spinsim":
-                plt.loglog(external_execution_times[external_errors < error_max]/4, external_errors[external_errors < error_max], f"{colour_legend[name]}+")
+                plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/4, external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}--", alpha = 0.25)
                 legend += [f"{legend_legend[name]} (/4)"]
-                plt.loglog(external_execution_times[external_errors < error_max]/8, external_errors[external_errors < error_max], f"{colour_legend[name]}x")
+                plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/8, external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}:", alpha = 0.25)
                 legend += [f"{legend_legend[name]} (/8)"]
         else:
             if name != reference_name:
-                plt.loglog(external_execution_times[external_errors < error_max], external_errors[external_errors < error_max], f"{colour_legend[name]}-")
+                plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
                 legend += [legend_legend[name]]
     plt.xlabel("Execution time (s)")
     plt.ylabel("Error")
@@ -1384,7 +1393,7 @@ def new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_pro
             archive.close_archive_file()
 
 def new_benchmark_internal_trotter_spinsim(signal, frequency, time_step_fines, state_properties):
-    for trotter_cutoff in range(4, 68, 4):
+    for trotter_cutoff in range(4, 44, 4):
         profile_state, archive_path = handle_arguments()
         archive = Archive(archive_path, "spinsim internal trotter", profile_state)
         archive.new_archive_file()

@@ -1,5 +1,5 @@
 import h5py
-from archive import Archive
+from archive import *
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -19,6 +19,10 @@ class Reconstruction():
         self.frequency_amplitude = None
         self.amplitude = None
 
+        self.frequency_full = None
+        self.frequency_amplitude_full = None
+        self.frequency_amplitude_difference = None
+
         self.step_size_sparse = step_size_sparse
         self.step_size_manifold = step_size_manifold
 
@@ -30,7 +34,7 @@ class Reconstruction():
         self.frequency = np.ascontiguousarray(frequency[permutation])
         self.frequency_amplitude = np.ascontiguousarray(frequency_amplitude[permutation])
 
-    def read_frequencies_from_experiment_results(self, experiment_results, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 100000):
+    def read_frequencies_from_experiment_results(self, experiment_results:ExperimentResults, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 100000):
         """
         Import frequency values from an experimental results object
         """
@@ -41,6 +45,23 @@ class Reconstruction():
         Import frequency values from the dot product Fourier transform of a signal
         """
         self.read_frequencies_directly(test_signal.frequency, test_signal.frequency_amplitude, number_of_samples)
+    
+    def evaluate_frequency_amplitude(self, test_signal:TestSignal = None):
+        self.frequency_full = np.empty_like(self.time_properties.time_coarse, dtype = np.double)
+        self.frequency_amplitude_full = np.empty_like(self.time_properties.time_coarse, dtype = np.double)
+        self.frequency_amplitude_difference = np.empty_like(self.time_properties.time_coarse, dtype = np.double)
+
+        # GPU control variables
+        threads_per_block = 128
+        blocks_per_grid = (self.time_properties.time_index_max + (threads_per_block - 1)) // threads_per_block
+        # Run GPU code
+        get_frequency_amplitude[blocks_per_grid, threads_per_block](self.time_properties.time_end_points, self.time_properties.time_coarse, self.time_properties.time_step_coarse, self.amplitude, self.frequency_full, self.frequency_amplitude_full)
+        if test_signal:
+            amplitude_difference = self.amplitude.copy()
+            neural_pulse = test_signal.neural_pulses[0]
+            # amplitude_difference[self.time_properties.time_coarse > neural_pulse.time_start - 0.5/neural_pulse.frequency and self.time_properties.time_coarse < neural_pulse.time_start + 1.5/neural_pulse.frequency] = 0
+            amplitude_difference[0:int(amplitude_difference.size/2)] = 0
+            get_frequency_amplitude[blocks_per_grid, threads_per_block](self.time_properties.time_end_points, self.time_properties.time_coarse, self.time_properties.time_step_coarse, amplitude_difference, self.frequency_full, self.frequency_amplitude_difference)
 
     def write_to_file(self, archive:h5py.Group):
         """
@@ -57,10 +78,10 @@ class Reconstruction():
         Plot the reconstruction signal, possibly against a template test signal
         """
         plt.figure()
-        if test_signal is not None:
+        if test_signal:
             plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude, "-k")
         plt.plot(self.time_properties.time_coarse, self.amplitude, "-r")
-        if test_signal is not None:
+        if test_signal:
             plt.legend(["Original", "Reconstruction"])
             plt.xlim(test_signal.time_properties.time_end_points)
         plt.xlabel("Time (s)")
@@ -70,21 +91,52 @@ class Reconstruction():
             archive.write_plot("Reconstruction", "reconstruction")
         plt.draw()
 
-        if test_signal.neural_pulses:
-            plt.figure()
-            if test_signal is not None:
+        if test_signal:
+            if test_signal.neural_pulses:
+                plt.figure()
                 plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude, "-k")
-            plt.plot(self.time_properties.time_coarse, self.amplitude, "-xr")
-            if test_signal is not None:
+                plt.plot(self.time_properties.time_coarse, self.amplitude, "-xr")
                 plt.legend(["Original", "Reconstruction"])
-            plt.xlabel("Time (s)")
+                plt.xlabel("Time (s)")
+                plt.ylabel("Amplitude (Hz)")
+                plt.grid()
+                neural_pulse = test_signal.neural_pulses[0]
+                plt.xlim([neural_pulse.time_start - 0.5/neural_pulse.frequency, neural_pulse.time_start + 1.5/neural_pulse.frequency])
+                if archive:
+                    archive.write_plot("Reconstruction", "reconstruction_zoom")
+                plt.draw()
+
+        if self.frequency_amplitude_full is not None:
+            plt.figure()
+            if test_signal:
+                plt.plot(test_signal.frequency, test_signal.frequency_amplitude, "-k")
+            plt.plot(self.frequency, self.frequency_amplitude, ".g")
+            plt.plot(self.frequency_full, self.frequency_amplitude_full, "--r")
+
+            if test_signal:
+                plt.legend(["Fourier Transform", "Measured", "Reconstructed"])
+            plt.xlabel("Frequency (Hz)")
             plt.ylabel("Amplitude (Hz)")
+            plt.xlim([0, np.max(self.frequency_full)])
+            # plt.ylim([-0.08, 0.08])
             plt.grid()
-            neural_pulse = test_signal.neural_pulses[0]
-            plt.xlim([neural_pulse.time_start - 0.5/neural_pulse.frequency, neural_pulse.time_start + 1.5/neural_pulse.frequency])
             if archive:
-                archive.write_plot("Reconstruction", "reconstruction_zoom")
+                archive.write_plot("Reconstructed frequency amplitude", "reconstructed_frequency_amplitude")
             plt.draw()
+            
+        if self.frequency_amplitude_difference is not None:
+            plt.figure()
+            plt.plot(self.frequency_full, self.frequency_amplitude_difference, "--r")
+
+            plt.xlabel("Frequency (Hz)")
+            plt.ylabel("Amplitude (Hz)")
+            plt.xlim([0, np.max(self.frequency_full)])
+            # plt.ylim([-0.08, 0.08])
+            plt.grid()
+            if archive:
+                archive.write_plot("Reconstructed frequency amplitude (difference)", "reconstructed_frequency_amplitude_difference")
+            plt.draw()
+
 
     def evaluate_ista(self):
         print("\033[33mStarting reconstruction (ISTA)...\033[0m")
