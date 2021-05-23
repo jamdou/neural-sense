@@ -286,25 +286,77 @@ def new_benchmark_device_aggregate(archive:Archive, archive_times):
     device_label = device_label.tolist()
     execution_frequency = 1/execution_time
 
+    core_count = {
+        "Core i7-6700" : 4,
+        "Core i7-8750H" : 6,
+        "Ryzen 9 5900X" : 12,
+        "Ryzen 7 5800X" : 8,
+        "Quadro K620" : 384,
+        "GeForce GTX 1070" : 2048,
+        "GeForce RTX 3070" : 5888,
+        "GeForce RTX 3080" : 8704
+    }
+
     colour = []
+    hatch = []
+    device_label_reformat = []
     for device_label_index in range(len(device_label)):
         device_label[device_label_index] = device_label[device_label_index].decode('UTF-8')
         device_label_instance = device_label[device_label_index]
         if "intel" in device_label_instance.lower():
+            device_label_reformat_instance = f"Core {device_label_instance[18:26].strip()}"
+            if "multi" in device_label_instance.lower():
+                device_label[device_label_index] = f"{device_label_reformat_instance}\n({core_count[device_label_reformat_instance]} core CPU)"
+                hatch += [""]
+            else:
+                device_label[device_label_index] = f"{device_label_reformat_instance}\n(CPU, single thread)"
+                hatch += ["//"]
             colour += ["b"]
         elif "cuda" in device_label_instance.lower():
+            if "nvidia" in device_label_instance.lower():
+                device_label_reformat_instance = device_label_instance[6:-4].strip()
+            else:
+                device_label_reformat_instance = device_label_instance[:-4].strip()
+            device_label[device_label_index] = f"{device_label_reformat_instance}\n({core_count[device_label_reformat_instance]} core cuda GPU)"
+            hatch += [""]
             colour += ["g"]
         else:
+            device_label_reformat_instance = device_label_instance[4:18].strip()
+            if "multi" in device_label_instance.lower():
+                device_label[device_label_index] = f"{device_label_reformat_instance}\n({core_count[device_label_reformat_instance]} core CPU)"
+                hatch += [""]
+            else:
+                device_label[device_label_index] = f"{device_label_reformat_instance}\n(CPU, single thread)"
+                hatch += ["//"]
             colour += ["r"]
+        device_label_reformat += [device_label_reformat_instance]
 
     plt.figure(figsize = [6.4, 8.0])
-    plt.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
-    plt.barh(range(len(device_label)), execution_frequency, tick_label = device_label, color = colour)
+    plt.subplots_adjust(left=0.3, right=0.95, top=0.9, bottom=0.1)
     for device_index in range(len(device_label)):
-        if execution_frequency[device_index] > 0.6*execution_frequency[len(device_label) - 1]:
-            plt.text(execution_frequency[device_index], device_index, " {:.1f}ms per sim ".format(execution_time[device_index]*1e3), ha = "right", va = "center", color = "w")
+        print(device_label[device_index])
+        plt.barh(device_label[device_index], execution_frequency[device_index], color = colour[device_index], hatch = hatch[device_index])
+    for device_index in range(len(device_label)):
+        if device_index == len(device_label) - 1:
+            plt.text(execution_frequency[device_index], device_index, f" {execution_time[device_index]*1e3:.1f} ms per simulation ", ha = "right", va = "center", color = "w")
         else:
-            plt.text(execution_frequency[device_index], device_index, " {:.1f}ms per sim ".format(execution_time[device_index]*1e3), ha = "left", va = "center")
+            if execution_frequency[device_index] > 0.8*execution_frequency[len(device_label) - 1]:
+                plt.text(execution_frequency[device_index], device_index, f" {execution_time[device_index]*1e3:.1f} ms ", ha = "right", va = "center", color = "w")
+            else:
+                plt.text(execution_frequency[device_index], device_index, f" {execution_time[device_index]*1e3:.1f} ms ", ha = "left", va = "center")
+    rect = plt.Rectangle((16, 0), 1, 0.5, fill = False)
+    rect.set_hatch("//")
+    plt.text(16, 0.25, "Limitted to single thread ", ha = "right", va = "center")
+    plt.gca().add_patch(rect)
+    rect = plt.Rectangle((16, 1), 1, 0.5, color = "b")
+    plt.text(16, 1.25, "Intel CPU ", ha = "right", va = "center")
+    plt.gca().add_patch(rect)
+    rect = plt.Rectangle((16, 2), 1, 0.5, color = "r")
+    plt.text(16, 2.25, "AMD CPU ", ha = "right", va = "center")
+    plt.gca().add_patch(rect)
+    rect = plt.Rectangle((16, 3), 1, 0.5, color = "g")
+    plt.text(16, 3.25, "Nvidia GPU ", ha = "right", va = "center")
+    plt.gca().add_patch(rect)
 
     plt.xlabel("Execution speed (simulations per second)")
     if archive:
