@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.lines as lns
 import time as tm
 from numba.core import errors
 import numpy as np
@@ -857,7 +858,7 @@ def new_benchmark_scipy(archive:Archive, signal_template:test_signal.TestSignal,
             #     dressing[0] = 2*frequency_instance*math.cos(math.tau*700e3*time)
             #     dressing[1] = 0
             #     dressing[2] = 700e3
-                
+
             def derivative(time, state):
                 dressing = np.empty(4, np.float64)
                 evaluate_dressing(time, dressing)
@@ -1291,11 +1292,42 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
         archive_group_name.attrs["archive"] = archive_time
 
     # === Plot legends ===
+    # legend_legend = {
+    #     "spinsim" : "ss",
+    #     "AtomicPy" : "ap",
+    #     "Mathematica" : "mm",
+    #     "SciPy" : "sp",
+
+    #     "IM = MAGNUS_CF4, RF = True" : "CF4 (RF)",
+    #     "IM = MAGNUS_CF4, RF = False" : "CF4 (LF)",
+    #     "IM = MIDPOINT_SAMPLE, RF = True" : "MP (RF)",
+    #     "IM = MIDPOINT_SAMPLE, RF = False" : "MP (LF)",
+    #     "IM = HALF_STEP, RF = True" : "HS (RF)",
+    #     "IM = HALF_STEP, RF = False" : "HS (LF)",
+
+    #     "TC = 4" : "4",
+    #     "TC = 8" : "8",
+    #     "TC = 12" : "12",
+    #     "TC = 16" : "16",
+    #     "TC = 20" : "20",
+    #     "TC = 24" : "24",
+    #     "TC = 28" : "28",
+    #     "TC = 32" : "32",
+    #     "TC = 36" : "36",
+    #     "TC = 40" : "40",
+    #     "TC = 44" : "44",
+    #     "TC = 48" : "48",
+    #     "TC = 52" : "52",
+    #     "TC = 56" : "56",
+    #     "TC = 60" : "60",
+    #     "TC = 64" : "64"
+    # }
+
     legend_legend = {
-        "spinsim" : "ss",
-        "AtomicPy" : "ap",
-        "Mathematica" : "mm",
-        "SciPy" : "sp",
+        "spinsim" : "spinsim",
+        "AtomicPy" : "AtomicPy",
+        "Mathematica" : "Mathematica",
+        "SciPy" : "SciPy",
 
         "IM = MAGNUS_CF4, RF = True" : "CF4 (RF)",
         "IM = MAGNUS_CF4, RF = False" : "CF4 (LF)",
@@ -1353,86 +1385,137 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
         "TC = 64" : ".-"
     }
 
+    def draw_spin(spin_dimension = 3):
+        if spin_dimension == 3:
+            plt.text(
+                0.03, 1.03,
+                "Spin one",
+                ha = "left", va = "bottom", transform = plt.gca().transAxes,
+                bbox = {
+                    "boxstyle" : "round",
+                    "facecolor" : "c",
+                    "alpha" : 0.5
+                }
+            )
+        else:
+            plt.text(
+                0.03, 1.03,
+                "Spin half",
+                ha = "left", va = "bottom", transform = plt.gca().transAxes,
+                bbox = {
+                    "boxstyle" : "round",
+                    "facecolor" : "y",
+                    "alpha" : 0.5
+                }
+            )
+
     if title:
         title = f"{title}:\n"
     else:
         title = ""
+    spin_dimension = state_reference.shape[1]
+    # print(spin_dimension)
 
     # === Plot time step vs error ===
     error_max = 1e-3
     error_min = 5e-12
     # np.logical_and(error_min < external_errors, external_errors < error_max) = np.logical_and(error_min < external_errors, external_errors < error_max)
     legend = []
+    legend_lines = []
     plt.figure()
     for name, external_time_step_fines, external_errors in zip(names, time_step_fines, errors):
         if is_external:
             plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
+            legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
         else:
             if name != reference_name:
                 plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
                 legend += [legend_legend[name]]
+                legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
+    draw_spin(spin_dimension)
     plt.xlabel("Integration time step (s)")
     plt.ylabel("Error")
-    ax = plt.gca()
-    ax.invert_xaxis()
-    ax.yaxis.tick_right()
-    ax.yaxis.set_label_position("right")
-    ax.spines["left"].set_visible(False)
-    ax.spines["top"].set_visible(False)
+    plt.gca().invert_xaxis()
+    plt.gca().yaxis.tick_right()
+    plt.gca().yaxis.set_label_position("right")
+    plt.gca().spines["left"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
     # plt.tick_params(axis='y', which='right', labelleft='off', labelright='on')
     plt.grid()
-    plt.legend(legend)
+    plt.legend(legend_lines, legend, loc = "upper left", ncol = 1)
     if archive:
-        archive.write_plot(f"{title}Effect of integration time step on error", "benchmark_external_step_error")
+        archive.write_plot(f"{title}Error vs integration time step", "benchmark_external_step_error")
     plt.draw()
 
     # === Plot time step vs execution time ===
     legend = []
+    legend_lines = []
     plt.figure()
     for name, external_time_step_fines, external_execution_times, external_errors in zip(names, time_step_fines, execution_times, errors):
         if is_external:
             plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
+            legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
             if name != "spinsim":
                 plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/4, f"{colour_legend[name]}--", alpha = 0.25)
-                legend += [f"{legend_legend[name]} (/4)"]
+                # legend += [f"{legend_legend[name]} (/4)"]
                 plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/8, f"{colour_legend[name]}:", alpha = 0.25)
-                legend += [f"{legend_legend[name]} (/8)"]
+                # legend += [f"{legend_legend[name]} (/8)"]
         else:
             if name != reference_name:
                 plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
                 legend += [legend_legend[name]]
+                legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
+    legend += ["Ideal 4 threads", "Ideal 8 threads"]
+    legend_lines += [
+        lns.Line2D([0], [0], 1, "--", "grey"),
+        lns.Line2D([0], [0], 1, ":", "grey")
+    ]
+    draw_spin(spin_dimension)
     plt.xlabel("Integration time step (s)")
     plt.ylabel("Execution time (s)")
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
     plt.grid()
-    plt.legend(legend)
+    plt.legend(legend_lines, legend, loc = "upper left", ncol = 1)
     if archive:
-        archive.write_plot(f"{title}Effect of integration time step on execution time", "benchmark_external_step_execution")
+        archive.write_plot(f"{title}Execution time vs integration time step", "benchmark_external_step_execution")
     plt.draw()
 
     # === Execution time vs error ===
     legend = []
+    legend_lines = []
     plt.figure()
     for name, external_execution_times, external_errors in zip(names, execution_times, errors):
         if is_external:
             plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
+            legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
             if name != "spinsim":
                 plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/4, external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}--", alpha = 0.25)
-                legend += [f"{legend_legend[name]} (/4)"]
+                # legend += [f"{legend_legend[name]} (/4)"]
                 plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/8, external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}:", alpha = 0.25)
-                legend += [f"{legend_legend[name]} (/8)"]
+                # legend += [f"{legend_legend[name]} (/8)"]
         else:
             if name != reference_name:
                 plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
                 legend += [legend_legend[name]]
+                legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
+    legend += ["Ideal 4 threads", "Ideal 8 threads"]
+    legend_lines += [
+        lns.Line2D([0], [0], 1, "--", "grey"),
+        lns.Line2D([0], [0], 1, ":", "grey")
+    ]
+    draw_spin(spin_dimension)
     plt.xlabel("Execution time (s)")
     plt.ylabel("Error")
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
     plt.grid()
-    plt.legend(legend)
+    plt.legend(legend_lines, legend, loc = "upper left", ncol = 1)
     if archive:
-        archive.write_plot(f"{title}Effect of execution time on error", "benchmark_external_execution_error")
+        archive.write_plot(f"{title}Error vs execution time", "benchmark_external_execution_error")
     plt.draw()
 
 def new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_properties):
