@@ -747,6 +747,7 @@ class Simulation:
         # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
         # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
         self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
+        # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, spinsim.Device.CPU, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
 
     def evaluate(self, rabi_frequency):
         """
@@ -757,7 +758,7 @@ class Simulation:
         rabi_frequency : :obj:`float`
             A value that modifies the field sampling in a simulation. Used to make rabi frequency sweeps.
         """
-        results = self.simulator.evaluate(rabi_frequency, self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init)
+        results = self.simulator.evaluate(self.signal.time_properties.time_end_points[0], self.signal.time_properties.time_end_points[1], self.signal.time_properties.time_step_fine, self.signal.time_properties.time_step_coarse, self.state_properties.state_init, [rabi_frequency])
         self.simulation_results.state = results.state
         self.signal.time_properties.time_coarse = results.time
         self.simulation_results.time_evolution = results.time_evolution
@@ -981,8 +982,8 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                             if time_sample >= source_time_end_points[source_index, 1] - sweep_duration:
                                 # Circular
                                 sweep_attenuation = math.cos((math.pi/2)*(time_sample - (source_time_end_points[source_index, 1] - sweep_duration))/sweep_duration)
-                                amplitude = rabi_frequency*sweep_attenuation
-                                phase = math.tau*rabi_frequency*(2*sweep_duration/math.pi)*(1 - sweep_attenuation)
+                                amplitude = rabi_frequency[0]*sweep_attenuation
+                                phase = math.tau*rabi_frequency[0]*(2*sweep_duration/math.pi)*(1 - sweep_attenuation)
 
                                 # # Hyperbolic
                                 # sweep_attenuation = 1/math.cosh(sweep_speed*(time_sample - (source_time_end_points[source_index, 1] - sweep_duration))/sweep_duration)
@@ -994,10 +995,10 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                                 # amplitude = rabi_frequency*(1 - sweep_attenuation)
                                 # phase = math.tau*(4*sweep_duration*rabi_frequency/2)*(sweep_attenuation**2)
                             else:
-                                amplitude = rabi_frequency
+                                amplitude = rabi_frequency[0]
                                 phase = 0
                             field_sample[spacial_index] += \
-                                2*amplitude*\
+                                math.tau*2*amplitude*\
                                 math.sin(\
                                     math.tau*source_frequency[source_index, spacial_index]*\
                                     (time_sample - source_time_end_points[source_index, 0]) +\
@@ -1007,14 +1008,14 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                     else:
                         if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
                             field_sample[spacial_index] += \
-                                source_amplitude[source_index, spacial_index]*\
+                                math.tau*source_amplitude[source_index, spacial_index]*\
                                 math.sin(\
                                     math.tau*source_frequency[source_index, spacial_index]*\
                                     (time_sample - source_time_end_points[source_index, 0]) +\
                                     source_phase[source_index, spacial_index]\
                                 )
             if field_sample.size > 2:
-                field_sample[3] = source_quadratic_shift
+                field_sample[3] = math.tau*source_quadratic_shift
     elif measurement_method == MeasurementMethod.HARD_PULSE_ROTATING:
         def evaluate_dressing(time_sample, rabi_frequency, field_sample):
             field_sample[0] = 0
@@ -1025,16 +1026,16 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                     if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
                         amplitude = source_amplitude[source_index, spacial_index]
                         if source_index == 0 and (spacial_index == 0 or spacial_index == 1):
-                            amplitude = rabi_frequency
+                            amplitude = rabi_frequency[0]
                         field_sample[spacial_index] += \
-                            amplitude*\
+                            math.tau*amplitude*\
                             math.sin(\
                                 math.tau*source_frequency[source_index, spacial_index]*\
                                 (time_sample - source_time_end_points[source_index, 0]) +\
                                 source_phase[source_index, spacial_index]\
                             )
             if field_sample.size > 2:
-                field_sample[3] = source_quadratic_shift
+                field_sample[3] = math.tau*source_quadratic_shift
     elif measurement_method == MeasurementMethod.HARD_PULSE:
         def evaluate_dressing(time_sample, rabi_frequency, field_sample):
             field_sample[0] = 0
@@ -1046,11 +1047,11 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                         amplitude = source_amplitude[source_index, spacial_index]
                         frequency = source_frequency[source_index, spacial_index]
                         if source_index == 0 and spacial_index == 0:
-                            amplitude = 2*rabi_frequency
-                            # frequency += 3*((rabi_frequency**2)/frequency)/4
-                        field_sample[spacial_index] += amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
+                            amplitude = 2*rabi_frequency[0]
+                            # frequency += 3*((rabi_frequency[0]**2)/frequency)/4
+                        field_sample[spacial_index] += math.tau*amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
             if field_sample.size > 2:
-                field_sample[3] = source_quadratic_shift
+                field_sample[3] = math.tau*source_quadratic_shift
     elif measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
         def evaluate_dressing(time_sample, detuning, field_sample):
             field_sample[0] = 0
@@ -1064,9 +1065,9 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                         if source_index == 0 and spacial_index == 0:
                             amplitude = 20000
                             frequency += detuning
-                        field_sample[spacial_index] += amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
+                        field_sample[spacial_index] += math.tau*amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
             if field_sample.size > 2:
-                field_sample[3] = source_quadratic_shift
+                field_sample[3] = math.tau*source_quadratic_shift
     else:
         def evaluate_dressing(time_sample, rabi_frequency, field_sample):
             field_sample[0] = 0
@@ -1077,16 +1078,16 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                     if (time_sample >= source_time_end_points[source_index, 0]) and (time_sample < source_time_end_points[source_index, 1]):
                         amplitude = source_amplitude[source_index, spacial_index]
                         if source_index == 0 and spacial_index == 0:
-                            amplitude = 2*rabi_frequency
+                            amplitude = 2*rabi_frequency[0]
                         field_sample[spacial_index] += \
-                            amplitude*\
+                            math.tau*amplitude*\
                             math.sin(\
                                 math.tau*source_frequency[source_index, spacial_index]*\
                                 (time_sample - source_time_end_points[source_index, 0]) +\
                                 source_phase[source_index, spacial_index]\
                             )
             if field_sample.size > 2:
-                field_sample[3] = source_quadratic_shift
+                field_sample[3] = math.tau*source_quadratic_shift
     return evaluate_dressing
 
 def correct_bloch_siegert_shift_frequency(frequency_resonant, frequency_bias):
