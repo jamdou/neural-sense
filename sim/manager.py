@@ -559,7 +559,7 @@ class SimulationManager:
     ----------
     signal : :obj:`list` of :class:`test_signal.TestSignal`
         A list of a signal objects containing information describing the magnetic environment of the simulation, as well as timing information for the simulation. :func:`evaluate()` will run simulations for all of these values.
-    trotter_cutoff : :obj:`list` of :obj:`int`
+    number_of_squares : :obj:`list` of :obj:`int`
         A list of the number of squares to be used in the matrix exponentiation algorithm :func:`simulation_utilities.matrix_exponential_lie_trotter()` during the simulation. :func:`evaluate()` will run simulations for all of these values.
     frequency : :class:`numpy.ndarray` of :class:`numpy.float64`, (frequency_index)
         A list of dressing rabi frequencies for the spin system. In units of Hz. :func:`evaluate()` will run simulations for all of these values.
@@ -578,7 +578,7 @@ class SimulationManager:
     measurement_method : :obj:`MeasurementMethod`
         Method used to retrieve frequency amplitudes.
     """
-    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, trotter_cutoff = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
+    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, number_of_squares = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
         """
         Parameters
         ----------
@@ -594,7 +594,7 @@ class SimulationManager:
             An optional :obj:`list` to directly write the state of the simulation to. Used for benchmarks.
         spin_output : :obj:`list` of (`numpy.ndarray` of  `numpy.complex128`, (time_index, state_index)), optional
             An optional :obj:`list` to directly write the spin of the simulation to. Used for benchmarks.
-        trotter_cutoff : :obj:`list` of :obj:`int`, optional
+        number_of_squares : :obj:`list` of :obj:`int`, optional
             A list of the number of squares to be used in the matrix exponentiation algorithm during the simulation. :func:`evaluate()` will run simulations for all of these values.
         device : :obj:`spinsim.Device`
             The target device (hardware) that the simulation is to be run on.
@@ -616,9 +616,9 @@ class SimulationManager:
         self.device = device
         if not isinstance(self.device, list):
             self.device = [self.device]
-        self.trotter_cutoff = np.asarray(trotter_cutoff)
+        self.number_of_squares = np.asarray(number_of_squares)
         self.frequency = np.asarray(frequency, dtype = np.float64)
-        self.frequency_amplitude = np.empty(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device), dtype = np.float64)
+        self.frequency_amplitude = np.empty(self.frequency.size*len(self.signal)*self.number_of_squares.size*len(self.device), dtype = np.float64)
         self.archive = archive
         self.state_output = state_output
         self.state_properties = state_properties
@@ -631,7 +631,7 @@ class SimulationManager:
 
     def evaluate(self, do_plot:bool = False, do_write_everything:bool = False):
         """
-        Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequency_amplitude`. The simulation `simulation_index` will be run with the frequency given by `frequency_index` mod :attr:`frequency.size`, the signal given by floor(`signal_index` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signal_index` / `frequency.size` / `trotter_cutoff.size`).
+        Evaluates the prepared set of simulations. Fills out the :class:`numpy.ndarray`, :attr:`frequency_amplitude`. The simulation `simulation_index` will be run with the frequency given by `frequency_index` mod :attr:`frequency.size`, the signal given by floor(`signal_index` / `frequency.size`) mod len(`signal`), and the trotter cutoff given by floor(`signal_index` / `frequency.size` / `number_of_squares.size`).
         Parameters
         ----------
         do_plot : :obj:`bool`, optional
@@ -646,11 +646,11 @@ class SimulationManager:
         print("Idx\tCmp\tTm\tdTm")
         archive_group_simulations = self.archive.archive_file.require_group("simulations")
         for device_index, device_instance in enumerate(self.device):
-            for trotter_cutoff_index, trotter_cutoff_instance in enumerate(self.trotter_cutoff):
+            for number_of_squares_index, number_of_squares_instance in enumerate(self.number_of_squares):
                 for signal_index, (signal_instance, signal_reconstruction_instance) in enumerate(zip(self.signal, self.signal_reconstruction)):
-                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, trotter_cutoff_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance, bias_amplitude = self.bias_amplitude, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
+                    simulation = Simulation(signal_instance, self.frequency[0], self.state_properties, number_of_squares_instance, device_instance, measurement_method = self.measurement_method, signal_reconstruction = signal_reconstruction_instance, bias_amplitude = self.bias_amplitude, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
                     for frequency_index in range(self.frequency.size):
-                        simulation_index = frequency_index + (signal_index + (trotter_cutoff_index + device_index*self.trotter_cutoff.size)*len(self.signal))*self.frequency.size
+                        simulation_index = frequency_index + (signal_index + (number_of_squares_index + device_index*self.number_of_squares.size)*len(self.signal))*self.frequency.size
                         frequency_value = self.frequency[frequency_index]
                         simulation.evaluate(frequency_value)
                         if self.measurement_method == MeasurementMethod.FARADAY_DEMODULATION:
@@ -680,7 +680,7 @@ class SimulationManager:
                             self.spin_output += [simulation.simulation_results.spin.copy()]
                         if self.execution_time_output is not None:
                             self.execution_time_output += [tm.time() - execution_time_end_points[1]]
-                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.trotter_cutoff.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]), end = "\r")
+                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.number_of_squares.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]), end = "\r")
                         execution_time_end_points[1] = tm.time()
         print("\n\033[32mDone!\033[0m\a")
 
@@ -692,7 +692,7 @@ sqrt2 = math.sqrt(2)
 sqrt3 = math.sqrt(3)
 exp_precision = 5                                # Where to cut off the exp Taylor series
 machine_epsilon = np.finfo(np.float64).eps*1000  # When to decide that vectors are parallel
-# trotter_cutoff = 52
+# number_of_squares = 52
 
 # interpolate = utilities.interpolate_source_cubic
 
@@ -710,10 +710,10 @@ class Simulation:
         The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
     simulation_results : :class:`SimulationResults`
         A record of the results of the simulation.
-    trotter_cutoff : :obj:`int`
+    number_of_squares : :obj:`int`
         The number of squares made by the spin 1 matrix exponentiator.
     """
-    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, trotter_cutoff = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
+    def __init__(self, signal:TestSignal, dressing_rabi_frequency = 1e3, state_properties:StateProperties = None, number_of_squares = 28, device:spinsim.Device = spinsim.Device.CUDA, measurement_method:MeasurementMethod = MeasurementMethod.FARADAY_DEMODULATION, signal_reconstruction:TestSignal = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
         """
         Parameters
         ----------
@@ -723,7 +723,7 @@ class Simulation:
             The amplitude of the dressing radiation to be applied to the system. Units of Hz.
         state_properties : :class:`StateProperties`, optional
             The :class:`StateProperties` initial conditions for the wavefunction of the quantum system.
-        trotter_cutoff : :obj:`int`, optional
+        number_of_squares : :obj:`int`, optional
             The number of squares made by the spin 1 matrix exponentiator.
         device : :obj:`spinsim.Device`
             The target device that the simulation is to be run on.
@@ -738,16 +738,16 @@ class Simulation:
             self.state_properties = StateProperties()
         self.source_properties = SourceProperties(self.signal, self.state_properties, dressing_rabi_frequency, 0.0, measurement_method = measurement_method, signal_reconstruction = self.signal_reconstruction, bias_amplitude = self.bias_amplitude)
         self.simulation_results = SimulationResults(self.signal, self.state_properties)
-        self.trotter_cutoff = trotter_cutoff
+        self.number_of_squares = number_of_squares
         self.device = device
 
         self.integration_method = integration_method
         self.use_rotating_frame = use_rotating_frame
 
-        # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, trotter_cutoff = trotter_cutoff)
-        # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64)
-        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
-        # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, spinsim.Device.CPU, trotter_cutoff = trotter_cutoff, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
+        # self.get_time_evolution = spinsim.time_evolver_factory(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, number_of_squares = number_of_squares)
+        # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, number_of_squares = number_of_squares, max_registers = 63, threads_per_block = 64)
+        self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, self.device, number_of_squares = number_of_squares, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
+        # self.simulator = spinsim.Simulator(self.source_properties.evaluate_dressing, self.state_properties.spin_quantum_number, spinsim.Device.CPU, number_of_squares = number_of_squares, max_registers = 63, threads_per_block = 64, integration_method = self.integration_method, use_rotating_frame = self.use_rotating_frame)
 
     def evaluate(self, rabi_frequency):
         """

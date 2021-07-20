@@ -68,29 +68,29 @@ class BenchmarkType(Enum):
         "log"
     )
     """
-    The results of :func:`benchmark.manager.new_benchmark_trotter_cutoff()`.
+    The results of :func:`benchmark.manager.new_benchmark_number_of_squares()`.
     """
 
-    TROTTER_CUTOFF = (
-        "trotter_cutoff",
+    number_of_squares = (
+        "number_of_squares",
         "Trotter cutoff",
         "Error",
         "Effect of trotter cutoff on error",
         "linear"
     )
     """
-    The results of :func:`benchmark.manager.new_benchmark_trotter_cutoff()`.
+    The results of :func:`benchmark.manager.new_benchmark_number_of_squares()`.
     """
 
-    TROTTER_CUTOFF_MATRIX = (
-        "trotter_cutoff_matrix",
+    number_of_squares_MATRIX = (
+        "number_of_squares_matrix",
         "Trotter cutoff",
         "Error",
         "Effect of trotter cutoff on error",
         "linear"
     )
     """
-    The results of :func:`benchmark.manager.new_benchmark_trotter_cutoff_matrix()`.
+    The results of :func:`benchmark.manager.new_benchmark_number_of_squares_matrix()`.
     """
 
     TIME_STEP_FINE = (
@@ -471,9 +471,9 @@ def new_benchmark_device(archive:Archive, signal:test_signal.TestSignal, frequen
 
     return
 
-def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bound = 1.0):
+def new_benchmark_number_of_squares_matrix(archive:Archive, number_of_squares, norm_bound = 1.0):
     """
-    Runs a benchmark for the trotter exponentiator :func:`utilities.matrixExponential_lie_trotter()` using arbitrary matrices. Uses :func:`benchmark_trotter_cutoff_matrix()` to execute the matrix exponentials.
+    Runs a benchmark for the trotter exponentiator :func:`utilities.matrixExponential_lie_trotter()` using arbitrary matrices. Uses :func:`benchmark_number_of_squares_matrix()` to execute the matrix exponentials.
 
     Specifically, let
     
@@ -487,7 +487,7 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
     .. math::
         E_{\\tau, k} = \\exp_\\tau(A_k).
     
-    Let :math:`\\tau_0` be the first element in `trotter_cutoff`, ususally the largest. Then the error :math:`e_\\tau` is calculated as
+    Let :math:`\\tau_0` be the first element in `number_of_squares`, ususally the largest. Then the error :math:`e_\\tau` is calculated as
 
     .. math::
         e_\\tau = \\frac{1}{\\#k}\\sum_{k, i, j} |(E_{\\tau, k})_{i,j} - E_{\\tau_0, k})_{i,j}|,
@@ -498,7 +498,7 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
     ----------
     archive : :class:`archive.Archive`
         Specifies where to save results and plots.
-    trotter_cutoff : :class:`numpy.ndarray` of :class:`numpy.int`
+    number_of_squares : :class:`numpy.ndarray` of :class:`numpy.int`
         An array of values of the trotter cutoff to run the matrix exponentiator at.
     norm_bound : `float`, optional
         An upper bound to the size of the norm of the matrices being exponentiated, since :func:`utilities.matrixExponential_lie_trotter()` works better using matrices with smaller norms. See :math:`\\nu` above. Defaults to 1.
@@ -513,12 +513,12 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
     time_index_max = int(1e5)
     result = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     result_bench = np.empty((time_index_max, 3, 3), dtype = np.complex128)
-    trotter_cutoff = np.asarray(trotter_cutoff)
-    error = np.empty_like(trotter_cutoff, dtype = np.float64)
+    number_of_squares = np.asarray(number_of_squares)
+    error = np.empty_like(number_of_squares, dtype = np.float64)
 
     threads_per_block = 64
     blocks_per_grid = (time_index_max + (threads_per_block - 1)) // threads_per_block
-    # benchmark_trotter_cutoff_matrix[blocks_per_grid, threads_per_block](norm_bound, trotter_cutoff[0], result_bench)
+    # benchmark_number_of_squares_matrix[blocks_per_grid, threads_per_block](norm_bound, number_of_squares[0], result_bench)
     Jx = (1/math.sqrt(2))*np.asarray(
         [
             [0, 1, 0],
@@ -558,12 +558,12 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
         print(f"\t{(time_index + 1)*100/time_index_max}%", end = "\t\t\t\r")
     print("\n\tDone")
     print("\tStarting spinsim")
-    for trotter_cutoff_index in range(trotter_cutoff.size):
-        utilities = spinsim.Utilities(spinsim.SpinQuantumNumber.ONE, spinsim.Device.CUDA, threads_per_block, trotter_cutoff[trotter_cutoff_index])
+    for number_of_squares_index in range(number_of_squares.size):
+        utilities = spinsim.Utilities(spinsim.SpinQuantumNumber.ONE, spinsim.Device.CUDA, threads_per_block, number_of_squares[number_of_squares_index])
         matrix_exponential_lie_trotter = utilities.matrix_exponential_lie_trotter
 
         @cuda.jit
-        def benchmark_trotter_cutoff_matrix(norm_bound, result):
+        def benchmark_number_of_squares_matrix(norm_bound, result):
             """
             Runs the exponentiations for the trotter matrix benchmark.
 
@@ -571,10 +571,10 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
             ----------
             norm_bound : `float`, optional
                 An upper bound to the size of the norm of the matrices being exponentiated, since :func:`utilities.matrixExponential_lie_trotter()` works better using matrices with smaller norms. Defaults to 1.
-            trotter_cutoff : :obj:`int`
+            number_of_squares : :obj:`int`
                 The value trotter cutoff to run the matrix exponentiator at.
             result : :class:`numpy.ndarray` of :class:`numpy.complex128`
-                The results of the matrix exponentiations for this value of `trotter_cutoff`.
+                The results of the matrix exponentiations for this value of `number_of_squares`.
             """
             source_sample = cuda.local.array(4,dtype = nb.float64)
 
@@ -587,39 +587,39 @@ def new_benchmark_trotter_cutoff_matrix(archive:Archive, trotter_cutoff, norm_bo
 
                 matrix_exponential_lie_trotter(source_sample, result[time_index, :])
 
-        benchmark_trotter_cutoff_matrix[blocks_per_grid, threads_per_block](norm_bound, result)
+        benchmark_number_of_squares_matrix[blocks_per_grid, threads_per_block](norm_bound, result)
         result_difference = (result - result_bench)
-        error[trotter_cutoff_index] = np.sqrt(np.sum(np.real(result_difference*np.conj(result_difference))))/time_index_max
+        error[number_of_squares_index] = np.sqrt(np.sum(np.real(result_difference*np.conj(result_difference))))/time_index_max
 
-        print(f"\t{(trotter_cutoff_index + 1)*100/trotter_cutoff.size}%", end = "\t\t\t\r")
+        print(f"\t{(number_of_squares_index + 1)*100/number_of_squares.size}%", end = "\t\t\t\r")
     print("\n\tDone")
     # time_index_max = 1000000
     # result = np.empty((time_index_max, 3, 3), dtype = np.complex128)
     # result_bench = np.empty((time_index_max, 3, 3), dtype = np.complex128)
-    # trotter_cutoff = np.asarray(trotter_cutoff)
-    # error = np.empty_like(trotter_cutoff, dtype = np.float64)
+    # number_of_squares = np.asarray(number_of_squares)
+    # error = np.empty_like(number_of_squares, dtype = np.float64)
     
     # blocks_per_grid = (time_index_max + (threads_per_block - 1)) // threads_per_block
-    # benchmark_trotter_cutoff_matrix[blocks_per_grid, threads_per_block](norm_bound, trotter_cutoff[0], result_bench)
+    # benchmark_number_of_squares_matrix[blocks_per_grid, threads_per_block](norm_bound, number_of_squares[0], result_bench)
 
-    # for trotter_cutoff_index in range(trotter_cutoff.size):
-    #     benchmark_trotter_cutoff_matrix[blocks_per_grid, threads_per_block](norm_bound, trotter_cutoff[trotter_cutoff_index], result)
+    # for number_of_squares_index in range(number_of_squares.size):
+    #     benchmark_number_of_squares_matrix[blocks_per_grid, threads_per_block](norm_bound, number_of_squares[number_of_squares_index], result)
     #     result_difference = (result - result_bench)
-    #     error[trotter_cutoff_index] = np.sqrt(np.sum(np.real(result_difference*np.conj(result_difference))))/time_index_max
+    #     error[number_of_squares_index] = np.sqrt(np.sum(np.real(result_difference*np.conj(result_difference))))/time_index_max
 
     print("\033[32mDone!\033[0m")
 
-    benchmark_results = BenchmarkResults(BenchmarkType.TROTTER_CUTOFF_MATRIX, trotter_cutoff, error)
+    benchmark_results = BenchmarkResults(BenchmarkType.number_of_squares_MATRIX, number_of_squares, error)
     benchmark_results.write_to_archive(archive)
     benchmark_results.plot(archive)
 
     return benchmark_results
 
-def new_benchmark_trotter_cutoff(archive:Archive, signal:test_signal.TestSignal, frequency, trotter_cutoff):
+def new_benchmark_number_of_squares(archive:Archive, signal:test_signal.TestSignal, frequency, number_of_squares):
     """
     Runs a benchmark for the trotter exponentiator using the integrator.
 
-    Specifically, let :math:`(\\psi_{f,\\tau})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a trotter cutoff of :math:`\\tau`. Let :math:`\\tau_0` be the first such trotter cutoff in `trotter_cutoff` (generally the largest one). Then the error :math:`e_\\tau` calculated by this benchmark is
+    Specifically, let :math:`(\\psi_{f,\\tau})_{m,t}` be the calculated state of the spin system, with magnetic number (`state_index`) :math:`m` at time :math:`t`, simulated with a dressing of :math:`f` with a trotter cutoff of :math:`\\tau`. Let :math:`\\tau_0` be the first such trotter cutoff in `number_of_squares` (generally the largest one). Then the error :math:`e_\\tau` calculated by this benchmark is
 
     .. math::
         \\begin{align*}
@@ -636,7 +636,7 @@ def new_benchmark_trotter_cutoff(archive:Archive, signal:test_signal.TestSignal,
         The signals being simulated in the benchmark.
     frequency : :class:`numpy.ndarray` of :class:`numpy.float64`
         The dressing frequencies being simulated in the benchmark.
-    trotter_cutoff : :class:`numpy.ndarray` of :class:`numpy.int`
+    number_of_squares : :class:`numpy.ndarray` of :class:`numpy.int`
         An array of values of the trotter cutoff to run the simulations at. The accuracy of the simulation output with each of these values are then compared.
 
     Returns
@@ -646,19 +646,19 @@ def new_benchmark_trotter_cutoff(archive:Archive, signal:test_signal.TestSignal,
     """
     state_output = []
     error = []
-    simulation_manager = manager.SimulationManager(signal, frequency, archive, None, state_output, trotter_cutoff)
+    simulation_manager = manager.SimulationManager(signal, frequency, archive, None, state_output, number_of_squares)
     simulation_manager.evaluate(False)
-    for trotter_cutoff_index in range(trotter_cutoff.size):
+    for number_of_squares_index in range(number_of_squares.size):
         error_temp = 0
         for frequency_index in range(frequency.size):
-            state_difference = state_output[frequency_index + trotter_cutoff_index*frequency.size] - state_output[frequency_index]
+            state_difference = state_output[frequency_index + number_of_squares_index*frequency.size] - state_output[frequency_index]
             error_temp += np.sum(np.sqrt(np.real(np.conj(state_difference)*state_difference)))
         error += [error_temp/(frequency.size*state_output[0].size)]
     
-    trotter_cutoff = np.asarray(trotter_cutoff)
+    number_of_squares = np.asarray(number_of_squares)
     error = np.asarray(error)
 
-    benchmark_results = BenchmarkResults(BenchmarkType.TROTTER_CUTOFF, trotter_cutoff, error)
+    benchmark_results = BenchmarkResults(BenchmarkType.number_of_squares, number_of_squares, error)
     benchmark_results.write_to_archive(archive)
     benchmark_results.plot(archive)
 
@@ -1083,7 +1083,7 @@ def plot_benchmark_comparison(archive:Archive, archive_times, legend, title):
             archive_group_benchmark_results["title"] = np.asarray([title], dtype='|S32')
         plt.draw()
 
-def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties, integration_method:spinsim.IntegrationMethod = None, use_rotating_frame:bool = None, trotter_cutoff = None, device:spinsim.Device = spinsim.Device.CUDA):
+def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.TestSignal, frequency, time_step_fine, state_properties:sim.manager.StateProperties, integration_method:spinsim.IntegrationMethod = None, use_rotating_frame:bool = None, number_of_squares = None, device:spinsim.Device = spinsim.Device.CUDA):
     """
     Runs a benchmark to test error induced by raising the size of the time step in the integrator, comparing the output state.
 
@@ -1123,17 +1123,17 @@ def new_benchmark_external_spinsim(archive:Archive, signal_template:test_signal.
         signal += [signal_instance]
     if integration_method:
         simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, integration_method = integration_method, use_rotating_frame = use_rotating_frame)
-    elif trotter_cutoff:
-        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, trotter_cutoff = [trotter_cutoff])
+    elif number_of_squares:
+        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, number_of_squares = [number_of_squares])
     else:
-        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, trotter_cutoff = [32])
+        simulation_manager = manager.SimulationManager(signal, frequency, archive, state_properties, state_output, execution_time_output = execution_time_output, bias_amplitude = 700e3, number_of_squares = [32])
     simulation_manager.evaluate(False)
 
     archive_group = archive.archive_file.require_group("benchmark_results/benchmark_external")
     if integration_method:
         archive_group.attrs["name"] = f"IM = {integration_method.name}, RF = {use_rotating_frame}"
-    elif trotter_cutoff:
-        archive_group.attrs["name"] = f"TC = {trotter_cutoff}"
+    elif number_of_squares:
+        archive_group.attrs["name"] = f"TC = {number_of_squares}"
     else:
         if device == spinsim.Device.CPU:
             archive_group.attrs["name"] = "spinsim (CPU)"
@@ -1781,18 +1781,27 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     legend_lines = []
     plt.figure()
     for name, external_time_step_fines, external_errors in zip(names, time_step_fines, errors):
+        indices_keep = np.logical_and(error_min < external_errors, external_errors < error_max)
+        have_started = False
+        for index_keep_index in range(indices_keep.size - 1, -1, -1):
+            if have_started:
+                if not indices_keep[index_keep_index + 1]:
+                    indices_keep[index_keep_index] = False
+            else:
+                if indices_keep[index_keep_index]:
+                    have_started = True
         if is_external:
-            plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
+            plt.loglog(external_time_step_fines[indices_keep], external_errors[indices_keep], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
             legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
         else:
             if name != reference_name:
                 if "RF = True" in name:
-                    plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
+                    plt.loglog(external_time_step_fines[indices_keep], external_errors[indices_keep], f"{colour_legend[name]}-")
                     legend += [f"{legend_legend[name]} (Rotating)"]
                     legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
                 else:
-                    plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}--")
+                    plt.loglog(external_time_step_fines[indices_keep], external_errors[indices_keep], f"{colour_legend[name]}--")
                     legend += [f"{legend_legend[name]} (Lab)"]
                     legend_lines += [lns.Line2D([0], [0], 1, "--", colour_legend[name][0], colour_legend[name][1])]
     if is_external:
@@ -1830,23 +1839,32 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     legend_lines = []
     plt.figure()
     for name, external_time_step_fines, external_execution_times, external_errors in zip(names, time_step_fines, execution_times, errors):
+        indices_keep = np.logical_and(error_min < external_errors, external_errors < error_max)
+        have_started = False
+        for index_keep_index in range(indices_keep.size - 1, -1, -1):
+            if have_started:
+                if not indices_keep[index_keep_index + 1]:
+                    indices_keep[index_keep_index] = False
+            else:
+                if indices_keep[index_keep_index]:
+                    have_started = True
         if is_external:
-            plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
+            plt.loglog(external_time_step_fines[indices_keep], external_execution_times[indices_keep], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
             legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
             if "spinsim" not in name and "QuTip" not in name:
                 # plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/4, f"{colour_legend[name]}--", alpha = 0.25)
                 # legend += [f"{legend_legend[name]} (/4)"]
-                plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/8, f"{colour_legend[name]}:", alpha = 0.25)
+                plt.loglog(external_time_step_fines[indices_keep], external_execution_times[indices_keep]/8, f"{colour_legend[name]}:", alpha = 0.25)
                 # legend += [f"{legend_legend[name]} (/8)"]
         else:
             if name != reference_name:
                 if "RF = True" in name:
-                    plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
+                    plt.loglog(external_time_step_fines[indices_keep], external_execution_times[indices_keep], f"{colour_legend[name]}-")
                     legend += [f"{legend_legend[name]} (Rotating)"]
                     legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
                 else:
-                    plt.loglog(external_time_step_fines[np.logical_and(error_min < external_errors, external_errors < error_max)], external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}--")
+                    plt.loglog(external_time_step_fines[indices_keep], external_execution_times[indices_keep], f"{colour_legend[name]}--")
                     legend += [f"{legend_legend[name]} (Lab)"]
                     legend_lines += [lns.Line2D([0], [0], 1, "--", colour_legend[name][0], colour_legend[name][1])]
     if is_external:
@@ -1886,25 +1904,34 @@ def new_benchmark_external_evaluation(archive:Archive, archive_times, reference_
     legend_lines = []
     plt.figure()
     for name, external_execution_times, external_errors in zip(names, execution_times, errors):
+        indices_keep = np.logical_and(error_min < external_errors, external_errors < error_max)
+        have_started = False
+        for index_keep_index in range(indices_keep.size - 1, -1, -1):
+            if have_started:
+                if not indices_keep[index_keep_index + 1]:
+                    indices_keep[index_keep_index] = False
+            else:
+                if indices_keep[index_keep_index]:
+                    have_started = True
         if is_external:
-            plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
+            plt.loglog(external_execution_times[indices_keep], external_errors[indices_keep], f"{colour_legend[name]}-")
             legend += [legend_legend[name]]
             legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
             if "spinsim" not in name and "QuTip" not in name:
                 # plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/4, external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}--", alpha = 0.25)
                 # legend += [f"{legend_legend[name]} (/4)"]
-                plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)]/8, external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}:", alpha = 0.25)
+                plt.loglog(external_execution_times[indices_keep]/8, external_errors[indices_keep], f"{colour_legend[name]}:", alpha = 0.25)
                 legend += ["(Ideal 8 threads)"]
                 legend_lines += [lns.Line2D([0], [0], 1, ":", colour_legend[name][0], colour_legend[name][1], alpha = 0.25)]
                 # legend += [f"{legend_legend[name]} (/8)"]
         else:
             if name != reference_name:
                 if "RF = True" in name:
-                    plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}-")
+                    plt.loglog(external_execution_times[indices_keep], external_errors[indices_keep], f"{colour_legend[name]}-")
                     legend += [f"{legend_legend[name]} (Rotating)"]
                     legend_lines += [lns.Line2D([0], [0], 1, "-", colour_legend[name][0], colour_legend[name][1])]
                 else:
-                    plt.loglog(external_execution_times[np.logical_and(error_min < external_errors, external_errors < error_max)], external_errors[np.logical_and(error_min < external_errors, external_errors < error_max)], f"{colour_legend[name]}--")
+                    plt.loglog(external_execution_times[indices_keep], external_errors[indices_keep], f"{colour_legend[name]}--")
                     legend += [f"{legend_legend[name]} (Lab)"]
                     legend_lines += [lns.Line2D([0], [0], 1, "--", colour_legend[name][0], colour_legend[name][1])]
     if is_external:
@@ -1959,9 +1986,9 @@ def new_benchmark_true_external_internal_spinsim(archive, frequency, time_step_f
                 archive.close_archive_file()
 
 def new_benchmark_internal_trotter_spinsim(signal, frequency, time_step_fines, state_properties):
-    for trotter_cutoff in range(4, 44, 4):
+    for number_of_squares in range(4, 44, 4):
         profile_state, archive_path = handle_arguments()
         archive = Archive(archive_path, "spinsim internal trotter", profile_state)
         archive.new_archive_file()
-        new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties, trotter_cutoff = trotter_cutoff)
+        new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties, number_of_squares = number_of_squares)
         archive.close_archive_file()
