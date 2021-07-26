@@ -6,6 +6,7 @@ import math
 from numba import cuda
 import numba as nb
 import time as tm
+from util import C
 
 from test_signal import *
 
@@ -73,6 +74,15 @@ class Reconstruction():
         archive_group_reconstruction["frequency_amplitude"] = self.frequency_amplitude
         archive_group_reconstruction["amplitude"] = self.amplitude
 
+        if self.reconstruction_step:
+            archive_group_reconstruction["reconstruction_step"] = self.reconstruction_step
+        if self.iteration_max:
+            archive_group_reconstruction["iteration_max"] = self.iteration_max
+        if self.norm_scale_factor:
+            archive_group_reconstruction["norm_scale_factor"] = self.norm_scale_factor
+        if self.reconstruction_type:
+            archive_group_reconstruction["reconstruction_type"] = self.reconstruction_type
+
     def plot(self, archive:Archive, test_signal:TestSignal):
         """
         Plot the reconstruction signal, possibly against a template test signal
@@ -137,9 +147,8 @@ class Reconstruction():
                 archive.write_plot("Reconstructed frequency amplitude (difference)", "reconstructed_frequency_amplitude_difference")
             plt.draw()
 
-
-    def evaluate_ista(self):
-        print("\033[33mStarting reconstruction (ISTA)...\033[0m")
+    def evaluate_ista(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87):
+        print(f"{C.y}Starting reconstruction (ISTA)...{C.d}")
         execution_time_endpoints = np.zeros(2, np.float64)
 
         execution_time_endpoints[0] = tm.time()
@@ -148,12 +157,21 @@ class Reconstruction():
         blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
-        # iteration_max = 50
-        iteration_max = 100
-        scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        # # iteration_max = 50
+        # iteration_max = 100
+        # scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.reconstruction_step = 1e-4/self.fourier_scale
+        expected_error_fullness = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
+        # self.norm_scale_factor = 0.25*((11.87*self.frequency_amplitude.size)**2)/3169
+        self.norm_scale_factor = 0.8*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_fullness
+        # self.iteration_max = int(417)
+        self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
+
+        print(f"\treconstruction_step: {self.reconstruction_step}\n\titeration_max: {self.iteration_max}\n\tnorm_scale_factor: {self.norm_scale_factor}")
         
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
-        evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, scale)
+        evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
         self.amplitude = np.zeros(self.time_properties.time_coarse.size, np.float64)
         amplitude = cuda.to_device(self.amplitude)
@@ -163,7 +181,7 @@ class Reconstruction():
         frequency_amplitude_prediction = np.zeros(self.frequency_amplitude.size, np.float64)
         frequency_amplitude_prediction = cuda.to_device(frequency_amplitude_prediction)
 
-        for iteration_index in range(iteration_max):
+        for iteration_index in range(self.iteration_max):
             evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 100/(3 + 20*(iteration_index/iteration_max)), 0.25*scale)
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 2/(3 + 3*(iteration_index/iteration_max)), scale)
@@ -171,17 +189,37 @@ class Reconstruction():
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 1, scale)
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 20, scale)
             # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 0.75, 0.1*iteration_max*scale)
-            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 0.08, 0.01*iteration_max*scale)
+            # evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, 0.08, 0.01*iteration_max*scale)
+            evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.fourier_scale, self.norm_scale_factor, self.reconstruction_step)
 
         self.amplitude = amplitude.copy_to_host()
 
         execution_time_endpoints[1] = tm.time()
-        print(f"ReTm = {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
+        print(f"\treconstruction_time: {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
 
-        print("\033[32mDone!\033[0m")
+        self.reconstruction_type = "ISTA"
+        print(f"{C.g}Done!{C.d}")
+
+    def evaluate_least_squares(self):
+        print(f"{C.y}Starting reconstruction (least squares)...{C.d}")
+
+        threads_per_block = 128
+        blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
+        blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
+
+        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+
+        fourier_transform = np.empty((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
+        evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
+
+        print(fourier_transform.shape, self.frequency_amplitude.shape)
+        self.amplitude = np.linalg.lstsq(fourier_transform, self.frequency_amplitude)[0]
+
+        self.reconstruction_type = "least squares"
+        print(f"{C.g}Done!{C.d}")
 
     def evaluate_fista(self):
-        print("\033[33mStarting reconstruction (FISTA)...\033[0m")
+        print(f"{C.y}Starting reconstruction (FISTA)...{C.d}")
         execution_time_endpoints = np.zeros(2, np.float64)
 
         execution_time_endpoints[0] = tm.time()
@@ -221,7 +259,7 @@ class Reconstruction():
         execution_time_endpoints[1] = tm.time()
         print(f"ReTm = {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
 
-        print("\033[32mDone!\033[0m")
+        print(f"{C.g}Done!{C.d}")
 
 @cuda.jit()
 def evaluate_fourier_transform(frequency, time_coarse, fourier_transform, scale):
@@ -239,16 +277,16 @@ def evaluate_frequency_amplitude_prediction(amplitude, fourier_transform, freque
             frequency_amplitude_prediction[frequency_index] += fourier_transform[frequency_index, time_index]*amplitude[time_index]
 
 @cuda.jit()
-def evaluate_next_iteration_ista(amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, soft_step_size, scale):
+def evaluate_next_iteration_ista(amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, fourier_scale, norm_scale_factor, reconstruction_step):
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if time_index < amplitude.size:
         for frequency_index in range(frequency_amplitude.size):
-            amplitude[time_index] += fourier_transform[frequency_index, time_index]*(frequency_amplitude[frequency_index] - frequency_amplitude_prediction[frequency_index])/scale
+            amplitude[time_index] += fourier_transform[frequency_index, time_index]*((frequency_amplitude[frequency_index] - frequency_amplitude_prediction[frequency_index])/fourier_scale)*reconstruction_step
 
-        if amplitude[time_index] > soft_step_size/scale:
-            amplitude[time_index] -= soft_step_size/scale
-        elif amplitude[time_index] < -soft_step_size/scale:
-            amplitude[time_index] += soft_step_size/scale
+        if amplitude[time_index] > norm_scale_factor*reconstruction_step:
+            amplitude[time_index] -= norm_scale_factor*reconstruction_step
+        elif amplitude[time_index] < -norm_scale_factor*reconstruction_step:
+            amplitude[time_index] += norm_scale_factor*reconstruction_step
         else:
             amplitude[time_index] = 0
 
