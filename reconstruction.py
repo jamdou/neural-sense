@@ -83,6 +83,13 @@ class Reconstruction():
         if self.reconstruction_type:
             archive_group_reconstruction["reconstruction_type"] = self.reconstruction_type
 
+        if self.expected_amplitude:
+            archive_group_reconstruction["expected_amplitude"] = self.expected_amplitude
+        if self.expected_frequency:
+            archive_group_reconstruction["expected_frequency"] = self.expected_frequency
+        if self.expected_error_measurement:
+            archive_group_reconstruction["expected_error_measurement"] = self.expected_error_measurement
+
     def plot(self, archive:Archive, test_signal:TestSignal):
         """
         Plot the reconstruction signal, possibly against a template test signal
@@ -150,12 +157,15 @@ class Reconstruction():
     def evaluate_ista(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87):
         print(f"{C.y}Starting reconstruction (ISTA)...{C.d}")
         execution_time_endpoints = np.zeros(2, np.float64)
-
         execution_time_endpoints[0] = tm.time()
 
         threads_per_block = 128
         blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
+
+        self.expected_amplitude = expected_amplitude
+        self.expected_frequency = expected_frequency
+        self.expected_error_measurement = expected_error_measurement
 
         # # iteration_max = 50
         # iteration_max = 100
@@ -164,7 +174,7 @@ class Reconstruction():
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_fullness = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         # self.norm_scale_factor = 0.25*((11.87*self.frequency_amplitude.size)**2)/3169
-        self.norm_scale_factor = 0.8*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_fullness
+        self.norm_scale_factor = 0.1*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_fullness
         # self.iteration_max = int(417)
         self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
 

@@ -41,22 +41,13 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # === Scaled protocol ===
-        scaled_frequency = 5013
-        scaled_density = 1/25
-        scaled_samples = 10
-        scaled_amplitude = 995.5
-        # scaled_sweep = [scaled_frequency/5, 14000]
-        scaled_sweep = [2000, 7000]
-        scaled_time_step = 1/(scaled_frequency*scaled_samples)
-        # scaled_sweep = [0, scaled_samples*scaled_density/2]
+        experiment_time = "20210504T142057"
+        scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
+        scaled.print()
+        scaled.write_to_file(archive)
 
-        scaled_time_end = 1/(scaled_frequency*scaled_density)
-        scaled_pulse_time = 0.2333333*scaled_time_end
-        scaled_frequency_step = scaled_density*scaled_frequency/2
-        # scaled_frequency_step = scaled_density*scaled_frequency*2
-
-        print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
-        print(f"{scaled_frequency:10.4e} {1/scaled_frequency:10.4e} {scaled_pulse_time:10.4e} {scaled_density:10.4e} {scaled_samples:10.4e} {scaled_sweep[0]:10.4e} {scaled_sweep[1]:10.4e} {scaled_frequency_step:10.4e} {scaled_time_end:10.4e}")
+        # print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
+        # print(f"{scaled.frequency:10.4e} {1/scaled.frequency:10.4e} {scaled.pulse_time:10.4e} {scaled.density:10.4e} {scaled.samples:10.4e} {scaled.sweep[0]:10.4e} {scaled.sweep[1]:10.4e} {scaled.frequency_step:10.4e} {scaled.time_end:10.4e}")
 
         # === Make signal ===
         # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
@@ -66,14 +57,14 @@ if __name__ == "__main__":
         # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.11])
         # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
 
-        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled_time_end + 0.02])
-        time_properties_reconstruction = test_signal.TimeProperties(scaled_time_step, 1e-7, 1e-8, [0, scaled_time_end])
+        time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, scaled.time_end + 0.02])
+        time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, 1e-7, 1e-8, [0, scaled.time_end])
 
         signal = test_signal.TestSignal(
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 200)],
@@ -83,7 +74,7 @@ if __name__ == "__main__":
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [test_signal.NeuralPulse(scaled_pulse_time, scaled_amplitude, scaled_frequency)],
+            [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties_reconstruction
@@ -114,16 +105,20 @@ if __name__ == "__main__":
         # === Experiment results ===
         # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
         # "20210429T125734"
-        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, "20210429T125734")
+        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time)
         experiment_results.write_to_archive(archive)
         # experiment_results.plot(archive, signal_reconstruction)
 
         # === Make reconstructions ===
         reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
-        reconstruction.evaluate_ista()
+        reconstruction.evaluate_ista(
+            expected_amplitude = scaled.amplitude,
+            expected_frequency = scaled.frequency,
+            expected_error_measurement = 11.87
+        )
         # reconstruction.evaluate_least_squares()
         # reconstruction.evaluate_fista()
         # reconstruction.evaluateISTAComplete()

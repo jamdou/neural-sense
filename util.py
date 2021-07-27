@@ -3,13 +3,107 @@ import numpy as np
 import numba.cuda as cuda
 import math
 import matplotlib.pyplot as plt
+import h5py
+
 import test_signal
 from sim import manager
+import archive as arch
 
 class C:
     d = "\033[0m"
     y = "\033[33m"
     g = "\033[32m"
+
+class ScaledParameters():
+    def __init__(self, scaled_frequency = 5000, scaled_density = 1/25, scaled_samples = 10, scaled_amplitude = 800, scaled_sweep = [2000, 7000], scaled_pulse_time_fraction = 0.2333333, scaled_time_step = None, scaled_time_end = None, scaled_pulse_time = None, scaled_frequency_step = None):
+        self.frequency = scaled_frequency
+        self.density = scaled_density
+        self.samples = scaled_samples
+        self.amplitude = scaled_amplitude
+        self.sweep = np.asarray(scaled_sweep)
+
+        if scaled_time_step is not None:
+            self.time_step = scaled_time_step
+        else:
+            self.time_step = 1/(self.frequency*self.samples)
+        if scaled_time_end is not None:
+            self.time_end = scaled_time_end
+        else:
+            self.time_end = 1/(self.frequency*self.density)
+        if scaled_pulse_time is not None:
+            self.pulse_time = scaled_pulse_time
+        else:
+            self.pulse_time =  scaled_pulse_time_fraction*self.time_end
+        if scaled_frequency_step is not None:
+            self.frequency_step = scaled_frequency_step
+        else:
+            self.frequency_step = self.density*self.frequency/2
+        
+
+    def write_to_file(self, archive:arch.Archive):
+        archive.archive_file["scaled_parameters"] = np.empty(0)
+        archive.archive_file["scaled_parameters"].attrs["frequency"] = self.frequency
+        archive.archive_file["scaled_parameters"].attrs["density"] = self.density
+        archive.archive_file["scaled_parameters"].attrs["samples"] = self.samples
+        archive.archive_file["scaled_parameters"].attrs["amplitude"] = self.amplitude
+        archive.archive_file["scaled_parameters"].attrs["sweep"] = self.sweep
+
+        archive.archive_file["scaled_parameters"].attrs["time_step"] = self.time_step
+        archive.archive_file["scaled_parameters"].attrs["time_end"] = self.time_end
+        archive.archive_file["scaled_parameters"].attrs["pulse_time"] = self.pulse_time
+        archive.archive_file["scaled_parameters"].attrs["frequency_step"] = self.frequency_step
+
+    @staticmethod
+    def new_from_archive_time(archive:arch.Archive, archive_time):
+        archive_previous = arch.Archive(archive.archive_path[:-25], "")
+        archive_previous.open_archive_file(archive_time)
+        scaled = ScaledParameters(
+            scaled_frequency = archive_previous.archive_file["scaled_parameters"].attrs["frequency"],
+            scaled_density = archive_previous.archive_file["scaled_parameters"].attrs["density"],
+            scaled_samples = archive_previous.archive_file["scaled_parameters"].attrs["samples"],
+            scaled_amplitude = archive_previous.archive_file["scaled_parameters"].attrs["amplitude"],
+            scaled_sweep = np.asarray(archive_previous.archive_file["scaled_parameters"].attrs["sweep"]),
+            scaled_time_step = archive_previous.archive_file["scaled_parameters"].attrs["time_step"],
+            scaled_time_end = archive_previous.archive_file["scaled_parameters"].attrs["time_end"],
+            scaled_pulse_time = archive_previous.archive_file["scaled_parameters"].attrs["pulse_time"],
+            scaled_frequency_step = archive_previous.archive_file["scaled_parameters"].attrs["frequency_step"]
+        )
+        return scaled
+
+    @staticmethod
+    def new_from_experiment_time(archive_time):
+        if archive_time == "20210429T125734":
+            scaled = ScaledParameters(
+                scaled_frequency = 5013,
+                scaled_density = 1/25,
+                scaled_samples = 10,
+                scaled_amplitude = 995.5,
+                scaled_sweep = [5013/5, 14000],
+                scaled_pulse_time_fraction = 0.2333333
+            )
+        elif archive_time == "20210430T162501":
+            scaled = ScaledParameters(
+                scaled_frequency = 5013,
+                scaled_density = 1/25,
+                scaled_samples = 10,
+                scaled_amplitude = 995.5/2,
+                scaled_sweep = [5013/5, 14000],
+                scaled_pulse_time_fraction = 0.2333333
+            )
+        elif archive_time == "20210504T142057":
+            scaled = ScaledParameters(
+                scaled_frequency = 5000,
+                scaled_density = 1/1000,
+                scaled_samples = 10,
+                scaled_amplitude = 995.5/2,
+                scaled_sweep = [2000, 7000],
+                scaled_pulse_time_fraction = 0.2333333
+            )
+        return scaled
+
+    def print(self):
+        print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
+        print(f"{self.frequency:10.4e} {1/self.frequency:10.4e} {self.pulse_time:10.4e} {self.density:10.4e} {self.samples:10.4e} {self.sweep[0]:10.4e} {self.sweep[1]:10.4e} {self.frequency_step:10.4e} {self.time_end:10.4e}")
 
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
     """
