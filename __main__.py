@@ -114,11 +114,13 @@ if __name__ == "__main__":
         # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
         # "20210429T125734"
         experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time)
-        experiment_results.write_to_archive(archive)
+        # experiment_results.write_to_archive(archive)
         # experiment_results.plot(archive, signal_reconstruction)
 
         # === Make reconstructions ===
         reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+        # experiment_results = analysis.find_line_noise_size(experiment_results, scaled, archive)
+        experiment_results.write_to_archive(archive)
         # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
         reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
@@ -143,7 +145,8 @@ if __name__ == "__main__":
         # # === === Analysis === ===
         # # === ===          === ===
 
-        # analysis.find_neural_signal_size(experiment_results, archive)
+        # # analysis.find_neural_signal_size(experiment_results, scaled, archive)
+        # analysis.find_line_noise_size(experiment_results, scaled, archive)
 
         # === ===                      === ===
         # === === Benchmarks and tests === ===

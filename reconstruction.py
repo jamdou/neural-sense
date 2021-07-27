@@ -225,7 +225,7 @@ class Reconstruction():
         self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_fullness = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
-        self.norm_scale_factor = 0.8*((11.87*self.frequency_amplitude.size)**2)/3169
+        self.norm_scale_factor = 0.5*((11.87*self.frequency_amplitude.size)**2)/3169
         # self.norm_scale_factor = ((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_fullness
         # self.iteration_max = int(417)
         self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
@@ -255,6 +255,8 @@ class Reconstruction():
             do_backtrack = True
             while do_backtrack:
                 copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous)
+                # average = np.mean(amplitude.copy_to_host())
+                # subtract_constant[blocks_per_grid_time, threads_per_block](amplitude, 0.1*average)
                 evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
                 evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.fourier_scale, self.norm_scale_factor, reconstruction_step_backtrack)
                 # evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
@@ -395,6 +397,12 @@ def copy_amplitude(amplitude_input, amplitude_output):
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if time_index < amplitude_output.size:
         amplitude_output[time_index] = amplitude_input[time_index]
+
+@cuda.jit()
+def subtract_constant(amplitude, constant):
+    time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if time_index < amplitude.size:
+        amplitude[time_index] -= constant
 
 #     def evaluate_ista_complete(self):
 #         """
