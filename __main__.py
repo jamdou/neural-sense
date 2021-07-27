@@ -41,8 +41,16 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # === Scaled protocol ===
-        experiment_time = "20210504T142057"
+        experiment_time = "20210429T125734"
         scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
+        # scaled = util.ScaledParameters(
+        #     scaled_frequency = 5013,
+        #     scaled_density = 1/30,
+        #     scaled_samples = 10,
+        #     scaled_amplitude = 995.5,
+        #     scaled_sweep = [5013/5, 14000],
+        #     scaled_pulse_time_fraction = 0.2333333*25/30
+        # )
         scaled.print()
         scaled.write_to_file(archive)
 
@@ -111,10 +119,15 @@ if __name__ == "__main__":
 
         # === Make reconstructions ===
         reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
-        reconstruction.evaluate_ista(
+        # reconstruction.evaluate_ista(
+        #     expected_amplitude = scaled.amplitude,
+        #     expected_frequency = scaled.frequency,
+        #     expected_error_measurement = 11.87
+        # )
+        reconstruction.evaluate_ista_backtracking(
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
             expected_error_measurement = 11.87
