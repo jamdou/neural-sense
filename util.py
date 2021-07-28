@@ -15,7 +15,7 @@ class C:
     g = "\033[32m"
 
 class ScaledParameters():
-    def __init__(self, scaled_frequency = 5000, scaled_density = 1/25, scaled_samples = 10, scaled_amplitude = 800, scaled_sweep = [2000, 7000], scaled_pulse_time_fraction = 0.2333333, scaled_time_step = None, scaled_time_end = None, scaled_pulse_time = None, scaled_frequency_step = None):
+    def __init__(self, scaled_frequency = 5000, scaled_density = 1/25, scaled_samples = 10, scaled_amplitude = 800, scaled_sweep = [2000, 7000], scaled_pulse_time_fraction = 0.2333333, scaled_time_step = None, scaled_time_end = None, scaled_pulse_time = None, scaled_frequency_step = None, scaled_stagger_constant = None, scaled_sample_frequencies = None):
         self.frequency = scaled_frequency
         self.density = scaled_density
         self.samples = scaled_samples
@@ -38,7 +38,16 @@ class ScaledParameters():
             self.frequency_step = scaled_frequency_step
         else:
             self.frequency_step = self.density*self.frequency/2
-        
+
+        if scaled_stagger_constant is not None:
+            self.stagger_constant = scaled_stagger_constant
+        else:
+            self.stagger_constant = 0
+        if scaled_sample_frequencies is not None:
+            self.sample_frequencies = scaled_sample_frequencies
+        else:
+            self.sample_frequencies = np.arange(self.sweep[0], min(max(self.sweep[1], 0), self.samples*self.frequency/2), self.frequency_step)
+            self.sample_frequencies += np.fmod(self.stagger_constant*self.sample_frequencies + self.frequency_step/2, self.frequency_step) - self.frequency_step/2
 
     def write_to_file(self, archive:arch.Archive):
         archive.archive_file["scaled_parameters"] = np.empty(0)
@@ -52,6 +61,7 @@ class ScaledParameters():
         archive.archive_file["scaled_parameters"].attrs["time_end"] = self.time_end
         archive.archive_file["scaled_parameters"].attrs["pulse_time"] = self.pulse_time
         archive.archive_file["scaled_parameters"].attrs["frequency_step"] = self.frequency_step
+        archive.archive_file["scaled_parameters"].attrs["stagger_constant"] = self.stagger_constant
 
     @staticmethod
     def new_from_archive_time(archive:arch.Archive, archive_time):
@@ -66,7 +76,9 @@ class ScaledParameters():
             scaled_time_step = archive_previous.archive_file["scaled_parameters"].attrs["time_step"],
             scaled_time_end = archive_previous.archive_file["scaled_parameters"].attrs["time_end"],
             scaled_pulse_time = archive_previous.archive_file["scaled_parameters"].attrs["pulse_time"],
-            scaled_frequency_step = archive_previous.archive_file["scaled_parameters"].attrs["frequency_step"]
+            scaled_frequency_step = archive_previous.archive_file["scaled_parameters"].attrs["frequency_step"],
+            scaled_stagger_constant = archive_previous.archive_file["scaled_parameters"].attrs["stagger_constant"],
+            scaled_sample_frequencies = np.asarray(archive_previous.archive_file["scaled_parameters"].attrs["sample_frequencies"])
         )
         return scaled
 
@@ -80,6 +92,16 @@ class ScaledParameters():
                 scaled_amplitude = 995.5,
                 scaled_sweep = [5013/5, 14000],
                 scaled_pulse_time_fraction = 0.2333333
+            )
+        elif archive_time == "20210429T125734s":
+            scaled = ScaledParameters(
+                scaled_frequency = 5013,
+                scaled_density = 1/25,
+                scaled_samples = 10,
+                scaled_amplitude = 995.5,
+                scaled_sweep = [5013/5, 14000],
+                scaled_pulse_time_fraction = 0.2333333,
+                scaled_stagger_constant = math.sqrt(5)
             )
         elif archive_time == "20210430T162501":
             scaled = ScaledParameters(
