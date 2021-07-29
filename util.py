@@ -47,7 +47,7 @@ class ScaledParameters():
             self.sample_frequencies = scaled_sample_frequencies
         else:
             self.sample_frequencies = np.arange(self.sweep[0], min(max(self.sweep[1], 0), self.samples*self.frequency/2), self.frequency_step)
-            self.sample_frequencies += np.fmod(self.stagger_constant*self.sample_frequencies + self.frequency_step/2, self.frequency_step) - self.frequency_step/2
+            self.sample_frequencies += np.fmod((self.stagger_constant*self.sample_frequencies)**2 + self.frequency_step/2, self.frequency_step) - self.frequency_step/2
 
     def write_to_file(self, archive:arch.Archive):
         archive.archive_file["scaled_parameters"] = np.empty(0)
@@ -115,11 +115,22 @@ class ScaledParameters():
         elif archive_time == "20210504T142057":
             scaled = ScaledParameters(
                 scaled_frequency = 5000,
-                scaled_density = 1/1000,
+                scaled_density = 1/100,
                 scaled_samples = 10,
                 scaled_amplitude = 995.5/2,
                 scaled_sweep = [2000, 7000],
                 scaled_pulse_time_fraction = 0.2333333
+            )
+        elif archive_time == "20210504T142057s":
+            scaled = ScaledParameters(
+                scaled_frequency = 5000,
+                scaled_density = 1/100,
+                scaled_samples = 10,
+                scaled_amplitude = 995.5,
+                scaled_sweep = [2000, 14000],
+                scaled_pulse_time_fraction = 0.2333333,
+                scaled_frequency_step = (1/100)*5000,
+                scaled_stagger_constant = math.tau
             )
         return scaled
 

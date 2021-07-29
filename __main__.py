@@ -41,7 +41,7 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # === Scaled protocol ===
-        experiment_time = "20210429T125734s"
+        experiment_time = "20210504T142057s"
         scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
         # scaled = util.ScaledParameters(
         #     scaled_frequency = 5013,
@@ -120,10 +120,10 @@ if __name__ == "__main__":
 
         # === Make reconstructions ===
         reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        experiment_results = analysis.find_line_noise_size_from_tilt(experiment_results, scaled, archive)
+        # experiment_results = analysis.find_line_noise_size_from_tilt(experiment_results, scaled, archive)
         experiment_results.write_to_archive(archive)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000)
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
         # reconstruction.evaluate_ista(
         #     expected_amplitude = scaled.amplitude,
