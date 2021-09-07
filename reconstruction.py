@@ -6,6 +6,7 @@ import math
 from numba import cuda
 import numba as nb
 import time as tm
+import util
 from util import C
 
 from test_signal import *
@@ -15,7 +16,10 @@ class Reconstruction():
     Controls a reconstruction of the signal from Fourier sine coefficients using compressive sensing
     """
     def __init__(self, time_properties:TimeProperties, step_size_sparse = 0.1, step_size_manifold = 100000):
+        # self.end_buffer = 5
+        self.end_buffer = 0
         self.time_properties = time_properties
+        self.time_properties.time_coarse = self.time_properties.time_coarse[0:self.time_properties.time_coarse.size - self.end_buffer]
         self.frequency = None
         self.frequency_amplitude = None
         self.amplitude = None
@@ -27,25 +31,27 @@ class Reconstruction():
         self.step_size_sparse = step_size_sparse
         self.step_size_manifold = step_size_manifold
 
-    def read_frequencies_directly(self, frequency, frequency_amplitude, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 7500):
+    def read_frequencies_directly(self, frequency, frequency_amplitude, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 7500, random_seed = None):
         """
         Import arbitrary frequency values for reconstruction
         """
-        permutation = np.random.choice(range(np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))), number_of_samples)
+        if random_seed:
+            np.random.seed(random_seed)
+        permutation = np.random.choice(range(np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))), number_of_samples, replace = False)
         self.frequency = np.ascontiguousarray(frequency[permutation])
         self.frequency_amplitude = np.ascontiguousarray(frequency_amplitude[permutation])
 
-    def read_frequencies_from_experiment_results(self, experiment_results:ExperimentResults, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 100000):
+    def read_frequencies_from_experiment_results(self, experiment_results:ExperimentResults, number_of_samples = 100, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seed = None):
         """
         Import frequency values from an experimental results object
         """
-        self.read_frequencies_directly(experiment_results.frequency, experiment_results.frequency_amplitude, number_of_samples, frequency_cutoff_low, frequency_cutoff_high)
+        self.read_frequencies_directly(experiment_results.frequency, experiment_results.frequency_amplitude, number_of_samples, frequency_cutoff_low, frequency_cutoff_high, random_seed = random_seed)
 
-    def read_frequencies_from_test_signal(self, test_signal:TestSignal, number_of_samples = 100):
+    def read_frequencies_from_test_signal(self, test_signal:TestSignal, number_of_samples = 100, random_seed = None):
         """
         Import frequency values from the dot product Fourier transform of a signal
         """
-        self.read_frequencies_directly(test_signal.frequency, test_signal.frequency_amplitude, number_of_samples)
+        self.read_frequencies_directly(test_signal.frequency, test_signal.frequency_amplitude, number_of_samples, random_seed = random_seed)
     
     def evaluate_frequency_amplitude(self, test_signal:TestSignal = None):
         self.frequency_full = np.empty_like(self.time_properties.time_coarse, dtype = np.double)
@@ -64,33 +70,38 @@ class Reconstruction():
             amplitude_difference[0:int(amplitude_difference.size/2)] = 0
             get_frequency_amplitude[blocks_per_grid, threads_per_block](self.time_properties.time_end_points, self.time_properties.time_coarse, self.time_properties.time_step_coarse, amplitude_difference, self.frequency_full, self.frequency_amplitude_difference)
 
-    def write_to_file(self, archive:h5py.Group):
+    def write_to_file(self, archive:h5py.Group, reconstruction_index = None):
         """
         Save the reconstruction results to a hdf5 file
         """
-        archive_group_reconstruction = archive.require_group("reconstruction")
+        if reconstruction_index is None:
+            archive_group_reconstruction = archive.require_group("reconstruction")
+        else:
+            archive_group_reconstruction = archive.require_group(f"reconstructions/{reconstruction_index}")
         self.time_properties.write_to_file(archive_group_reconstruction)
         archive_group_reconstruction["frequency"] = self.frequency
         archive_group_reconstruction["frequency_amplitude"] = self.frequency_amplitude
         archive_group_reconstruction["amplitude"] = self.amplitude
 
-        if self.reconstruction_step:
+        if hasattr(self, "reconstruction_step"):
             archive_group_reconstruction["reconstruction_step"] = self.reconstruction_step
-        if self.iteration_max:
+        if hasattr(self, "iteration_max"):
             archive_group_reconstruction["iteration_max"] = self.iteration_max
-        if self.norm_scale_factor:
+        if hasattr(self, "norm_scale_factor"):
             archive_group_reconstruction["norm_scale_factor"] = self.norm_scale_factor
-        if self.reconstruction_type:
+        if hasattr(self, "reconstruction_type"):
             archive_group_reconstruction["reconstruction_type"] = self.reconstruction_type
 
-        if self.expected_amplitude:
+        if hasattr(self, "expected_amplitude"):
             archive_group_reconstruction["expected_amplitude"] = self.expected_amplitude
-        if self.expected_frequency:
+        if hasattr(self, "expected_frequency"):
             archive_group_reconstruction["expected_frequency"] = self.expected_frequency
-        if self.expected_error_measurement:
+        if hasattr(self, "expected_error_measurement"):
             archive_group_reconstruction["expected_error_measurement"] = self.expected_error_measurement
-        if self.backtrack_scale:
+        if hasattr(self, "backtrack_scale"):
             archive_group_reconstruction["backtrack_scale"] = self.backtrack_scale
+        if hasattr(self, "shrink_size_max"):
+            archive_group_reconstruction["shrink_size_max"] = self.shrink_size_max
 
     def plot(self, archive:Archive, test_signal:TestSignal):
         """
@@ -98,7 +109,7 @@ class Reconstruction():
         """
         plt.figure()
         if test_signal:
-            plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude, "-k")
+            plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude[0:test_signal.amplitude.size - self.end_buffer], "-k")
         plt.plot(self.time_properties.time_coarse, self.amplitude, "-r")
         if test_signal:
             plt.legend(["Original", "Reconstruction"])
@@ -113,7 +124,7 @@ class Reconstruction():
         if test_signal:
             if test_signal.neural_pulses:
                 plt.figure()
-                plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude, "-k")
+                plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude[0:test_signal.amplitude.size - self.end_buffer], "-k")
                 plt.plot(self.time_properties.time_coarse, self.amplitude, "-xr")
                 plt.legend(["Original", "Reconstruction"])
                 plt.xlabel("Time (s)")
@@ -203,7 +214,7 @@ class Reconstruction():
         print(f"\treconstruction_time: {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
 
         self.reconstruction_type = "ISTA"
-        print(f"{C.g}Done!{C.d}")
+        print(f"{C.g}Finished reconstruction (ISTA).{C.d}")
 
     def evaluate_ista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9):
         print(f"{C.y}Starting reconstruction (ISTA with backtracking)...{C.d}")
@@ -275,7 +286,7 @@ class Reconstruction():
         print(f"\treconstruction_time: {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
 
         self.reconstruction_type = "ISTA with backtracking"
-        print(f"{C.g}Done!{C.d}")
+        print(f"{C.g}Finished reconstruction (ISTA with backtracking).{C.d}")
 
     def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9):
         print(f"{C.y}Starting reconstruction (FISTA with backtracking)...{C.d}")
@@ -291,11 +302,13 @@ class Reconstruction():
         self.expected_error_measurement = expected_error_measurement
         self.backtrack_scale = backtrack_scale
 
-        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
-        self.norm_scale_factor = 0.25*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        self.norm_scale_factor = 0.5*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
         self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
+        self.shrink_size_max = 1e2
 
         print(f"\treconstruction_step: {self.reconstruction_step}\n\titeration_max: {self.iteration_max}\n\tnorm_scale_factor: {self.norm_scale_factor}")
         
@@ -326,7 +339,15 @@ class Reconstruction():
             while do_backtrack:
                 copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous)
                 evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
-                evaluate_next_iteration_ista[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.fourier_scale, self.norm_scale_factor, reconstruction_step_backtrack)
+                shrink_scale = np.max(np.abs(amplitude.copy_to_host()))
+                shrink_scale_denominator = shrink_scale - self.norm_scale_factor*self.reconstruction_step
+                if shrink_scale_denominator < 0:
+                    shrink_scale_denominator = 0
+                shrink_scale = shrink_scale/shrink_scale_denominator
+                if shrink_scale > self.shrink_size_max:
+                    shrink_scale = self.shrink_size_max
+                # shrink_scale = 1
+                evaluate_next_iteration_ista_shrink_scale[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.fourier_scale, self.norm_scale_factor, reconstruction_step_backtrack, shrink_scale)
                 fast_step_size_previous_previous = fast_step_size_previous
                 fast_step_size_previous = fast_step_size
                 fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
@@ -334,7 +355,7 @@ class Reconstruction():
                 norm_previous = norm
                 norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
                 if iteration_index > 0:
-                    if norm > norm_previous:
+                    if norm > norm_previous or norm == 0:
                         reconstruction_step_backtrack *= backtrack_scale
                         copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude_previous, amplitude)
                         norm = norm_previous
@@ -354,7 +375,7 @@ class Reconstruction():
         print(f"\treconstruction_time: {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
 
         self.reconstruction_type = "FISTA with backtracking"
-        print(f"{C.g}Done!{C.d}")
+        print(f"{C.g}Finished reconstruction (FISTA with backtracking).{C.d}")
 
     def evaluate_least_squares(self):
         print(f"{C.y}Starting reconstruction (least squares)...{C.d}")
@@ -363,16 +384,16 @@ class Reconstruction():
         blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
-        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
 
         fourier_transform = np.empty((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
         evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
-        print(fourier_transform.shape, self.frequency_amplitude.shape)
-        self.amplitude = np.linalg.lstsq(fourier_transform, self.frequency_amplitude)[0]
+        self.amplitude = np.linalg.lstsq(fourier_transform, self.frequency_amplitude, rcond = None)[0]
 
         self.reconstruction_type = "least squares"
-        print(f"{C.g}Done!{C.d}")
+        print(f"{C.g}Finished reconstruction (least squares).{C.d}")
 
     def evaluate_fista(self):
         print(f"{C.y}Starting reconstruction (FISTA)...{C.d}")
@@ -415,7 +436,7 @@ class Reconstruction():
         execution_time_endpoints[1] = tm.time()
         print(f"ReTm = {execution_time_endpoints[1] - execution_time_endpoints[0]:4.2f}")
 
-        print(f"{C.g}Done!{C.d}")
+        print(f"{C.g}Finished reconstruction (FISTA).{C.d}")
 
 @cuda.jit()
 def evaluate_fourier_transform(frequency, time_coarse, fourier_transform, scale):
@@ -445,6 +466,21 @@ def evaluate_next_iteration_ista(amplitude, frequency_amplitude, frequency_ampli
             amplitude[time_index] += norm_scale_factor*reconstruction_step
         else:
             amplitude[time_index] = 0
+
+@cuda.jit()
+def evaluate_next_iteration_ista_shrink_scale(amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, fourier_scale, norm_scale_factor, reconstruction_step, shrink_scale):
+    time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if time_index < amplitude.size:
+        for frequency_index in range(frequency_amplitude.size):
+            amplitude[time_index] += fourier_transform[frequency_index, time_index]*((frequency_amplitude[frequency_index] - frequency_amplitude_prediction[frequency_index])/fourier_scale)*reconstruction_step
+
+        if amplitude[time_index] > norm_scale_factor*reconstruction_step:
+            amplitude[time_index] -= norm_scale_factor*reconstruction_step
+        elif amplitude[time_index] < -norm_scale_factor*reconstruction_step:
+            amplitude[time_index] += norm_scale_factor*reconstruction_step
+        else:
+            amplitude[time_index] = 0
+        amplitude[time_index] *= shrink_scale
 
 @cuda.jit()
 def evaluate_fista_fast_step(amplitude, amplitude_previous, fast_step_size, fast_step_size_previous):
@@ -481,6 +517,93 @@ def subtract_constant(amplitude, constant):
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if time_index < amplitude.size:
         amplitude[time_index] -= constant
+
+def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_method = None, expected_amplitude = None, expected_frequency = None, expected_error_measurement = None):
+    if evaluation_method is None:
+        evaluation_method = Reconstruction.evaluate_least_squares
+    reconstruction = Reconstruction(expected_signal.time_properties)
+
+    random_seeds = np.array(random_seeds)
+
+    print(f"{C.y}Starting number of samples sweep...{C.d}")
+    numbers_of_samples = []
+    amplitudes = []
+    for reconstruction_index, number_of_samples in enumerate(range(min(sweep_parameters[1], experiment_results.frequency.size), sweep_parameters[0], -sweep_parameters[2])):
+        numbers_of_samples.append(number_of_samples)
+        for random_index, random_seed in enumerate(random_seeds):
+            reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples, frequency_cutoff_low = frequency_cutoff_low, frequency_cutoff_high = frequency_cutoff_high, random_seed = random_seed)
+            if evaluation_method == Reconstruction.evaluate_least_squares:
+                reconstruction.evaluate_least_squares()
+            else:
+                reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
+            reconstruction.write_to_file(archive.archive_file, random_seeds.size*reconstruction_index + random_index)
+
+            amplitudes.append(reconstruction.amplitude.copy())
+            if reconstruction_index + random_index == 0:
+                reconstruction.plot(None, expected_signal)
+    reconstruction.plot(None, expected_signal)
+    print(f"{C.g}Finished number of samples sweep.{C.d}")
+
+    print(f"{C.y}Starting error analysis...{C.d}")
+    errors_1 = []
+    errors_2 = []
+    errors_sup = []
+    for reconstruction_index, number_of_samples in enumerate(range(min(sweep_parameters[1], experiment_results.frequency.size), sweep_parameters[0], -sweep_parameters[2])):
+        error_1 = 0
+        error_2 = 0
+        error_sup = 0
+        for random_index, random_seed in enumerate(random_seeds):
+            amplitude = amplitudes[random_seeds.size*reconstruction_index + random_index]
+            error_1 += np.mean(np.abs(amplitude - expected_signal.amplitude))
+            error_2 += math.sqrt(np.mean((amplitude - expected_signal.amplitude)**2))
+            error_sup += np.max(np.abs(amplitude - expected_signal.amplitude))
+        errors_1.append(error_1/random_seeds.size)
+        errors_2.append(error_2/random_seeds.size)
+        errors_sup.append(error_sup/random_seeds.size)
+    print(f"{C.g}Finished error analysis.{C.d}")
+
+    numbers_of_samples = np.array(numbers_of_samples)
+    errors_1 = np.array(errors_1)
+    errors_2 = np.array(errors_2)
+    errors_sup = np.array(errors_sup)
+
+    if archive:
+        sweep_group = archive.archive_file.require_group("reconstruction_sweeps/number_of_samples")
+        sweep_group["number_of_samples"] = numbers_of_samples
+        sweep_group["error_1"] = errors_1
+        sweep_group["error_2"] = errors_2
+        sweep_group["error_sup"] = errors_sup
+
+    plt.figure()
+    plt.plot(numbers_of_samples, errors_1, "k-")
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel("1-norm compared to expected signal (Hz)")
+    if archive:
+        archive.write_plot("Sweeping the number of samples used in reconstruction\n(1-norm)", "number_of_samples_error_1")
+    plt.draw()
+
+    plt.figure()
+    plt.subplot()
+    plt.plot(numbers_of_samples, errors_2, "k-")
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel("2-norm compared to expected signal (Hz)")
+    if archive:
+        archive.write_plot("Sweeping the number of samples used in reconstruction\n(2-norm)", "number_of_samples_error_2")
+    plt.draw()
+
+    plt.figure()
+    plt.subplot()
+    plt.plot(numbers_of_samples, errors_sup, "k-")
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel("sup-norm compared to expected signal (Hz)")
+    if archive:
+        archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
+    plt.draw()
+
+
 
 #     def evaluate_ista_complete(self):
 #         """

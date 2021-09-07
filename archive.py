@@ -256,7 +256,7 @@ class ExperimentResults:
     frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.float64`
         The Fourier sine coefficient of the signal being measured, as determined by the experiment. In units of Hz.
     """
-    def __init__(self, frequency = None, frequency_amplitude = None, archive_time = None, experiment_type = "unknown"):
+    def __init__(self, frequency:np.ndarray = None, frequency_amplitude:np.ndarray = None, archive_time:str = None, experiment_type:str = "unknown"):
         """
         Parameters
         ----------

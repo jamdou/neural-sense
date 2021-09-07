@@ -14,6 +14,9 @@ class C:
     y = "\033[33m"
     g = "\033[32m"
 
+class Seeds:
+    metroid = 19960806
+
 class ScaledParameters():
     def __init__(self, scaled_frequency = 5000, scaled_density = 1/25, scaled_samples = 10, scaled_amplitude = 800, scaled_sweep = [2000, 7000], scaled_pulse_time_fraction = 0.2333333, scaled_time_step = None, scaled_time_end = None, scaled_pulse_time = None, scaled_frequency_step = None, scaled_stagger_constant = None, scaled_sample_frequencies = None):
         self.frequency = scaled_frequency
@@ -89,6 +92,24 @@ class ScaledParameters():
                 scaled_frequency = 5013,
                 scaled_density = 1/25,
                 scaled_samples = 10,
+                scaled_amplitude = 995.5,
+                scaled_sweep = [5013/5, 14000],
+                scaled_pulse_time_fraction = 0.2333333
+            )
+        elif archive_time == "20210429T125734e":
+            scaled = ScaledParameters(
+                scaled_frequency = 5013,
+                scaled_density = 1/24,
+                scaled_samples = 10,
+                scaled_amplitude = 995.5,
+                scaled_sweep = [5013/5, 14000],
+                scaled_pulse_time_fraction = 0.2333333*25/24
+            )
+        elif archive_time == "20210429T125734i":
+            scaled = ScaledParameters(
+                scaled_frequency = 5013,
+                scaled_density = 1/25,
+                scaled_samples = 10/math.sqrt(2),
                 scaled_amplitude = 995.5,
                 scaled_sweep = [5013/5, 14000],
                 scaled_pulse_time_fraction = 0.2333333

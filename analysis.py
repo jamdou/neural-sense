@@ -132,12 +132,13 @@ def find_line_noise_size_from_tilt(experiment_results:arch.ExperimentResults, sc
     frequency = np.copy(experiment_results.frequency)
     time = np.arange(0, scaled.time_end, scaled.time_step)
     
-    frequency_amplitude_approximated_normalised = (1/(math.tau*scaled.time_end))*(1/(2*frequency))*np.cos(math.tau*frequency*scaled.time_end)*np.sin(math.tau*frequency_line_noise*scaled.time_end)
+    frequency_amplitude_approximated_normalised = (1/(math.tau*scaled.time_end))*(1/(2*frequency))*np.sin(math.tau*frequency*scaled.time_end)*np.sin(math.tau*frequency_line_noise*scaled.time_end)
+    # frequency_amplitude_approximated_normalised = (1/(math.tau*scaled.time_end))*(1/2)*np.sin(math.tau*frequency*scaled.time_end)*np.sin(math.tau*frequency_line_noise*scaled.time_end)
     frequency_amplitude_measured = np.copy(experiment_results.frequency_amplitude)
 
     amplitude = np.sum(frequency_amplitude_approximated_normalised*frequency_amplitude_measured)/np.sum(frequency_amplitude_approximated_normalised**2)
     frequency_amplitude_predict = math.tau*scaled.time_end*amplitude*frequency_amplitude_approximated_normalised
-    frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_approximated_normalised
+    frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_predict
     mean_squared_error = np.mean(frequency_amplitude_residual**2)
 
     print(f"\tAmp: {amplitude}\n\tSquared error: {mean_squared_error}\n\tRMS Error: {np.sqrt(mean_squared_error)}")
@@ -161,7 +162,28 @@ def find_line_noise_size_from_tilt(experiment_results:arch.ExperimentResults, sc
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Amplitude (Hz)")
     if archive:
-        archive.write_plot("Neural pulse amplitude (best fit)", "analysis_pulse_amplitude_fit_result")
+        archive.write_plot("Neural pulse line tilt (best fit)", "analysis_line_tilt_fit_result")
     plt.draw()
 
     return modified_experiment_results
+
+def find_time_blind_spots(scaled:util.ScaledParameters, archive:arch.Archive = None):
+    time = np.arange(0, scaled.time_end, scaled.time_step)
+    frequencies = scaled.sample_frequencies
+
+    blind_spots = np.zeros_like(time)
+    for frequency in frequencies:
+        blind_spots += np.abs(np.sin(math.tau*frequency*time))
+    blind_spots = (max(blind_spots) - blind_spots)/max(blind_spots)
+    
+    if archive:
+        analysis_group = archive.archive_file.require_group("analysis")
+        analysis_group["blind_spots"] = blind_spots
+
+    plt.figure()
+    plt.plot(time, blind_spots, "k-")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Blindness")
+    if archive:
+        archive.write_plot("Blind spots", "time_blind_spots")
+    plt.draw()
