@@ -14,6 +14,28 @@ class C:
     y = "\033[33m"
     g = "\033[32m"
 
+    level = 0
+
+    @classmethod
+    def starting(cls, message:str):
+        tabs = C.level*"  "
+        message = message.replace('\n', f'\n{tabs}')
+        print(f"{tabs}{C.y}Starting {message}...{C.d}")
+        C.level += 1
+
+    @classmethod
+    def finished(cls, message:str):
+        C.level = max(C.level - 1, 0)
+        tabs = C.level*"  "
+        message = message.replace('\n', f'\n{tabs}')
+        print(f"{tabs}{C.g}Finished {message}!{C.d}")
+
+    @classmethod
+    def print(cls, message:str, end = "\n"):
+        tabs = C.level*"  "
+        message = message.replace('\n', f'\n{tabs}')
+        print(f"{tabs}{message}", end = end)
+
 class Seeds:
     metroid = 19960806
 
