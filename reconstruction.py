@@ -288,7 +288,7 @@ class Reconstruction():
         self.reconstruction_type = "ISTA with backtracking"
         C.finished("reconstruction (ISTA with backtracking)")
 
-    def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9):
+    def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 0.5):
         C.starting("reconstruction (FISTA with backtracking)")
         execution_time_endpoints = np.zeros(2, np.float64)
         execution_time_endpoints[0] = tm.time()
@@ -306,7 +306,7 @@ class Reconstruction():
         self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
-        self.norm_scale_factor = 0.5*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
         self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
         self.shrink_size_max = 1e2
 
@@ -394,6 +394,20 @@ class Reconstruction():
 
         self.reconstruction_type = "least squares"
         C.finished("reconstruction (least squares)")
+
+    def evaluate_fista_ayanzadeh(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifiers = np.geomspace(0.1, 1.0, 10)):
+        C.starting("FISTA (Ayanzadeh)")
+        amplitudes = []
+        for norm_scale_factor_modifier in norm_scale_factor_modifiers:
+            C.print(f"{norm_scale_factor_modifier}")
+            self.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+            amplitudes.append(self.amplitude.copy())
+
+        self.amplitude *= 0
+        for amplitude in amplitudes:
+            self.amplitude += amplitude
+        self.amplitude /= len(amplitudes)
+        C.finished("FISTA (Ayanzadeh)")
 
     def evaluate_fista(self):
         C.starting("reconstruction (FISTA)")
@@ -537,6 +551,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
                 reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples, frequency_cutoff_low = frequency_cutoff_low, frequency_cutoff_high = frequency_cutoff_high, random_seed = random_seed)
                 if evaluation_method == "least_squares":
                     reconstruction.evaluate_least_squares()
+                elif evaluation_method == "fista_ayanzadeh":
+                    reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
                 else:
                     reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
                 reconstruction.write_to_file(archive.archive_file, (numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
@@ -584,6 +600,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
     evaluation_method_labels = {
         "least_squares" : "Least squares",
+        "fista_ayanzadeh" : "FISTA (Ayanzadeh)",
         "fista_backtracking" : "FISTA (Backtracking)",
         "fista" : "FISTA",
         "ista_backtracking" : "ISTA (Backtracking)",
@@ -595,6 +612,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     evaluation_method_legend = {
         "least_squares" : "b-",
         "fista_backtracking" : "c-",
+        "fista_ayanzadeh" : "y-",
         "fista" : "c--",
         "ista_backtracking" : "k-",
         "ista" : "k--",

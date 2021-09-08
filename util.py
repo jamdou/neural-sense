@@ -18,21 +18,21 @@ class C:
 
     @classmethod
     def starting(cls, message:str):
-        tabs = C.level*"  "
+        tabs = cls.level*"  "
         message = message.replace('\n', f'\n{tabs}')
-        print(f"{tabs}{C.y}Starting {message}...{C.d}")
-        C.level += 1
+        print(f"{tabs}{cls.y}Starting {message}...{cls.d}")
+        cls.level += 1
 
     @classmethod
     def finished(cls, message:str):
-        C.level = max(C.level - 1, 0)
-        tabs = C.level*"  "
+        cls.level = max(cls.level - 1, 0)
+        tabs = cls.level*"  "
         message = message.replace('\n', f'\n{tabs}')
-        print(f"{tabs}{C.g}Finished {message}!{C.d}")
+        print(f"{tabs}{cls.g}Finished {message}!{cls.d}")
 
     @classmethod
     def print(cls, message:str, end = "\n"):
-        tabs = C.level*"  "
+        tabs = cls.level*"  "
         message = message.replace('\n', f'\n{tabs}')
         print(f"{tabs}{message}", end = end)
 

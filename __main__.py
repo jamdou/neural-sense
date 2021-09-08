@@ -88,33 +88,33 @@ if __name__ == "__main__":
             time_properties_reconstruction
         )
 
-        # # === Make state ===
-        # # [0.5, 1/np.sqrt(2), 0.5]
-        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
-        # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
+        # === Make state ===
+        # [0.5, 1/np.sqrt(2), 0.5]
+        state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
-        # cuda.profile_start()
-        # # === Run simulations ===
-        # # frequency = np.arange(70, 3071, 30)
-        # # frequency = np.arange(250, 2251, 3)
-        # # frequency = np.arange(250, 2000, 10.0)
-        # # frequency = np.arange(250, 2251, 50)
-        # # frequency = np.arange(250, 2251, 460e3/1e5)
-        # # frequency = np.arange(990, 1010, 0.02)
-        # # frequency = np.arange(253, 3251, 30)
-        # # frequency = np.arange(1000, 1003, 1)
-        # # frequency = np.arange(1000, 1001, 1)
-        # # frequency = np.arange(0, 1000000, 1)
-        # # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-        # frequency = scaled.sample_frequencies
+        cuda.profile_start()
+        # === Run simulations ===
+        # frequency = np.arange(70, 3071, 30)
+        # frequency = np.arange(250, 2251, 3)
+        # frequency = np.arange(250, 2000, 10.0)
+        # frequency = np.arange(250, 2251, 50)
+        # frequency = np.arange(250, 2251, 460e3/1e5)
+        # frequency = np.arange(990, 1010, 0.02)
+        # frequency = np.arange(253, 3251, 30)
+        # frequency = np.arange(1000, 1003, 1)
+        # frequency = np.arange(1000, 1001, 1)
+        # frequency = np.arange(0, 1000000, 1)
+        # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
+        frequency = scaled.sample_frequencies
 
-        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-        # simulation_manager.evaluate(False, False)
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+        simulation_manager.evaluate(False, False)
 
         # === Experiment results ===
-        # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
         # "20210429T125734"
-        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
+        # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
         # experiment_results.write_to_archive(archive)
         experiment_results.plot(archive, signal_reconstruction)
 
@@ -123,8 +123,8 @@ if __name__ == "__main__":
         # # experiment_results = analysis.find_line_noise_size_from_tilt(experiment_results, scaled, archive)
         # # experiment_results.frequency_amplitude /= np.sqrt(2)
         # experiment_results.write_to_archive(archive)
-        # # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
+        # # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
         # # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
         # # reconstruction.evaluate_ista(
         # #     expected_amplitude = scaled.amplitude,
@@ -141,7 +141,12 @@ if __name__ == "__main__":
         # #     expected_frequency = scaled.frequency,
         # #     expected_error_measurement = 11.87
         # # )
-        # reconstruction.evaluate_least_squares()
+        # reconstruction.evaluate_fista_ayanzadeh(
+        #     expected_amplitude = scaled.amplitude,
+        #     expected_frequency = scaled.frequency,
+        #     expected_error_measurement = 11.87
+        # )
+        # # reconstruction.evaluate_least_squares()
         # # reconstruction.evaluate_fista()
         # # reconstruction.evaluateISTAComplete()
         # # reconstruction.evaluate_frequency_amplitude(signal_reconstruction)
@@ -168,7 +173,7 @@ if __name__ == "__main__":
             sweep_parameters = (0, 10000, 10),
             archive = archive,
             random_seeds = np.arange(10)*util.Seeds.metroid,
-            evaluation_methods = ["least_squares", "fista_backtracking"],
+            evaluation_methods = ["least_squares", "fista_backtracking", "fista_ayanzadeh"],
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
             expected_error_measurement = 11.87
