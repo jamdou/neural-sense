@@ -11,8 +11,10 @@ import archive as arch
 
 class C:
     d = "\033[0m"
-    y = "\033[33m"
+    r = "\033[31m"
     g = "\033[32m"
+    y = "\033[33m"
+    k = "\033[30m"
 
     level = 0
 

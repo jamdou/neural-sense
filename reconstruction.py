@@ -35,6 +35,9 @@ class Reconstruction():
         """
         Import arbitrary frequency values for reconstruction
         """
+        if number_of_samples > np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high)):
+            number_of_samples = np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))
+            C.print(f"{C.r}number_of_samples is greater than the total number of samples input. Resetting{C.d}")
         if random_seed:
             np.random.seed(random_seed)
         permutation = np.random.choice(range(np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))), number_of_samples, replace = False)
@@ -288,7 +291,7 @@ class Reconstruction():
         self.reconstruction_type = "ISTA with backtracking"
         C.finished("reconstruction (ISTA with backtracking)")
 
-    def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 0.5):
+    def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0):
         C.starting("reconstruction (FISTA with backtracking)")
         execution_time_endpoints = np.zeros(2, np.float64)
         execution_time_endpoints[0] = tm.time()
@@ -304,6 +307,7 @@ class Reconstruction():
 
         # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        # self.reconstruction_step = 1e-4/self.fourier_scale
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
@@ -365,6 +369,7 @@ class Reconstruction():
                             break
                     else:
                         do_backtrack = False
+                        # reconstruction_step_backtrack = self.reconstruction_step
                 else:
                     do_backtrack = False
                 C.print(f"Index: {iteration_index}, Reconstruction step: {reconstruction_step_backtrack}, norm: {norm}", end = "\r")
@@ -395,7 +400,7 @@ class Reconstruction():
         self.reconstruction_type = "least squares"
         C.finished("reconstruction (least squares)")
 
-    def evaluate_fista_ayanzadeh(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifiers = np.geomspace(0.1, 1.0, 10)):
+    def evaluate_fista_ayanzadeh(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifiers = np.geomspace(1.0, 3.0, 10)):
         C.starting("FISTA (Ayanzadeh)")
         amplitudes = []
         for norm_scale_factor_modifier in norm_scale_factor_modifiers:

@@ -73,9 +73,9 @@ if __name__ == "__main__":
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
-            # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 200)],
+            # [],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 1000])],
+            # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
         )
         signal_reconstruction = test_signal.TestSignal(
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
         frequency = scaled.sample_frequencies
 
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.CORPSE, signal_reconstruction = signal_reconstruction)
         simulation_manager.evaluate(False, False)
 
         # === Experiment results ===
@@ -118,45 +118,54 @@ if __name__ == "__main__":
         # experiment_results.write_to_archive(archive)
         experiment_results.plot(archive, signal_reconstruction)
 
-        # # === Make reconstructions ===
-        # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        # # experiment_results = analysis.find_line_noise_size_from_tilt(experiment_results, scaled, archive)
-        # # experiment_results.frequency_amplitude /= np.sqrt(2)
-        # experiment_results.write_to_archive(archive)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
-        # # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(75, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
-        # # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
-        # # reconstruction.evaluate_ista(
-        # #     expected_amplitude = scaled.amplitude,
-        # #     expected_frequency = scaled.frequency,
-        # #     expected_error_measurement = 11.87
-        # # )
-        # # reconstruction.evaluate_ista_backtracking(
-        # #     expected_amplitude = scaled.amplitude,
-        # #     expected_frequency = scaled.frequency,
-        # #     expected_error_measurement = 11.87
-        # # )
-        # # reconstruction.evaluate_fista_backtracking(
-        # #     expected_amplitude = scaled.amplitude,
-        # #     expected_frequency = scaled.frequency,
-        # #     expected_error_measurement = 11.87
-        # # )
-        # reconstruction.evaluate_fista_ayanzadeh(
+        # === Make reconstructions ===
+        reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+        # experiment_results = analysis.find_line_noise_size_from_tilt(experiment_results, scaled, archive)
+        # experiment_results.frequency_amplitude /= np.sqrt(2)
+        experiment_results.write_to_archive(archive)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14e3, random_seed = util.Seeds.metroid)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(80, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
+        # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
+        # reconstruction.evaluate_ista(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
         #     expected_error_measurement = 11.87
         # )
-        # # reconstruction.evaluate_least_squares()
-        # # reconstruction.evaluate_fista()
-        # # reconstruction.evaluateISTAComplete()
-        # # reconstruction.evaluate_frequency_amplitude(signal_reconstruction)
-        # reconstruction.plot(archive, signal_reconstruction)
-        # reconstruction.write_to_file(archive.archive_file)
+        # reconstruction.evaluate_ista_backtracking(
+        #     expected_amplitude = scaled.amplitude,
+        #     expected_frequency = scaled.frequency,
+        #     expected_error_measurement = 11.87
+        # )
+        # reconstruction.evaluate_fista_backtracking(
+        #     expected_amplitude = scaled.amplitude,
+        #     expected_frequency = scaled.frequency,
+        #     expected_error_measurement = 11.87
+        # )
+        reconstruction.evaluate_fista_ayanzadeh(
+            expected_amplitude = scaled.amplitude,
+            expected_frequency = scaled.frequency,
+            expected_error_measurement = 11.87
+        )
+        # reconstruction.evaluate_least_squares()
+        # reconstruction.evaluate_fista()
+        # reconstruction.evaluateISTAComplete()
+        # reconstruction.evaluate_frequency_amplitude(signal_reconstruction)
+        reconstruction.plot(archive, signal_reconstruction)
+        reconstruction.write_to_file(archive.archive_file)
 
 
-        # === ===                       === ===
-        # === === Reconstruction sweeps === ===
-        # === ===                       === ===
+        # # === ===                       === ===
+        # # === === Reconstruction sweeps === ===
+        # # === ===                       === ===
+
+        # # recon.run_reconstruction_subsample_sweep(
+        # #     expected_signal = signal_reconstruction,
+        # #     experiment_results = experiment_results,
+        # #     sweep_parameters = (0, 10000, 10),
+        # #     archive = archive,
+        # #     random_seeds = np.arange(10)*util.Seeds.metroid,
+        # #     evaluation_methods = ["least_squares"]
+        # # )
 
         # recon.run_reconstruction_subsample_sweep(
         #     expected_signal = signal_reconstruction,
@@ -164,20 +173,11 @@ if __name__ == "__main__":
         #     sweep_parameters = (0, 10000, 10),
         #     archive = archive,
         #     random_seeds = np.arange(10)*util.Seeds.metroid,
-        #     evaluation_methods = ["least_squares"]
+        #     evaluation_methods = ["least_squares", "fista_backtracking", "fista_ayanzadeh"],
+        #     expected_amplitude = scaled.amplitude,
+        #     expected_frequency = scaled.frequency,
+        #     expected_error_measurement = 11.87
         # )
-
-        recon.run_reconstruction_subsample_sweep(
-            expected_signal = signal_reconstruction,
-            experiment_results = experiment_results,
-            sweep_parameters = (0, 10000, 10),
-            archive = archive,
-            random_seeds = np.arange(10)*util.Seeds.metroid,
-            evaluation_methods = ["least_squares", "fista_backtracking", "fista_ayanzadeh"],
-            expected_amplitude = scaled.amplitude,
-            expected_frequency = scaled.frequency,
-            expected_error_measurement = 11.87
-        )
 
         # === ===          === ===
         # === === Analysis === ===

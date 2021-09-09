@@ -26,6 +26,7 @@ class MeasurementMethod(enum.Enum):
     HARD_PULSE_ROTATING = "hard pulse (rotating)"
     HARD_PULSE_DETUNING_TEST = "hard pulse (detuning test)"
     ADIABATIC_DEMAPPING = "adiabatic demapping"
+    CORPSE = "CORPSE"
 
 class StateProperties:
     """
@@ -237,7 +238,7 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 1e4
+            readout_amplitude = 1e3
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
             # cycle_period = 1/100
@@ -280,6 +281,66 @@ class SourceProperties:
             source_time_end_points[2, 1] = signal.time_properties.time_end_points[1]
 
             self.source_index_max += 3
+
+        elif self.measurement_method == MeasurementMethod.CORPSE:
+            # Initialise
+            source_amplitude = np.zeros([5, 3])
+            source_phase = np.zeros([5, 3])
+            source_frequency = np.zeros([5, 3])
+            source_time_end_points = np.zeros([5, 2])
+            source_type = np.empty([5], dtype = object)
+
+            # Label
+            source_type[0] = "Dressing"
+            source_type[1] = "Readout (CORPSE 1)"
+            source_type[2] = "Readout (CORPSE 2)"
+            source_type[3] = "Readout (CORPSE 3)"
+            source_type[4] = "Bias"
+
+            # Bias
+            source_amplitude[4, 2] = bias_amplitude
+            source_phase[4, 2] = math.pi/2
+
+            # Dressing
+            readout_amplitude = 1e3
+            dressing_end_buffer = (2/readout_amplitude)
+
+            source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[0, 1] = signal_reconstruction.time_properties.time_end_points[1]
+
+            source_amplitude[0, 0] = 2*self.dressing_rabi_frequency
+            source_frequency[0, 0] = bias_amplitude
+            source_phase[0, 0] = math.pi/2
+
+            # CORPSE readout
+            corpse_factor = math.asin(math.sqrt(2)/4)/math.tau
+
+            # CORPSE 1
+            source_time_end_points[1, 0] = source_time_end_points[0, 1] + dressing_end_buffer
+            source_time_end_points[1, 1] = source_time_end_points[1, 0] + (9/8 - corpse_factor)/readout_amplitude
+            source_amplitude[1, 0] = 2*readout_amplitude
+            source_frequency[1, 0] = bias_amplitude
+            source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+
+            # CORPSE 2
+            source_time_end_points[2, 0] = source_time_end_points[1, 1] + dressing_end_buffer
+            source_time_end_points[2, 1] = source_time_end_points[2, 0] + (1 - 2*corpse_factor)/readout_amplitude
+            source_amplitude[2, 0] = -2*readout_amplitude
+            source_frequency[2, 0] = bias_amplitude
+            source_phase[2, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[2, 0]), 1)
+
+            # CORPSE 3
+            source_time_end_points[3, 0] = source_time_end_points[2, 1] + dressing_end_buffer
+            source_time_end_points[3, 1] = source_time_end_points[3, 0] + (1/8 - corpse_factor)/readout_amplitude
+            source_amplitude[3, 0] = 2*readout_amplitude
+            source_frequency[3, 0] = bias_amplitude
+            source_phase[3, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[3, 0]), 1)
+
+            # Bias
+            source_time_end_points[4, 0] = signal.time_properties.time_end_points[0]
+            source_time_end_points[4, 1] = signal.time_properties.time_end_points[1]
+
+            self.source_index_max += 5
 
         elif self.measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
             # Initialise
@@ -578,7 +639,7 @@ class SimulationManager:
     measurement_method : :obj:`MeasurementMethod`
         Method used to retrieve frequency amplitudes.
     """
-    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, number_of_squares = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.HARD_PULSE, signal_reconstruction = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
+    def __init__(self, signal, frequency, archive:Archive, state_properties:StateProperties = None, state_output = None, spin_output = None, number_of_squares = [28], device:spinsim.Device = None, execution_time_output = None, measurement_method:MeasurementMethod = MeasurementMethod.CORPSE, signal_reconstruction = None, bias_amplitude = 840e3, integration_method:spinsim.IntegrationMethod = spinsim.IntegrationMethod.MAGNUS_CF4, use_rotating_frame:bool = True):
         """
         Parameters
         ----------
@@ -1036,7 +1097,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
                             )
             if field_sample.size > 2:
                 field_sample[3] = math.tau*source_quadratic_shift
-    elif measurement_method == MeasurementMethod.HARD_PULSE:
+    elif measurement_method == MeasurementMethod.HARD_PULSE or measurement_method == MeasurementMethod.CORPSE:
         def evaluate_dressing(time_sample, rabi_frequency, field_sample):
             field_sample[0] = 0
             field_sample[1] = 0
