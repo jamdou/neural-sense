@@ -1,5 +1,6 @@
 from matplotlib.colors import Colormap
 import numpy as np
+import numba as nb
 import numba.cuda as cuda
 import math
 import matplotlib.pyplot as plt
@@ -365,77 +366,164 @@ def fit_frequency(frequency_dressing, spin, time_coarse, do_plot = False):
 
     return shift, shift_predict
 
-class Spectrogram():
-    def __init__(self, time, signal, bin_size, window_size, frequency_range):
-        self.time = np.ascontiguousarray(time)
-        self.signal = np.ascontiguousarray(signal)
-        self.frequency_range = frequency_range
-        time_step = (time[time.size - 1] - time[0])/time.size
-        self.bin_size = [bin_size[0], bin_size[1]]
-        self.bin_size[0] /= time_step
-        self.window_size = int(0.5*window_size/time_step)
-        print(self.window_size)
-        # print((int((time[time.size - 1] - time[0])//bin_size[0]), int((frequency_range[1] - frequency_range[0])//bin_size[1])))
-        self.stft = np.empty((int(time.size//self.bin_size[0]), int((frequency_range[1] - frequency_range[0])//self.bin_size[1]), 3), np.float64)
-        self.bin_size[0] = int(time.size/self.stft.shape[0])
-        self.bin_size = np.asarray(self.bin_size, np.int64)
-        # self.bin_size[0] = int(self.bin_size[0]/time_step)
-        self.bin_start = [
-            time[0],
-            frequency_range[0]
-        ]
-        self.bin_start = np.asarray(self.bin_start, np.int64)
+def fft_cuda(signal):
+    power_of_2_shape = int(2**math.ceil(math.log2(signal.shape[1])))
+    number_of_iterations = int(math.ceil(math.log2(signal.shape[1])))
+    if signal.ndim == 2:
+        signal_reshape = np.zeros((signal.shape[0], power_of_2_shape))
+    else:
+        signal_reshape = np.zeros((1, power_of_2_shape))
+    signal_reshape[:, 0:signal.shape[1]] = signal
+    output = np.array(signal_reshape, np.cdouble)
+    # output = cuda.to_device(output)
 
-        threads_per_block = (16, 8)
-        blocks_per_grid = (
-            (self.stft.shape[0] + (threads_per_block[0] - 1)) // threads_per_block[0],
-            (self.stft.shape[1] + (threads_per_block[1] - 1)) // threads_per_block[1],
-        )
+    block_size = (int(max(128//signal_reshape.shape[0], 1)), int(signal_reshape.shape[0]))
+    number_of_blocks = (int(signal_reshape.shape[1] // block_size[0]), int(signal_reshape.shape[0] // block_size[1]))
+    print(block_size)
+    print(number_of_blocks)
+    for iteration_index in range(1, number_of_iterations):
+        stride = int(2**iteration_index)
+        # block_size = (int(max(128//signal_reshape.shape[0], 1)), int(signal_reshape.shape[0]))
+        # number_of_blocks = (int(max((signal_reshape.shape[1]/stride) // block_size[0], 1)), int(signal_reshape.shape[0] // block_size[1]))
+        # print(block_size)
+        dit_fft_cuda[number_of_blocks, block_size](output, stride)
+    
+    return output
 
-        get_stft[blocks_per_grid, threads_per_block](self.time, self.signal, self.bin_start, self.bin_size, self.window_size, self.stft)
+@cuda.jit("(complex128[:, :], int32)")
+def dit_fft_cuda(input, stride):
+    sample_index = cuda.blockIdx.x*cuda.blockDim.x + cuda.threadIdx.x
+    fft_index = cuda.blockIdx.y*cuda.blockDim.y + cuda.threadIdx.x
+    if fft_index < input.shape[0]:
+        if sample_index < input.shape[1]//stride:
+            for stride_index in range(input.shape[1]//stride//2):
+                p = input[fft_index, sample_index*stride + stride_index]
+                q = input[fft_index, sample_index*stride + stride_index + stride//2]*(math.cos(math.tau/(input.shape[1]//stride)*stride_index) - 1j*math.sin(math.tau/(input.shape[1]//stride)*stride_index))
+                input[fft_index, sample_index*stride + stride_index] = p + q
+                input[fft_index, sample_index*stride + stride_index + stride//2] = p - q
 
-        # self.stft[:, :, 2] += np.min(self.stft[:, :, 2])
-        self.stft /= np.max(self.stft[:, :, 2])
-        self.stft[:, :, 0] = self.stft[:, :, 2]*0.5*(1 + self.stft[:, :, 0])
-        self.stft[:, :, 1] = self.stft[:, :, 2]*0.5*(1 + self.stft[:, :, 1])
+def fft_cuda_test():
+    time = np.linspace(0, 1, 4096)
+    # signal = np.vstack([np.cos(math.tau*300*time), np.cos(math.tau*400*time)])
+    signal = np.vstack([np.sign(np.cos(math.tau*300*time))])
+    plt.figure()
+    plt.plot(signal[0, :])
+    plt.show()
+    print(signal.shape)
+    fft = np.abs(fft_cuda(signal))
+    plt.figure()
+    plt.plot(fft[0, :])
+    # plt.plot(fft[1, :])
+    plt.show()
 
-        # self.stft[:, :, 2] = 1 - self.stft[:, :, 2]
-        # print(self.stft.real)
+if __name__ == "__main__":
+    fft_cuda_test()
+# class Sepctrogram():
+#     def __init__(self, signal):
+#         self.signal = signal
 
-    def plot(self, do_technicolour = False):
-        plt.figure()
-        stft = np.swapaxes(self.stft, 0, 1)
-        if not do_technicolour:
-            stft = stft[:, :, 2]
-        plt.imshow(
-            stft,
-            aspect = "auto",
-            extent = (self.time[0], self.time[self.time.size - 1], self.frequency_range[0]/1e3, self.frequency_range[1]/1e3),
-            origin = "lower",
-            cmap = "inferno"
-        )
-        plt.xlabel("Time (s)")
-        plt.ylabel("Frequency (kHz)")
-        plt.draw()
+#     @nb.njit
+#     def compute_stft(self):
+#         pass
+    
+#     @nb.njit
+#     def compute_fft(self, signal):
+#         signal_reshape = np.zeros(2**math.ceil(math.log2(signal.size)))
+#         self.signal[0, signal.size - 1] = signal
+#         output = self.compute_dit_fft(signal, 0, signal_reshape.size, 1)
+#         return output
+    
+#     @nb.njit
+#     def compute_dit_fft(self, signal, start, number_of_samples, stride):
+#         output = np.empty(number_of_samples)
+#         if number_of_samples == 1:
+#             output[0] = np.array([signal[start]])
+#         else:
+#             for i in nb.prange(2):
+#                 if i == 0:
+#                     output_even = self.compute_dit_fft(signal, start, number_of_samples/2, stride*2)
+#                 else:
+#                     output_odd = self.compute_dit_fft(signal, start + stride, number_of_samples/2, stride*2)
+#             np.concatenate(output_even, output_odd)
+#             for sample_point in nb.prange(number_of_samples/2):
+#                 p = output[sample_point]
+#                 q = output[sample_point + number_of_samples/2]*math.exp(-1j*math.tau/number_of_samples*sample_point)
+#                 output[sample_point] = p + q
+#                 output[sample_point + number_of_samples/2] = p - q
+#         return output
 
-    def write_to_file(self, archive):
-        pass
 
-@cuda.jit
-def get_stft(time, signal, bin_start, bin_size, window_size, stft):
-    time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
-    frequency_index = cuda.threadIdx.y + cuda.blockIdx.y*cuda.blockDim.y
-    if time_index < stft.shape[0] and frequency_index < stft.shape[1]:
-        frequency = bin_start[1] + frequency_index*bin_size[1]
-        time_sample_index = time_index*bin_size[0]
-        stft_temp = 0
-        for time_fine_index in range(-window_size, window_size):
-            if time_sample_index + time_fine_index >= 0 and time_sample_index + time_fine_index < time.size:
-                stft_temp += signal[time_sample_index + time_fine_index]*(math.cos(math.tau*frequency*time[time_sample_index + time_fine_index]) - 1j*math.sin(math.tau*frequency*time[time_sample_index + time_fine_index]))*(1 + math.cos(0.5*math.tau*time_fine_index/window_size))
-                # *math.exp(-1e14*(time[time_sample_index + int(bin_size[0]/2)] - time[time_sample_index + time_fine_index])**2)
-        stft_abs = math.sqrt((stft_temp.real**2 + stft_temp.imag**2).real)#/(frequency**2)
+# class Spectrogram():
+#     def __init__(self, time, signal, bin_size, window_size, frequency_range):
+#         self.time = np.ascontiguousarray(time)
+#         self.signal = np.ascontiguousarray(signal)
+#         self.frequency_range = frequency_range
+#         time_step = (time[time.size - 1] - time[0])/time.size
+#         self.bin_size = [bin_size[0], bin_size[1]]
+#         self.bin_size[0] /= time_step
+#         self.window_size = int(0.5*window_size/time_step)
+#         print(self.window_size)
+#         # print((int((time[time.size - 1] - time[0])//bin_size[0]), int((frequency_range[1] - frequency_range[0])//bin_size[1])))
+#         self.stft = np.empty((int(time.size//self.bin_size[0]), int((frequency_range[1] - frequency_range[0])//self.bin_size[1]), 3), np.float64)
+#         self.bin_size[0] = int(time.size/self.stft.shape[0])
+#         self.bin_size = np.asarray(self.bin_size, np.int64)
+#         # self.bin_size[0] = int(self.bin_size[0]/time_step)
+#         self.bin_start = [
+#             time[0],
+#             frequency_range[0]
+#         ]
+#         self.bin_start = np.asarray(self.bin_start, np.int64)
 
-        # stft_log = math.log(stft_abs + 0.001)
-        stft[time_index, frequency_index, 0] = stft_temp.real
-        stft[time_index, frequency_index, 1] = stft_temp.imag
-        stft[time_index, frequency_index, 2] = stft_abs
+#         threads_per_block = (16, 8)
+#         blocks_per_grid = (
+#             (self.stft.shape[0] + (threads_per_block[0] - 1)) // threads_per_block[0],
+#             (self.stft.shape[1] + (threads_per_block[1] - 1)) // threads_per_block[1],
+#         )
+
+#         get_stft[blocks_per_grid, threads_per_block](self.time, self.signal, self.bin_start, self.bin_size, self.window_size, self.stft)
+
+#         # self.stft[:, :, 2] += np.min(self.stft[:, :, 2])
+#         self.stft /= np.max(self.stft[:, :, 2])
+#         self.stft[:, :, 0] = self.stft[:, :, 2]*0.5*(1 + self.stft[:, :, 0])
+#         self.stft[:, :, 1] = self.stft[:, :, 2]*0.5*(1 + self.stft[:, :, 1])
+
+#         # self.stft[:, :, 2] = 1 - self.stft[:, :, 2]
+#         # print(self.stft.real)
+
+#     def plot(self, do_technicolour = False):
+#         plt.figure()
+#         stft = np.swapaxes(self.stft, 0, 1)
+#         if not do_technicolour:
+#             stft = stft[:, :, 2]
+#         plt.imshow(
+#             stft,
+#             aspect = "auto",
+#             extent = (self.time[0], self.time[self.time.size - 1], self.frequency_range[0]/1e3, self.frequency_range[1]/1e3),
+#             origin = "lower",
+#             cmap = "inferno"
+#         )
+#         plt.xlabel("Time (s)")
+#         plt.ylabel("Frequency (kHz)")
+#         plt.draw()
+
+#     def write_to_file(self, archive):
+#         pass
+
+# @cuda.jit
+# def get_stft(time, signal, bin_start, bin_size, window_size, stft):
+#     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+#     frequency_index = cuda.threadIdx.y + cuda.blockIdx.y*cuda.blockDim.y
+#     if time_index < stft.shape[0] and frequency_index < stft.shape[1]:
+#         frequency = bin_start[1] + frequency_index*bin_size[1]
+#         time_sample_index = time_index*bin_size[0]
+#         stft_temp = 0
+#         for time_fine_index in range(-window_size, window_size):
+#             if time_sample_index + time_fine_index >= 0 and time_sample_index + time_fine_index < time.size:
+#                 stft_temp += signal[time_sample_index + time_fine_index]*(math.cos(math.tau*frequency*time[time_sample_index + time_fine_index]) - 1j*math.sin(math.tau*frequency*time[time_sample_index + time_fine_index]))*(1 + math.cos(0.5*math.tau*time_fine_index/window_size))
+#                 # *math.exp(-1e14*(time[time_sample_index + int(bin_size[0]/2)] - time[time_sample_index + time_fine_index])**2)
+#         stft_abs = math.sqrt((stft_temp.real**2 + stft_temp.imag**2).real)#/(frequency**2)
+
+#         # stft_log = math.log(stft_abs + 0.001)
+#         stft[time_index, frequency_index, 0] = stft_temp.real
+#         stft[time_index, frequency_index, 1] = stft_temp.imag
+#         stft[time_index, frequency_index, 2] = stft_abs
