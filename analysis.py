@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.optimize
 import math
 import matplotlib.pyplot as plt
 from numpy.lib.function_base import gradient
@@ -165,6 +166,94 @@ def find_line_noise_size_from_tilt(experiment_results:arch.ExperimentResults, sc
         archive.write_plot("Neural pulse line tilt (best fit)", "analysis_line_tilt_fit_result")
     plt.draw()
 
+    return modified_experiment_results
+
+def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None, frequency_line_noise = 50):
+    C.starting("finding line noise (Rabi model)")
+
+    frequency = experiment_results.frequency.copy()
+    frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
+
+    def noise_model(rabi_frequency, noise_amplitude):
+        return -(1/(math.tau*scaled.time_end))*np.cos(math.tau*rabi_frequency*scaled.time_end + (noise_amplitude**2)/(4*math.tau*rabi_frequency)*scaled.time_end + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end)))*(math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end)/np.sqrt((math.tau*rabi_frequency)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end))**2))
+
+    noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 1000)[0][0]
+
+    frequency_amplitude_fitted = noise_model(frequency, noise_amplitude_fitted)
+    frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted
+
+    mean_squared_error = np.mean(frequency_amplitude_residual**2)
+
+    C.print(f"Noise = {noise_amplitude_fitted}")
+    C.finished("finding line noise (Rabi model)")
+    
+    analysis_group = archive.archive_file.require_group("analysis")
+    analysis_group["line_noise_amplitude_fit"] = frequency_amplitude_residual
+    analysis_group["line_noise_amplitude_fit"].attrs["line_noise_amplitude"] = noise_amplitude_fitted
+    analysis_group["line_noise_amplitude_fit"].attrs["mean_squared_error"] = mean_squared_error
+    analysis_group["line_noise_amplitude_fit"].attrs["root_mean_squared_error"] = np.sqrt(mean_squared_error)
+    if experiment_results.archive_time:
+        analysis_group["line_noise_amplitude_fit"].attrs["old_archive_time"] = experiment_results.archive_time
+
+    modified_experiment_results = arch.ExperimentResults(frequency = 1*experiment_results.frequency, frequency_amplitude = frequency_amplitude_residual.copy(), archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected")
+
+    plt.figure()
+    plt.plot(frequency, frequency_amplitude_measured, "r.")
+    plt.plot(frequency, frequency_amplitude_fitted, "b.")
+    plt.plot(frequency, frequency_amplitude_residual, "y.--")
+    plt.legend(["Measured", "Fitted", "Residual"])
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Amplitude (Hz)")
+    if archive:
+        archive.write_plot("Neural pulse line Rabi (best fit)", "analysis_line_rabi_fit_result")
+    plt.draw()
+    return modified_experiment_results
+
+def find_noise_size_from_fourier_transform(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None, frequency_line_noise = 50):
+    C.starting("finding line noise (FT model)")
+
+    frequency = experiment_results.frequency.copy()
+    frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
+
+    def noise_model(rabi_frequency, noise_amplitude):
+        rabi_frequency_readout = 1e4
+        readout_overshoot = -math.pi*((math.tau*noise_amplitude)**2)/(8*((math.tau*rabi_frequency_readout)**2))*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end))
+        # C.print(f"{readout_overshoot}")
+        fourier_transform_line_noise = math.tau*noise_amplitude/2*(np.sin(math.tau*(rabi_frequency + frequency_line_noise)*scaled.time_end)/(math.tau*(rabi_frequency + frequency_line_noise)) - np.sin(math.tau*(rabi_frequency - frequency_line_noise)*scaled.time_end)/(math.tau*(rabi_frequency - frequency_line_noise)))
+        return 1/(math.tau*scaled.time_end)*np.sin(fourier_transform_line_noise*np.cos(readout_overshoot) - fourier_transform_line_noise*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
+        # return 1/(math.tau*scaled.time_end)*( - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
+
+    noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 500)[0][0]
+
+    frequency_amplitude_fitted = noise_model(frequency, 200)
+    frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted
+
+    mean_squared_error = np.mean(frequency_amplitude_residual**2)
+
+    C.print(f"Noise = {noise_amplitude_fitted:.2f}")
+    C.print(f"RMSE = {np.sqrt(mean_squared_error):.2f}")
+    C.finished("finding line noise (FT model)")
+    
+    analysis_group = archive.archive_file.require_group("analysis")
+    analysis_group["line_noise_amplitude_fit"] = frequency_amplitude_residual
+    analysis_group["line_noise_amplitude_fit"].attrs["line_noise_amplitude"] = noise_amplitude_fitted
+    analysis_group["line_noise_amplitude_fit"].attrs["mean_squared_error"] = mean_squared_error
+    analysis_group["line_noise_amplitude_fit"].attrs["root_mean_squared_error"] = np.sqrt(mean_squared_error)
+    if experiment_results.archive_time:
+        analysis_group["line_noise_amplitude_fit"].attrs["old_archive_time"] = experiment_results.archive_time
+
+    modified_experiment_results = arch.ExperimentResults(frequency = 1*experiment_results.frequency, frequency_amplitude = frequency_amplitude_residual.copy(), archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected")
+
+    plt.figure()
+    plt.plot(frequency, frequency_amplitude_measured, "r.")
+    plt.plot(frequency, frequency_amplitude_fitted, "b.")
+    plt.plot(frequency, frequency_amplitude_residual, "y.")
+    plt.legend(["Measured", "Fitted", "Residual"])
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Amplitude (Hz)")
+    if archive:
+        archive.write_plot("Neural pulse line FT (best fit)", "analysis_line_ft_fit_result")
+    plt.draw()
     return modified_experiment_results
 
 def find_time_blind_spots(scaled:util.ScaledParameters, archive:arch.Archive = None):

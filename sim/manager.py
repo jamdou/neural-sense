@@ -238,7 +238,7 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 1e3
+            readout_amplitude = 1e4
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
             # cycle_period = 1/100

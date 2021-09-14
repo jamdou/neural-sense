@@ -72,9 +72,9 @@ if __name__ == "__main__":
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
-            # [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 1000])],
+            # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
+            [],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 200])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
         )
@@ -103,13 +103,13 @@ if __name__ == "__main__":
         # frequency = np.arange(990, 1010, 0.02)
         # frequency = np.arange(253, 3251, 30)
         # frequency = np.arange(1000, 1003, 1)
-        frequency = np.arange(1000, 1001, 1)
+        # frequency = np.arange(1000, 1001, 1)
         # frequency = np.arange(0, 1000000, 1)
         # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-        # frequency = scaled.sample_frequencies
+        frequency = scaled.sample_frequencies
 
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.CORPSE, signal_reconstruction = signal_reconstruction)
-        simulation_manager.evaluate(True, False)
+        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+        simulation_manager.evaluate(False, False)
 
         # === Experiment results ===
         experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
@@ -186,6 +186,8 @@ if __name__ == "__main__":
         # analysis.find_time_blind_spots(scaled, archive)
         # analysis.find_neural_signal_size(experiment_results, scaled, archive)
         # analysis.find_line_noise_size(experiment_results, scaled, archive)
+        # analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+        analysis.find_noise_size_from_fourier_transform(experiment_results, scaled, archive)
 
         # === ===                      === ===
         # === === Benchmarks and tests === ===
