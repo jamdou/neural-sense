@@ -45,7 +45,7 @@ if __name__ == "__main__":
         # scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
         scaled = util.ScaledParameters(
             scaled_frequency = 5000,
-            scaled_density = 1/25,
+            scaled_density = 1/20,
             scaled_samples = 10,
             scaled_amplitude = 995.5/2,
             scaled_sweep = [5000/5, 14000],
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 400])],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 50])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties

@@ -175,18 +175,40 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
 
     def noise_model(rabi_frequency, noise_amplitude):
-        rabi_frequency_readout = 5e4
-        pulse_sample_delay = 0.125
-        # pulse_sample_delay = 0
-        readout_overshoot = math.pi/2*(np.sqrt((math.tau*rabi_frequency_readout)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout)))**2)/(math.tau*rabi_frequency_readout) - 1)
-        tilt = np.arctan(noise_amplitude*np.sin(math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout))/rabi_frequency)
-        rabi_phase = math.tau*rabi_frequency*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout) + (math.tau*noise_amplitude)**2/(4*math.tau*rabi_frequency)*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout) + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout)))
-        return -(1/(math.tau*scaled.time_end))*np.cos(rabi_phase)#*np.sin(tilt + readout_overshoot)
+        rabi_frequency_readout = 2e4
+        time_end = scaled.time_end
+
+        noise_end_sample = noise_amplitude*np.sin(math.tau*frequency_line_noise*time_end)
+
+        true_rabi = np.sqrt(rabi_frequency**2 + noise_end_sample**2)
+        cos_tilt = rabi_frequency/true_rabi
+        sin_tilt = noise_end_sample/true_rabi
+
+        true_rabi_readout = np.sqrt(rabi_frequency_readout**2 + noise_end_sample**2)
+        cos_tilt_readout = rabi_frequency_readout/true_rabi_readout
+        sin_tilt_readout = noise_end_sample/true_rabi_readout
+
+        rabi_phase = (math.tau*(rabi_frequency + (noise_amplitude**2)/(4*rabi_frequency))*time_end + (noise_amplitude**2)/(8*rabi_frequency*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*time_end)))
+        cos_rabi_phase = np.cos(rabi_phase)
+        sin_rabi_phase = np.sin(rabi_phase)
+
+        cos_overshoot = np.sin(math.pi/(2*cos_tilt_readout))
+
+        # return cos_tilt*cos_tilt_readout*cos_overshoot
+        return (cos_rabi_phase*(cos_tilt*cos_tilt_readout*cos_overshoot - sin_tilt*((sin_tilt_readout**2) - (cos_tilt_readout**2)*cos_overshoot)) - sin_rabi_phase*(cos_tilt_readout*sin_tilt_readout + cos_tilt_readout*sin_tilt_readout*cos_overshoot))
+        # -(1/(math.tau*scaled.time_end))*
+
+        # pulse_sample_delay = 0.125
+        # # pulse_sample_delay = 0
+        # readout_overshoot = math.pi/2*(np.sqrt((math.tau*rabi_frequency_readout)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout)))**2)/(math.tau*rabi_frequency_readout) - 1)
+        # tilt = np.arctan(noise_amplitude*np.sin(math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout))/rabi_frequency)
+        # rabi_phase = math.tau*rabi_frequency*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout) + (math.tau*noise_amplitude)**2/(4*math.tau*rabi_frequency)*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout) + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout)))
+        # return -(1/(math.tau*scaled.time_end))*np.cos(rabi_phase)#*np.sin(tilt + readout_overshoot)
         # return -(1/(math.tau*scaled.time_end))*np.cos(math.tau*rabi_frequency*scaled.time_end + (noise_amplitude**2)/(4*math.tau*rabi_frequency)*scaled.time_end + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end)))*(math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end)/np.sqrt((math.tau*rabi_frequency)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end))**2))
 
     # noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 100, method = "trf")[0][0]
 
-    frequency_amplitude_fitted = noise_model(frequency, 400)
+    frequency_amplitude_fitted = noise_model(frequency, 50)
     frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted
 
     mean_squared_error = np.mean(frequency_amplitude_residual**2)
