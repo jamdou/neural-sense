@@ -238,13 +238,13 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 1e4
+            readout_amplitude = 5e4
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
             # cycle_period = 1/100
             cycle_period = None
             # readout_amplitude = 1/(math.floor((1/readout_amplitude)/cycle_period)*cycle_period)
-            dressing_end_buffer = (2/readout_amplitude)
+            dressing_end_buffer = 0*(2/readout_amplitude)
             # readout_amplitude = 0
 
             source_time_end_points[0, 0] = signal.time_properties.time_end_points[0]

@@ -42,15 +42,15 @@ if __name__ == "__main__":
 
         # === Scaled protocol ===
         experiment_time = "20210429T125734"
-        scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
-        # scaled = util.ScaledParameters(
-        #     scaled_frequency = 5013,
-        #     scaled_density = 1/30,
-        #     scaled_samples = 10,
-        #     scaled_amplitude = 995.5,
-        #     scaled_sweep = [5013/5, 14000],
-        #     scaled_pulse_time_fraction = 0.2333333*25/30
-        # )
+        # scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
+        scaled = util.ScaledParameters(
+            scaled_frequency = 5000,
+            scaled_density = 1/25,
+            scaled_samples = 10,
+            scaled_amplitude = 995.5/2,
+            scaled_sweep = [5000/5, 14000],
+            scaled_pulse_time_fraction = 0.2333333
+        )
         scaled.print()
         scaled.write_to_file(archive)
 
@@ -74,8 +74,9 @@ if __name__ == "__main__":
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 200])],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 400])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
+            # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
         )
         signal_reconstruction = test_signal.TestSignal(
@@ -144,7 +145,7 @@ if __name__ == "__main__":
         # reconstruction.evaluate_fista_ayanzadeh(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 11.87
+        #     expected_error_measurement = 11.87/3
         # )
         # # reconstruction.evaluate_least_squares()
         # # reconstruction.evaluate_fista()
@@ -186,8 +187,8 @@ if __name__ == "__main__":
         # analysis.find_time_blind_spots(scaled, archive)
         # analysis.find_neural_signal_size(experiment_results, scaled, archive)
         # analysis.find_line_noise_size(experiment_results, scaled, archive)
-        # analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
-        analysis.find_noise_size_from_fourier_transform(experiment_results, scaled, archive)
+        analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+        # analysis.find_noise_size_from_fourier_transform(experiment_results, scaled, archive)
 
         # === ===                      === ===
         # === === Benchmarks and tests === ===

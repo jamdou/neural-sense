@@ -175,21 +175,29 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
 
     def noise_model(rabi_frequency, noise_amplitude):
-        return -(1/(math.tau*scaled.time_end))*np.cos(math.tau*rabi_frequency*scaled.time_end + (noise_amplitude**2)/(4*math.tau*rabi_frequency)*scaled.time_end + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end)))*(math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end)/np.sqrt((math.tau*rabi_frequency)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end))**2))
+        rabi_frequency_readout = 5e4
+        pulse_sample_delay = 0.125
+        # pulse_sample_delay = 0
+        readout_overshoot = math.pi/2*(np.sqrt((math.tau*rabi_frequency_readout)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout)))**2)/(math.tau*rabi_frequency_readout) - 1)
+        tilt = np.arctan(noise_amplitude*np.sin(math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout))/rabi_frequency)
+        rabi_phase = math.tau*rabi_frequency*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout) + (math.tau*noise_amplitude)**2/(4*math.tau*rabi_frequency)*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout) + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*(scaled.time_end + pulse_sample_delay/rabi_frequency_readout)))
+        return -(1/(math.tau*scaled.time_end))*np.cos(rabi_phase)#*np.sin(tilt + readout_overshoot)
+        # return -(1/(math.tau*scaled.time_end))*np.cos(math.tau*rabi_frequency*scaled.time_end + (noise_amplitude**2)/(4*math.tau*rabi_frequency)*scaled.time_end + ((math.tau*noise_amplitude)**2)/(8*math.tau*rabi_frequency*math.tau*frequency_line_noise)*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end)))*(math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end)/np.sqrt((math.tau*rabi_frequency)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end))**2))
 
-    noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 1000)[0][0]
+    # noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 100, method = "trf")[0][0]
 
-    frequency_amplitude_fitted = noise_model(frequency, noise_amplitude_fitted)
+    frequency_amplitude_fitted = noise_model(frequency, 400)
     frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted
 
     mean_squared_error = np.mean(frequency_amplitude_residual**2)
 
-    C.print(f"Noise = {noise_amplitude_fitted}")
+    # C.print(f"Noise = {noise_amplitude_fitted}")
+    C.print(f"RMSE = {np.sqrt(mean_squared_error):.2f}")
     C.finished("finding line noise (Rabi model)")
     
     analysis_group = archive.archive_file.require_group("analysis")
     analysis_group["line_noise_amplitude_fit"] = frequency_amplitude_residual
-    analysis_group["line_noise_amplitude_fit"].attrs["line_noise_amplitude"] = noise_amplitude_fitted
+    # analysis_group["line_noise_amplitude_fit"].attrs["line_noise_amplitude"] = noise_amplitude_fitted
     analysis_group["line_noise_amplitude_fit"].attrs["mean_squared_error"] = mean_squared_error
     analysis_group["line_noise_amplitude_fit"].attrs["root_mean_squared_error"] = np.sqrt(mean_squared_error)
     if experiment_results.archive_time:
@@ -200,7 +208,7 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     plt.figure()
     plt.plot(frequency, frequency_amplitude_measured, "r.")
     plt.plot(frequency, frequency_amplitude_fitted, "b.")
-    plt.plot(frequency, frequency_amplitude_residual, "y.--")
+    plt.plot(frequency, frequency_amplitude_residual, "y.")
     plt.legend(["Measured", "Fitted", "Residual"])
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Amplitude (Hz)")
@@ -216,16 +224,17 @@ def find_noise_size_from_fourier_transform(experiment_results:arch.ExperimentRes
     frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
 
     def noise_model(rabi_frequency, noise_amplitude):
-        rabi_frequency_readout = 1e4
-        readout_overshoot = -math.pi*((math.tau*noise_amplitude)**2)/(8*((math.tau*rabi_frequency_readout)**2))*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end))
+        rabi_frequency_readout = 2e4
+        # readout_overshoot = 10*math.pi*((math.tau*noise_amplitude)**2)/(8*((math.tau*rabi_frequency_readout)**2))*(1 - np.cos(2*math.tau*frequency_line_noise*scaled.time_end))
+        readout_overshoot = math.pi/2*(np.sqrt((math.tau*rabi_frequency_readout)**2 + (math.tau*noise_amplitude*np.sin(math.tau*frequency_line_noise*scaled.time_end))**2)/(math.tau*rabi_frequency_readout) - 1)
         # C.print(f"{readout_overshoot}")
         fourier_transform_line_noise = math.tau*noise_amplitude/2*(np.sin(math.tau*(rabi_frequency + frequency_line_noise)*scaled.time_end)/(math.tau*(rabi_frequency + frequency_line_noise)) - np.sin(math.tau*(rabi_frequency - frequency_line_noise)*scaled.time_end)/(math.tau*(rabi_frequency - frequency_line_noise)))
-        return 1/(math.tau*scaled.time_end)*np.sin(fourier_transform_line_noise*np.cos(readout_overshoot) - fourier_transform_line_noise*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
+        return -1/(math.tau*scaled.time_end)*(np.sin(fourier_transform_line_noise)*np.cos(readout_overshoot) - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
         # return 1/(math.tau*scaled.time_end)*( - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
 
     noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 500)[0][0]
 
-    frequency_amplitude_fitted = noise_model(frequency, 200)
+    frequency_amplitude_fitted = noise_model(frequency, 500)
     frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted
 
     mean_squared_error = np.mean(frequency_amplitude_residual**2)
