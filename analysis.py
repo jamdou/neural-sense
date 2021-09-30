@@ -1,12 +1,12 @@
 import numpy as np
-import scipy.optimize
+# from scipy.optimize import curve_fit
 import math
 import matplotlib.pyplot as plt
 from numpy.lib.function_base import gradient
 
 import archive as arch
-from util import C
 import util
+from util import C
 
 def find_neural_signal_size(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None):
     print(f"{C.y}Starting fit...{C.d}")
@@ -206,7 +206,7 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     mean_squared_error = None
     for starting_noise_amplitude in range(-2000, 2100, 100):
         try:
-            noise_amplitude_fitted_start = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, starting_noise_amplitude, method = "trf")[0][0]
+            noise_amplitude_fitted_start = curve_fit(noise_model, frequency, frequency_amplitude_measured, starting_noise_amplitude, method = "trf")[0][0]
         except:
             noise_amplitude_fitted_start = 0
         frequency_amplitude_fitted_start = noise_model(frequency, noise_amplitude_fitted_start)
@@ -259,7 +259,7 @@ def find_noise_size_from_fourier_transform(experiment_results:arch.ExperimentRes
         return -1/(math.tau*scaled.time_end)*(np.sin(fourier_transform_line_noise)*np.cos(readout_overshoot) - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
         # return 1/(math.tau*scaled.time_end)*( - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
 
-    noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 500)[0][0]
+    noise_amplitude_fitted = curve_fit(noise_model, frequency, frequency_amplitude_measured, 500)[0][0]
 
     frequency_amplitude_fitted = noise_model(frequency, 500)
     frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted
