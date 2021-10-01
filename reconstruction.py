@@ -319,7 +319,10 @@ class Reconstruction():
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
         evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
-        self.amplitude = 100 + 0*np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+        # self.amplitude = 100 + 0*np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+        # self.amplitude = 150*(1 - 2*np.fmod(self.time_properties.time_coarse/self.time_properties.time_coarse[1], 2))
+        self.amplitude = 0*self.time_properties.time_coarse
+        self.amplitude[0] = 1
         amplitude = cuda.to_device(self.amplitude)
         amplitude_previous = cuda.to_device(1*self.amplitude)
 
@@ -347,10 +350,11 @@ class Reconstruction():
                 shrink_scale_denominator = shrink_scale - self.norm_scale_factor*self.reconstruction_step
                 if shrink_scale_denominator < 0:
                     shrink_scale_denominator = 0
-                shrink_scale = shrink_scale/shrink_scale_denominator
-                if shrink_scale > self.shrink_size_max:
                     shrink_scale = self.shrink_size_max
-                # shrink_scale = 1
+                else:
+                    shrink_scale = shrink_scale/shrink_scale_denominator
+                    if shrink_scale > self.shrink_size_max:
+                        shrink_scale = self.shrink_size_max
                 evaluate_next_iteration_ista_shrink_scale[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.norm_scale_factor, reconstruction_step_backtrack, shrink_scale)
                 fast_step_size_previous_previous = fast_step_size_previous
                 fast_step_size_previous = fast_step_size
@@ -412,13 +416,16 @@ class Reconstruction():
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
         evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
-        self.amplitude = 100 + 0*np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+        # self.amplitude = 100 + 0*np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+        # self.amplitude = 150*(1 - 2*np.fmod(self.time_properties.time_coarse/self.time_properties.time_coarse[1], 2))
+        self.amplitude = 0*self.time_properties.time_coarse
+        self.amplitude[0] = 1
         amplitude = cuda.to_device(self.amplitude)
         amplitude_previous = cuda.to_device(1*self.amplitude)
 
         frequency_amplitude = cuda.to_device(self.frequency_amplitude)
-        fit_parameters = cuda.to_device(np.array([500], np.float64))
-        fit_parameters_previous = cuda.to_device(np.array([500], np.float64))
+        fit_parameters = cuda.to_device(np.array([800], np.float64))
+        fit_parameters_previous = cuda.to_device(np.array([800], np.float64))
         line_noise_derivative_amplitude = cuda.to_device(0*self.frequency_amplitude)
 
         frequency_amplitude_prediction = np.zeros(self.frequency_amplitude.size, np.float64)
@@ -438,14 +445,16 @@ class Reconstruction():
             do_backtrack = True
             while do_backtrack:
                 copy_amplitude_fit[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fit_parameters, fit_parameters_previous)
-                evaluate_frequency_amplitude_prediction_fit[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction, cuda.to_device(self.frequency), fit_parameters, line_noise_derivative_amplitude, self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0], rabi_frequency_readout, frequency_line_noise)
+                evaluate_frequency_amplitude_prediction_fit[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction, cuda.to_device(self.frequency), fit_parameters, line_noise_derivative_amplitude, self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0] + 0.0/rabi_frequency_readout, rabi_frequency_readout, frequency_line_noise)
                 shrink_scale = np.max(np.abs(amplitude.copy_to_host()))
                 shrink_scale_denominator = shrink_scale - self.norm_scale_factor*self.reconstruction_step
                 if shrink_scale_denominator < 0:
                     shrink_scale_denominator = 0
-                shrink_scale = shrink_scale/shrink_scale_denominator
-                if shrink_scale > self.shrink_size_max:
                     shrink_scale = self.shrink_size_max
+                else:
+                    shrink_scale = shrink_scale/shrink_scale_denominator
+                    if shrink_scale > self.shrink_size_max:
+                        shrink_scale = self.shrink_size_max
                 # shrink_scale = 1
                 evaluate_next_iteration_ista_fit[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.norm_scale_factor, reconstruction_step_backtrack, shrink_scale, fit_parameters, line_noise_derivative_amplitude)
                 fast_step_size_previous_previous = fast_step_size_previous
@@ -649,7 +658,7 @@ def evaluate_next_iteration_ista_fit(amplitude, frequency_amplitude, frequency_a
 
     if time_index == amplitude.size:
         for frequency_index in range(frequency_amplitude.size):
-            fit_parameters[0] += 2*line_noise_derivative_amplitude[frequency_index]*(frequency_amplitude[frequency_index] - frequency_amplitude_prediction[frequency_index])*reconstruction_step*5e-1
+            fit_parameters[0] += 2*line_noise_derivative_amplitude[frequency_index]*(frequency_amplitude[frequency_index] - frequency_amplitude_prediction[frequency_index])*reconstruction_step*8e-2
 
 @cuda.jit()
 def evaluate_fista_fast_step(amplitude, amplitude_previous, fast_step_size, fast_step_size_previous):
@@ -703,7 +712,7 @@ def subtract_constant(amplitude, constant):
     if time_index < amplitude.size:
         amplitude[time_index] -= constant
 
-def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None):
+def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None):
     reconstruction = Reconstruction(expected_signal.time_properties)
 
     random_seeds = np.array(random_seeds)
@@ -724,8 +733,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
                     reconstruction.evaluate_least_squares()
                 elif evaluation_method == "fista_ayanzadeh":
                     reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
+                elif evaluation_method == "fista_fit":
+                    reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 else:
-                    reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
+                    reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 reconstruction.write_to_file(archive.archive_file, (numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
 
                 amplitudes.append(reconstruction.amplitude.copy())
@@ -773,6 +784,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         "least_squares" : "Least squares",
         "fista_ayanzadeh" : "FISTA (Ayanzadeh)",
         "fista_backtracking" : "FISTA (Backtracking)",
+        "fista_fit" : "FISTA (Line noise fit)",
         "fista" : "FISTA",
         "ista_backtracking" : "ISTA (Backtracking)",
         "ista" : "ISTA",
@@ -783,6 +795,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     evaluation_method_legend = {
         "least_squares" : "b-",
         "fista_backtracking" : "c-",
+        "fista_fit" : "r-",
         "fista_ayanzadeh" : "y-",
         "fista" : "c--",
         "ista_backtracking" : "k-",

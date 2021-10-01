@@ -76,7 +76,7 @@ if __name__ == "__main__":
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             # [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 400])],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 600])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
@@ -127,8 +127,8 @@ if __name__ == "__main__":
         experiment_results.plot(archive, signal_reconstruction)
         # experiment_results.frequency_amplitude /= np.sqrt(2)
         experiment_results.write_to_archive(archive)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14e3, random_seed = util.Seeds.metroid)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(80, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14e3, random_seed = util.Seeds.metroid)
+        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(70, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
         # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
         # reconstruction.evaluate_ista(
         #     expected_amplitude = scaled.amplitude,
@@ -144,7 +144,7 @@ if __name__ == "__main__":
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
         #     expected_error_measurement = 11.87,
-        #     norm_scale_factor_modifier = 0.0004
+        #     norm_scale_factor_modifier = 0.001
         # )
         # reconstruction.evaluate_fista_ayanzadeh(
         #     expected_amplitude = scaled.amplitude,
@@ -155,7 +155,7 @@ if __name__ == "__main__":
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
             expected_error_measurement = 11.87,
-            norm_scale_factor_modifier = 0.0004,#0.002
+            norm_scale_factor_modifier = 0.001,#0.002
         )
         # reconstruction.evaluate_least_squares()
         # reconstruction.evaluate_fista()
@@ -184,10 +184,13 @@ if __name__ == "__main__":
         #     sweep_parameters = (0, 10000, 10),
         #     archive = archive,
         #     random_seeds = np.arange(10)*util.Seeds.metroid,
-        #     evaluation_methods = ["least_squares", "fista_backtracking", "fista_ayanzadeh"],
+        #     evaluation_methods = ["least_squares", "fista_backtracking", "fista_fit"],
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 11.87
+        #     expected_error_measurement = 11.87,
+        #     norm_scale_factor_modifier = 0.001,
+        #     frequency_line_noise = 50,
+        #     rabi_frequency_readout = 2e3
         # )
 
         # === ===          === ===
