@@ -7,7 +7,7 @@ import numba as nb
 import time as tm
 
 import util
-from util import C
+from util import PrettyTritty as C
 from archive import *
 from test_signal import *
 

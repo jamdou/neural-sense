@@ -12,11 +12,13 @@ from numba import cuda
 import numba as nb
 import time as tm
 import os
-from test_signal import *
 import enum
-import util
+
+from test_signal import *
 from archive import Archive
 import h5py
+
+from util import PrettyTritty as C
 
 # from .benchmark.results import *
 
@@ -238,7 +240,7 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 2e4
+            readout_amplitude = 5e4
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
             # cycle_period = 1/100
@@ -272,7 +274,7 @@ class SourceProperties:
             # source_time_end_points[1, 0] = source_time_end_points[1, 1] - 1/(4*readout_amplitude)
             source_amplitude[1, 0] = 2*readout_amplitude
             source_frequency[1, 0] = bias_amplitude# + 3*((readout_amplitude**2)/bias_amplitude)/4
-            source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+            source_phase[1, 0] = math.tau*math.fmod(bias_amplitude*(source_time_end_points[1, 0]), 1)
             # source_amplitude[1, 1] = readout_amplitude
             # source_frequency[1, 1] = bias_amplitude# - (readout_amplitude**2/bias_amplitude)/4
             # source_phase[1, 1] = math.tau*math.fmod(0.25 + bias_amplitude*(source_time_end_points[1, 0]), 1)
@@ -700,11 +702,12 @@ class SimulationManager:
         do_write_everything : :obj:`bool`, optional
             If :obj:`True`, then save all time series data to file as well as parametric data. Defaults to :obj:`False` to reduce archive file size.
         """
-        print("\033[33mStarting simulations...\033[0m")
+        # print("\033[33mStarting simulations...\033[0m")
+        C.starting("simulation batch")
         execution_time_end_points = np.empty(2)
         execution_time_end_points[0] = tm.time()
         execution_time_end_points[1] = execution_time_end_points[0]
-        print("Idx\tCmp\tTm\tdTm")
+        C.print(f"|{'Index':>8s}|{'Progress':>8s}|{'Time':>8s}|{'d Time':>8s}|")
         archive_group_simulations = self.archive.archive_file.require_group("simulations")
         for device_index, device_instance in enumerate(self.device):
             for number_of_squares_index, number_of_squares_instance in enumerate(self.number_of_squares):
@@ -740,9 +743,11 @@ class SimulationManager:
                             self.spin_output += [simulation.simulation_results.spin.copy()]
                         if self.execution_time_output is not None:
                             self.execution_time_output += [tm.time() - execution_time_end_points[1]]
-                        print("{:4d}\t{:3.0f}%\t{:3.0f}s\t{:2.3f}s".format(simulation_index, 100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.number_of_squares.size*len(self.device)), tm.time() - execution_time_end_points[0], tm.time() - execution_time_end_points[1]), end = "\r")
+                        C.print(f"|{simulation_index:8d}|{100*(simulation_index + 1)/(self.frequency.size*len(self.signal)*self.number_of_squares.size*len(self.device)):7.0f}%|{tm.time() - execution_time_end_points[0]:7.4g}s|{tm.time() - execution_time_end_points[1]:7.3f}s|", end = "\r")
                         execution_time_end_points[1] = tm.time()
-        print("\n\033[32mDone!\033[0m\a")
+        C.print("\n")
+        C.finished("simulation batch")
+        # print("\n\033[32mDone!\033[0m\a")
 
 #===============================================================#
 

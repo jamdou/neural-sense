@@ -7,10 +7,9 @@ import matplotlib.pyplot as plt
 import h5py
 
 import test_signal
-from sim import manager
 import archive as arch
 
-class C:
+class PrettyTritty:
     d = "\033[0m"
     r = "\033[31m"
     g = "\033[32m"
@@ -39,6 +38,7 @@ class C:
         message = message.replace('\n', f'\n{tabs}')
         print(f"{tabs}{message}", end = end)
 
+C = PrettyTritty
 class Seeds:
     metroid = 19960806
 
@@ -188,6 +188,8 @@ def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = 
     """
 
     """
+    from sim import manager
+    
     spin_output = []
     error = []
     time_coarse = signal.time_properties.time_coarse

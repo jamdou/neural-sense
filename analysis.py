@@ -1,12 +1,12 @@
 import numpy as np
-# from scipy.optimize import curve_fit
+import scipy.optimize
 import math
 import matplotlib.pyplot as plt
 from numpy.lib.function_base import gradient
 
 import archive as arch
 import util
-from util import C
+from util import PrettyTritty as C
 
 def find_neural_signal_size(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None):
     print(f"{C.y}Starting fit...{C.d}")
@@ -174,9 +174,13 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     frequency = experiment_results.frequency.copy()
     frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
 
-    def noise_model(rabi_frequency, noise_amplitude):
-        rabi_frequency_readout = 2e4
-        time_end = scaled.time_end
+    def noise_model(rabi_frequency, noise_amplitude, time_extra_cycle):
+        rabi_frequency_readout = 5e4
+        if time_extra_cycle < 0:
+            time_extra_cycle = 0
+        if time_extra_cycle > 0.25:
+            time_extra_cycle = 0.25
+        time_end = scaled.time_end + time_extra_cycle/rabi_frequency_readout
 
         noise_end_sample = noise_amplitude*np.sin(math.tau*frequency_line_noise*time_end)
 
@@ -206,10 +210,13 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     mean_squared_error = None
     for starting_noise_amplitude in range(-2000, 2100, 100):
         try:
-            noise_amplitude_fitted_start = curve_fit(noise_model, frequency, frequency_amplitude_measured, starting_noise_amplitude, method = "trf")[0][0]
+            fit = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, [starting_noise_amplitude, 0], method = "trf")[0]
+            noise_amplitude_fitted_start = fit[0]
+            time_extra_cycle = fit[1]
         except:
             noise_amplitude_fitted_start = 0
-        frequency_amplitude_fitted_start = noise_model(frequency, noise_amplitude_fitted_start)
+            time_extra_cycle = 0
+        frequency_amplitude_fitted_start = noise_model(frequency, noise_amplitude_fitted_start, time_extra_cycle)
         frequency_amplitude_residual_start = frequency_amplitude_measured - frequency_amplitude_fitted_start
         mean_squared_error_start = np.mean(frequency_amplitude_residual_start**2)
         if mean_squared_error is None or mean_squared_error_start < mean_squared_error:
@@ -218,7 +225,8 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
             frequency_amplitude_residual = frequency_amplitude_residual_start
             mean_squared_error = mean_squared_error_start
 
-    C.print(f"Noise = {noise_amplitude_fitted}")
+    C.print(f"Noise = {noise_amplitude_fitted:.2f}")
+    C.print(f"Extra cycle = {time_extra_cycle:.2f}")
     C.print(f"RMSE = {np.sqrt(mean_squared_error):.2f}")
     C.finished("finding line noise (Rabi model)")
     
@@ -259,7 +267,7 @@ def find_noise_size_from_fourier_transform(experiment_results:arch.ExperimentRes
         return -1/(math.tau*scaled.time_end)*(np.sin(fourier_transform_line_noise)*np.cos(readout_overshoot) - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
         # return 1/(math.tau*scaled.time_end)*( - np.cos(fourier_transform_line_noise)*np.cos(math.tau*rabi_frequency*scaled.time_end)*np.sin(readout_overshoot))
 
-    noise_amplitude_fitted = curve_fit(noise_model, frequency, frequency_amplitude_measured, 500)[0][0]
+    noise_amplitude_fitted = scipy.optimize.curve_fit(noise_model, frequency, frequency_amplitude_measured, 500)[0][0]
 
     frequency_amplitude_fitted = noise_model(frequency, 500)
     frequency_amplitude_residual = frequency_amplitude_measured - frequency_amplitude_fitted

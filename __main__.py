@@ -17,6 +17,7 @@ import spinsim                      # Main simulation package
 import reconstruction as recon      # Uses compressive sensing to reconstruct the a magnetic signal
 import sim
 import util
+from util import PrettyTritty as C
 import analysis
 
 if __name__ == "__main__":
@@ -25,9 +26,9 @@ if __name__ == "__main__":
 
     # Check to see if there is a compatible GPU
     if cuda.list_devices():
-        print("\033[32mUsing cuda device {}\033[0m".format(cuda.list_devices()[0].name.decode('UTF-8')))
+        C.print(f"{C.g}Using cuda device {cuda.list_devices()[0].name.decode('UTF-8')}{C.d}")
     else:
-        print("\033[31mNo cuda devices found. System is incompatible. Exiting...\033[0m")
+        print(f"{C.r}No cuda devices found. System is incompatible. Exiting...{C.d}")
         exit()
 
     profile_state, archive_path = handle_arguments()
@@ -43,16 +44,16 @@ if __name__ == "__main__":
 
         # === Scaled protocol ===
         experiment_time = "20210429T125734"
-        scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
-        # scaled = util.ScaledParameters(
-        #     scaled_frequency = 5000,
-        #     scaled_density = 1/35,
-        #     scaled_samples = 10,
-        #     scaled_amplitude = 995.5/2,
-        #     scaled_sweep = [5000/5, 14000],
-        #     scaled_pulse_time_fraction = 0.2333333,
-        #     # scaled_stagger_constant = math.sqrt(7)
-        # )
+        # scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
+        scaled = util.ScaledParameters(
+            scaled_frequency = 5000,
+            scaled_density = 1/25,
+            scaled_samples = 10,
+            scaled_amplitude = 995.5/2,
+            scaled_sweep = [5000/5, 14000],
+            scaled_pulse_time_fraction = 0.2333333,
+            # scaled_stagger_constant = math.sqrt(7)
+        )
         scaled.print()
         scaled.write_to_file(archive)
 
@@ -71,12 +72,12 @@ if __name__ == "__main__":
         time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [0, scaled.time_end])
 
         signal = test_signal.TestSignal(
-            # [],
+            [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
+            # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             # [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 600])],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 0])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
@@ -121,48 +122,48 @@ if __name__ == "__main__":
         # experiment_results.write_to_archive(archive)
         # experiment_results.plot(archive, signal_reconstruction)
 
-        # === Make reconstructions ===
-        reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-        # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
-        experiment_results.plot(archive, signal_reconstruction)
-        # experiment_results.frequency_amplitude /= np.sqrt(2)
-        experiment_results.write_to_archive(archive)
-        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14e3, random_seed = util.Seeds.metroid)
-        reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(70, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
-        # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
-        # reconstruction.evaluate_ista(
-        #     expected_amplitude = scaled.amplitude,
-        #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 11.87
-        # )
-        # reconstruction.evaluate_ista_backtracking(
-        #     expected_amplitude = scaled.amplitude,
-        #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 11.87
-        # )
-        # reconstruction.evaluate_fista_backtracking(
+        # # === Make reconstructions ===
+        # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+        # # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+        # experiment_results.plot(archive, signal_reconstruction)
+        # # experiment_results.frequency_amplitude /= np.sqrt(2)
+        # experiment_results.write_to_archive(archive)
+        # # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(10000, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14e3, random_seed = util.Seeds.metroid)
+        # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = min(70, experiment_results.frequency.size), frequency_cutoff_low = 0, frequency_cutoff_high = 14000, random_seed = util.Seeds.metroid)
+        # # reconstruction.read_frequencies_from_test_signal(signal_reconstruction, number_of_samples = 139)
+        # # reconstruction.evaluate_ista(
+        # #     expected_amplitude = scaled.amplitude,
+        # #     expected_frequency = scaled.frequency,
+        # #     expected_error_measurement = 11.87
+        # # )
+        # # reconstruction.evaluate_ista_backtracking(
+        # #     expected_amplitude = scaled.amplitude,
+        # #     expected_frequency = scaled.frequency,
+        # #     expected_error_measurement = 11.87
+        # # )
+        # # reconstruction.evaluate_fista_backtracking(
+        # #     expected_amplitude = scaled.amplitude,
+        # #     expected_frequency = scaled.frequency,
+        # #     expected_error_measurement = 11.87,
+        # #     norm_scale_factor_modifier = 0.001
+        # # )
+        # # reconstruction.evaluate_fista_ayanzadeh(
+        # #     expected_amplitude = scaled.amplitude,
+        # #     expected_frequency = scaled.frequency,
+        # #     expected_error_measurement = 11.87/3
+        # # )
+        # reconstruction.evaluate_fista_fit(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
         #     expected_error_measurement = 11.87,
-        #     norm_scale_factor_modifier = 0.001
+        #     norm_scale_factor_modifier = 0.0015,#0.002
         # )
-        # reconstruction.evaluate_fista_ayanzadeh(
-        #     expected_amplitude = scaled.amplitude,
-        #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 11.87/3
-        # )
-        reconstruction.evaluate_fista_fit(
-            expected_amplitude = scaled.amplitude,
-            expected_frequency = scaled.frequency,
-            expected_error_measurement = 11.87,
-            norm_scale_factor_modifier = 0.001,#0.002
-        )
-        # reconstruction.evaluate_least_squares()
-        # reconstruction.evaluate_fista()
-        # reconstruction.evaluateISTAComplete()
-        # reconstruction.evaluate_frequency_amplitude(signal_reconstruction)
-        reconstruction.plot(archive, signal_reconstruction)
-        reconstruction.write_to_file(archive.archive_file)
+        # # reconstruction.evaluate_least_squares()
+        # # reconstruction.evaluate_fista()
+        # # reconstruction.evaluateISTAComplete()
+        # # reconstruction.evaluate_frequency_amplitude(signal_reconstruction)
+        # reconstruction.plot(archive, signal_reconstruction)
+        # reconstruction.write_to_file(archive.archive_file)
 
 
         # # === ===                       === ===
@@ -200,7 +201,7 @@ if __name__ == "__main__":
         # analysis.find_time_blind_spots(scaled, archive)
         # analysis.find_neural_signal_size(experiment_results, scaled, archive)
         # analysis.find_line_noise_size(experiment_results, scaled, archive)
-        # analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+        analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
         # analysis.find_noise_size_from_fourier_transform(experiment_results, scaled, archive)
 
         # === ===                      === ===
