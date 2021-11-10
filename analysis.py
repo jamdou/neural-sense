@@ -175,11 +175,13 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
     frequency_amplitude_measured = experiment_results.frequency_amplitude.copy()
 
     def noise_model(rabi_frequency, noise_amplitude, time_extra_cycle):
-        rabi_frequency_readout = 5e4
-        if time_extra_cycle < 0:
-            time_extra_cycle = 0
-        if time_extra_cycle > 0.25:
-            time_extra_cycle = 0.25
+        rabi_frequency_readout = 2e4
+        larmor_frequency = 840e3
+        # if time_extra_cycle < 0:
+        #     time_extra_cycle = 0
+        # if time_extra_cycle > 0.25:
+        #     time_extra_cycle = 0.25
+        time_extra_cycle = 0#0.25
         time_end = scaled.time_end + time_extra_cycle/rabi_frequency_readout
 
         noise_end_sample = noise_amplitude*np.sin(math.tau*frequency_line_noise*time_end)
@@ -188,9 +190,9 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
         cos_tilt = rabi_frequency/true_rabi
         sin_tilt = noise_end_sample/true_rabi
 
-        true_rabi_readout = np.sqrt(rabi_frequency_readout**2 + noise_end_sample**2)
+        true_rabi_readout = np.sqrt(rabi_frequency_readout**2 + (noise_end_sample + 0.25*(rabi_frequency_readout**2)/larmor_frequency)**2)
         cos_tilt_readout = rabi_frequency_readout/true_rabi_readout
-        # sin_tilt_readout = noise_end_sample/true_rabi_readout
+        sin_tilt_readout = (noise_end_sample + 0.25*(rabi_frequency_readout**2)/larmor_frequency)/true_rabi_readout
 
         rabi_phase = math.tau*(rabi_frequency + (noise_amplitude**2)/(4*rabi_frequency))*time_end# - (noise_amplitude**2)/(8*rabi_frequency*frequency_line_noise)*np.cos(2*math.tau*frequency_line_noise*time_end))
         cos_rabi_phase = np.cos(rabi_phase)
@@ -216,7 +218,8 @@ def find_noise_size_from_rabi(experiment_results:arch.ExperimentResults, scaled:
         except:
             noise_amplitude_fitted_start = 0
             time_extra_cycle = 0
-        frequency_amplitude_fitted_start = noise_model(frequency, noise_amplitude_fitted_start, time_extra_cycle)
+        # frequency_amplitude_fitted_start = noise_model(frequency, noise_amplitude_fitted_start, time_extra_cycle)
+        frequency_amplitude_fitted_start = noise_model(frequency, 0, 0)
         frequency_amplitude_residual_start = frequency_amplitude_measured - frequency_amplitude_fitted_start
         mean_squared_error_start = np.mean(frequency_amplitude_residual_start**2)
         if mean_squared_error is None or mean_squared_error_start < mean_squared_error:

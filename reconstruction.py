@@ -332,7 +332,7 @@ class Reconstruction():
         frequency_amplitude_prediction = cuda.to_device(frequency_amplitude_prediction)
 
         norm = 0
-        norm_previous = 0
+        norm_previous = np.infty
         reconstruction_step_backtrack = self.reconstruction_step
 
         fast_step_size = 1
@@ -362,7 +362,7 @@ class Reconstruction():
                 evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
                 norm_previous = norm
                 norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
-                if iteration_index > 0:
+                if iteration_index > -1:
                     if norm > norm_previous or norm == 0:
                         reconstruction_step_backtrack *= backtrack_scale
                         copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude_previous, amplitude)

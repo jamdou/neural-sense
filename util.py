@@ -8,6 +8,7 @@ import h5py
 
 import test_signal
 import archive as arch
+# from sim import manager
 
 class PrettyTritty:
     d = "\033[0m"
@@ -61,7 +62,7 @@ class ScaledParameters():
         if scaled_pulse_time is not None:
             self.pulse_time = scaled_pulse_time
         else:
-            self.pulse_time =  scaled_pulse_time_fraction*self.time_end
+            self.pulse_time = scaled_pulse_time_fraction*self.time_end
         if scaled_frequency_step is not None:
             self.frequency_step = scaled_frequency_step
         else:

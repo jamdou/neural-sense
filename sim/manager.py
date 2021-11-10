@@ -240,7 +240,7 @@ class SourceProperties:
             source_phase[2, 2] = math.pi/2
 
             #Dressing
-            readout_amplitude = 5e4
+            readout_amplitude = 2e4
             # cycle_period = 1/(2*bias_amplitude)
             # cycle_period = 1/(4*bias_amplitude)
             # cycle_period = 1/100
@@ -274,7 +274,7 @@ class SourceProperties:
             # source_time_end_points[1, 0] = source_time_end_points[1, 1] - 1/(4*readout_amplitude)
             source_amplitude[1, 0] = 2*readout_amplitude
             source_frequency[1, 0] = bias_amplitude# + 3*((readout_amplitude**2)/bias_amplitude)/4
-            source_phase[1, 0] = math.tau*math.fmod(bias_amplitude*(source_time_end_points[1, 0]), 1)
+            source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
             # source_amplitude[1, 1] = readout_amplitude
             # source_frequency[1, 1] = bias_amplitude# - (readout_amplitude**2/bias_amplitude)/4
             # source_phase[1, 1] = math.tau*math.fmod(0.25 + bias_amplitude*(source_time_end_points[1, 0]), 1)
