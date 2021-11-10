@@ -323,3 +323,61 @@ def find_time_blind_spots(scaled:util.ScaledParameters, archive:arch.Archive = N
     if archive:
         archive.write_plot("Blind spots", "time_blind_spots")
     plt.draw()
+
+def add_shot_noise(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None, atom_count = 1e6, noise_modifier = 1) -> arch.ExperimentResults:
+    C.starting("addition of simulated shot noise")
+    fourier_scale = -1/(math.tau*scaled.time_end)
+    projections = experiment_results.frequency_amplitude/fourier_scale
+    noisy_projections = np.empty_like(projections)
+    populations = np.empty(3)
+    # random_number_generator = np.random.default_rng()
+    for projection_index, projection in enumerate(projections):
+        populations[0] = (projection**2 + 2*projection + 1)/4    # +
+        populations[1] = (1 - projection**2)/2                   # 0
+        populations[2] = (projection**2 - 2*projection + 1)/4    # -
+        
+        populations *= atom_count
+        noisy_populations = np.random.poisson(populations/(noise_modifier**2))
+        noisy_populations *= noise_modifier**2
+        
+        noisy_projections[projection_index] = (noisy_populations[0] - noisy_populations[2])/np.sum(noisy_populations)
+        # noisy_projections[projection_index] = (populations[0] - populations[2])/np.sum(populations)
+        # if projection_index == 0:
+        #     print(projection)
+        #     print(noisy_projections[projection_index])
+        #     print(populations)
+        #     print(noisy_populations)
+        #     print(np.sum(populations))
+
+    modified_experiment_results = arch.ExperimentResults(frequency = experiment_results.frequency.copy(), frequency_amplitude = noisy_projections*fourier_scale, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, Shot noise added")
+
+    error = fourier_scale*(noisy_projections - projections)
+    error_rms = np.sqrt(np.mean(error**2))
+    error_average = np.mean(np.abs(error))
+    error_max = np.max(np.abs(error))
+    C.print(f"Average error: {error_average:.4g}Hz")
+    C.print(f"RMS error: {error_rms:.4g}Hz")
+    C.print(f"Max error: {error_max:.4g}Hz")
+
+    C.finished("addition of simulated shot noise")
+
+    shot_noise_group = archive.archive_file.require_group("added_shot_noise")
+    shot_noise_group["unmodified"] = experiment_results.frequency_amplitude
+    shot_noise_group["noise_added"] = modified_experiment_results.frequency_amplitude
+    shot_noise_group["residual"] = error
+    shot_noise_group["residual"].attrs["average"] = error_average
+    shot_noise_group["residual"].attrs["rms"] = error_rms
+    shot_noise_group["residual"].attrs["max"] = error_max
+    
+    plt.figure()
+    plt.plot(experiment_results.frequency, experiment_results.frequency_amplitude, "r--", label = "Unmodified")
+    plt.plot(modified_experiment_results.frequency, modified_experiment_results.frequency_amplitude, "bx", label = "Noise added")
+    plt.plot(modified_experiment_results.frequency, error, "y+", label = "Residual")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Frequency amplitude (Hz)")
+    plt.legend()
+    if archive:
+        archive.write_plot("Added shot noise", "added_shot_noise")
+    plt.draw()
+
+    return modified_experiment_results
