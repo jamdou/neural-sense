@@ -186,11 +186,13 @@ class Reconstruction():
         # # iteration_max = 50
         # iteration_max = 100
         # scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
-        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/((self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         # self.norm_scale_factor = 0.25*((11.87*self.frequency_amplitude.size)**2)/3169
         self.norm_scale_factor = ((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        # self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
         # self.iteration_max = int(417)
         self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
 
@@ -233,7 +235,8 @@ class Reconstruction():
         self.expected_error_measurement = expected_error_measurement
         self.backtrack_scale = backtrack_scale
 
-        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/((self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.reconstruction_step = 1e-1/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         self.norm_scale_factor = 0.2*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
@@ -309,8 +312,10 @@ class Reconstruction():
         self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         # self.reconstruction_step = 1e-4/self.fourier_scale
         self.reconstruction_step = 1e-1/self.fourier_scale
+        # self.reconstruction_step = 5e-2/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
-        self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
         self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
         self.shrink_size_max = 1e2
 
@@ -334,6 +339,8 @@ class Reconstruction():
         norm = 0
         norm_previous = np.infty
         reconstruction_step_backtrack = self.reconstruction_step
+        moving_away_strike_max = 3
+        moving_away_strike = moving_away_strike_max
 
         fast_step_size = 1
         fast_step_size_previous = 1
@@ -362,8 +369,12 @@ class Reconstruction():
                 evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
                 norm_previous = norm
                 norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
-                if iteration_index > -1:
-                    if norm > norm_previous or norm == 0:
+                if iteration_index > 0:#-1:
+                    if norm > norm_previous:
+                        moving_away_strike -= 1
+                        norm = norm_previous
+                    if moving_away_strike == 0 or norm == 0:
+                        moving_away_strike = moving_away_strike_max
                         reconstruction_step_backtrack *= backtrack_scale
                         copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude_previous, amplitude)
                         norm = norm_previous
@@ -407,7 +418,8 @@ class Reconstruction():
         # self.reconstruction_step = 1e-4/self.fourier_scale
         self.reconstruction_step = 1e-1/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
-        self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
         self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
         self.shrink_size_max = 1e2
 
@@ -494,8 +506,8 @@ class Reconstruction():
         blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
-        self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
-        # self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
 
         fourier_transform = np.empty((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
         evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
