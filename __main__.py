@@ -44,16 +44,16 @@ if __name__ == "__main__":
 
         # === Scaled protocol ===
         experiment_time = "20210429T125734"
-        # scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
-        scaled = util.ScaledParameters(
-            scaled_frequency = 5000,
-            scaled_density = 1/50,
-            scaled_samples = 10,
-            scaled_amplitude = 500,#995.5/2,
-            scaled_sweep = [5000/5, 14000],
-            scaled_pulse_time_fraction = 0.2333333,
-            # scaled_stagger_constant = math.sqrt(7)
-        )
+        scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
+        # scaled = util.ScaledParameters(
+        #     scaled_frequency = 5000,
+        #     scaled_density = 1/50,
+        #     scaled_samples = 10,
+        #     scaled_amplitude = 500,#995.5/2,
+        #     scaled_sweep = [5000/5, 14000],
+        #     scaled_pulse_time_fraction = 0.2333333,
+        #     # scaled_stagger_constant = math.sqrt(7)
+        # )
         scaled.print()
         scaled.write_to_file(archive)
 
@@ -92,33 +92,33 @@ if __name__ == "__main__":
             time_properties_reconstruction
         )
 
-        # === Make state ===
-        # [0.5, 1/np.sqrt(2), 0.5]
-        state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
-        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
+        # # === Make state ===
+        # # [0.5, 1/np.sqrt(2), 0.5]
+        # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+        # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
-        cuda.profile_start()
-        # === Run simulations ===
-        # frequency = np.arange(70, 3071, 30)
-        # frequency = np.arange(250, 2251, 3)
-        # frequency = np.arange(250, 2000, 10.0)
-        # frequency = np.arange(250, 2251, 50)
-        # frequency = np.arange(250, 2251, 460e3/1e5)
-        # frequency = np.arange(990, 1010, 0.02)
-        # frequency = np.arange(253, 3251, 30)
-        # frequency = np.arange(1000, 1003, 1)
-        # frequency = np.arange(1000, 1001, 1)
-        # frequency = np.arange(0, 1000000, 1)
-        # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-        frequency = scaled.sample_frequencies
+        # cuda.profile_start()
+        # # === Run simulations ===
+        # # frequency = np.arange(70, 3071, 30)
+        # # frequency = np.arange(250, 2251, 3)
+        # # frequency = np.arange(250, 2000, 10.0)
+        # # frequency = np.arange(250, 2251, 50)
+        # # frequency = np.arange(250, 2251, 460e3/1e5)
+        # # frequency = np.arange(990, 1010, 0.02)
+        # # frequency = np.arange(253, 3251, 30)
+        # # frequency = np.arange(1000, 1003, 1)
+        # # frequency = np.arange(1000, 1001, 1)
+        # # frequency = np.arange(0, 1000000, 1)
+        # # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
+        # frequency = scaled.sample_frequencies
 
-        simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-        simulation_manager.evaluate(False, False)
+        # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+        # simulation_manager.evaluate(False, False)
 
         # === Experiment results ===
-        experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+        # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
         # "20210429T125734"
-        # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
+        experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
         # experiment_results.write_to_archive(archive)
         # experiment_results.plot(archive, signal_reconstruction)
 
@@ -145,8 +145,8 @@ if __name__ == "__main__":
         # reconstruction.evaluate_fista_backtracking(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 0.25,#0.25,#11.87e-2,
-        #     norm_scale_factor_modifier = 5#0.0001
+        #     expected_error_measurement = 4,#0.4,#0.25,#11.87e-2,
+        #     norm_scale_factor_modifier = 3#0.0001
         # )
         # # reconstruction.evaluate_fista_ayanzadeh(
         # #     expected_amplitude = scaled.amplitude,
@@ -189,7 +189,7 @@ if __name__ == "__main__":
             evaluation_methods = ["least_squares", "fista_backtracking"],
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
-            expected_error_measurement = 0.40,#0.25,#0.05,#0.2,#11.87,
+            expected_error_measurement = 4,#0.40,#0.25,#0.05,#0.2,#11.87,
             norm_scale_factor_modifier = 3,#0.001,
             frequency_line_noise = 50,
             rabi_frequency_readout = 2e3
