@@ -179,6 +179,15 @@ class ScaledParameters():
                 scaled_frequency_step = (1/100)*5000,
                 scaled_stagger_constant = math.tau
             )
+        elif archive_time == "20211117T123323" or archive_time == "20211117T155508":
+            scaled = ScaledParameters(
+                scaled_frequency = 5000,
+                scaled_density = 1/25,
+                scaled_samples = 10,
+                scaled_amplitude = 1000,
+                scaled_sweep = [1000, 14000],
+                scaled_pulse_time_fraction = 0.2333333
+            )
         return scaled
 
     def print(self):
