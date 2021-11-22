@@ -729,7 +729,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
     random_seeds = np.array(random_seeds)
     numbers_of_samples = []
-    for reconstruction_index, number_of_samples in enumerate(range(min(sweep_parameters[1], experiment_results.frequency.size), sweep_parameters[0], -sweep_parameters[2])):
+    sweep_samples = range(min(sweep_parameters[1], experiment_results.frequency.size), sweep_parameters[0], -sweep_parameters[2])
+    for reconstruction_index, number_of_samples in enumerate(sweep_samples):
             numbers_of_samples.append(number_of_samples)
     numbers_of_samples = np.array(numbers_of_samples)
 
@@ -737,7 +738,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     # numbers_of_samples = []
     amplitudes = []
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-        for reconstruction_index, number_of_samples in enumerate(range(min(sweep_parameters[1], experiment_results.frequency.size), sweep_parameters[0], -sweep_parameters[2])):
+        for reconstruction_index, number_of_samples in enumerate(sweep_samples):
             # numbers_of_samples.append(number_of_samples)
             for random_index, random_seed in enumerate(random_seeds):
                 reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples, frequency_cutoff_low = frequency_cutoff_low, frequency_cutoff_high = frequency_cutoff_high, random_seed = random_seed)
@@ -765,7 +766,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         errors_1 = []
         errors_2 = []
         errors_sup = []
-        for reconstruction_index, number_of_samples in enumerate(range(min(sweep_parameters[1], experiment_results.frequency.size), sweep_parameters[0], -sweep_parameters[2])):
+        for reconstruction_index, number_of_samples in enumerate(sweep_samples):
             error_1 = 0
             error_2 = 0
             error_sup = 0
@@ -813,6 +814,20 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         "ista_backtracking" : "k-",
         "ista" : "k--",
     }
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+        time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
+        amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
+        for reconstruction_index, number_of_samples in enumerate(sweep_samples):
+                amplitude_mesh[reconstruction_index, :] = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size]
+        plt.figure()
+        # time_mesh, samples_mesh, 
+        plt.pcolormesh(time_mesh, samples_mesh, amplitude_mesh, cmap = "Spectral", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Number of samples")
+        plt.colorbar()
+        if archive:
+            archive.write_plot(f"Sweeping the number of samples used in reconstruction\n{evaluation_method_labels[evaluation_method]}", f"number_of_samples_{evaluation_method}")
+        plt.draw()
 
     plt.figure()
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
