@@ -76,8 +76,8 @@ if __name__ == "__main__":
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
-            [],
-            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
+            # [],
+            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
@@ -135,7 +135,8 @@ if __name__ == "__main__":
         # reconstruction.evaluate_ista(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 11.87
+        #     expected_error_measurement = 4,#0.4,#0.25,#11.87e-2,
+        #     norm_scale_factor_modifier = 3#0.0001
         # )
         # reconstruction.evaluate_ista_backtracking(
         #     expected_amplitude = scaled.amplitude,
@@ -194,6 +195,24 @@ if __name__ == "__main__":
         #     frequency_line_noise = 50,
         #     rabi_frequency_readout = 2e3
         # )
+        experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
+        recon.run_reconstruction_subsample_sweep(
+            expected_signal = signal_reconstruction,
+            experiment_results = experiment_results,
+            sweep_parameters = (0, 10000, 10),
+            archive = archive,
+            random_seeds = np.arange(10)*util.Seeds.metroid,
+            evaluation_methods = [
+                "least_squares",
+                "fista_backtracking"
+            ],
+            expected_amplitude = scaled.amplitude,
+            expected_frequency = scaled.frequency,
+            expected_error_measurement = 0.4, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
+            norm_scale_factor_modifier = 3,#3,#0.001,
+            frequency_line_noise = 50,
+            rabi_frequency_readout = 2e3
+        )
 
         # # === ===          === ===
         # # === === Analysis === ===

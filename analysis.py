@@ -324,13 +324,9 @@ def find_time_blind_spots(scaled:util.ScaledParameters, archive:arch.Archive = N
         archive.write_plot("Blind spots", "time_blind_spots")
     plt.draw()
 
-def add_shot_noise(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None, atom_count = 1e6, noise_modifier = 1) -> arch.ExperimentResults:
-    C.starting("addition of simulated shot noise")
-    fourier_scale = -1/(math.tau*scaled.time_end)
-    projections = experiment_results.frequency_amplitude/fourier_scale
+def add_shot_noise_to_projections(projections, atom_count, noise_modifier):
     noisy_projections = np.empty_like(projections)
     populations = np.empty(3)
-    # random_number_generator = np.random.default_rng()
     for projection_index, projection in enumerate(projections):
         populations[0] = (projection**2 + 2*projection + 1)/4    # +
         populations[1] = (1 - projection**2)/2                   # 0
@@ -341,13 +337,14 @@ def add_shot_noise(experiment_results:arch.ExperimentResults, scaled:util.Scaled
         noisy_populations *= noise_modifier**2
         
         noisy_projections[projection_index] = (noisy_populations[0] - noisy_populations[2])/np.sum(noisy_populations)
-        # noisy_projections[projection_index] = (populations[0] - populations[2])/np.sum(populations)
-        # if projection_index == 0:
-        #     print(projection)
-        #     print(noisy_projections[projection_index])
-        #     print(populations)
-        #     print(noisy_populations)
-        #     print(np.sum(populations))
+    return noisy_projections
+
+def add_shot_noise(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None, atom_count = 1e6, noise_modifier = 1) -> arch.ExperimentResults:
+    C.starting("addition of simulated shot noise")
+    fourier_scale = -1/(math.tau*scaled.time_end)
+    projections = experiment_results.frequency_amplitude/fourier_scale
+
+    noisy_projections = add_shot_noise_to_projections(projections, atom_count, noise_modifier)
 
     modified_experiment_results = arch.ExperimentResults(frequency = experiment_results.frequency.copy(), frequency_amplitude = noisy_projections*fourier_scale, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, Shot noise added")
 
