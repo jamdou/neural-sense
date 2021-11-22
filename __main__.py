@@ -77,7 +77,18 @@ if __name__ == "__main__":
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
             # [],
-            [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
+            # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
+            [
+                test_signal.SinusoidalNoise([0, 0, 170.41], [0.0, 0.0, 50], [0.0, 0.0, math.pi/2]),
+                test_signal.SinusoidalNoise([0, 0, 514.65], [0.0, 0.0, 50], [0.0, 0.0, 0.0]),
+                test_signal.SinusoidalNoise([0, 0, -9.5], [0.0, 0.0, 150], [0.0, 0.0, math.pi/2]),
+                test_signal.SinusoidalNoise([0, 0, 34.2], [0.0, 0.0, 150], [0.0, 0.0, 0.0]),
+                test_signal.SinusoidalNoise([0, 0, 12.6], [0.0, 0.0, 250], [0.0, 0.0, math.pi/2]),
+                test_signal.SinusoidalNoise([0, 0, 41.2], [0.0, 0.0, 250], [0.0, 0.0, 0.0]),
+                test_signal.SinusoidalNoise([0, 0, 1.8], [0.0, 0.0, 350], [0.0, 0.0, math.pi/2]),
+                test_signal.SinusoidalNoise([0, 0, -5.6], [0.0, 0.0, 350], [0.0, 0.0, 0.0]),
+            ],
             # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
             # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
             time_properties
@@ -135,8 +146,8 @@ if __name__ == "__main__":
         # reconstruction.evaluate_ista(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 4,#0.4,#0.25,#11.87e-2,
-        #     norm_scale_factor_modifier = 3#0.0001
+        #     expected_error_measurement = 1.25, #1.25, #4,#0.4,#0.25,#11.87e-2,
+        #     norm_scale_factor_modifier = 1, #3#0.0001
         # )
         # reconstruction.evaluate_ista_backtracking(
         #     expected_amplitude = scaled.amplitude,
@@ -195,7 +206,7 @@ if __name__ == "__main__":
         #     frequency_line_noise = 50,
         #     rabi_frequency_readout = 2e3
         # )
-        experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
+        # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
         recon.run_reconstruction_subsample_sweep(
             expected_signal = signal_reconstruction,
             experiment_results = experiment_results,
@@ -203,13 +214,13 @@ if __name__ == "__main__":
             archive = archive,
             random_seeds = np.arange(10)*util.Seeds.metroid,
             evaluation_methods = [
-                "least_squares",
+                # "least_squares",
                 "fista_backtracking"
             ],
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
-            expected_error_measurement = 0.4, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
-            norm_scale_factor_modifier = 3,#3,#0.001,
+            expected_error_measurement = 3, #1.25, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
+            norm_scale_factor_modifier = 1,#3,#0.001,
             frequency_line_noise = 50,
             rabi_frequency_readout = 2e3
         )

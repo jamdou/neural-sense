@@ -814,19 +814,48 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         "ista_backtracking" : "k-",
         "ista" : "k--",
     }
+    time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
+    amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
+    residual_mesh = np.empty_like(amplitude_mesh)
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-        time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
-        amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
         for reconstruction_index, number_of_samples in enumerate(sweep_samples):
                 amplitude_mesh[reconstruction_index, :] = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size]
+                residual_mesh[reconstruction_index, :] = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size] - expected_signal.amplitude
+        
         plt.figure()
-        # time_mesh, samples_mesh, 
-        plt.pcolormesh(time_mesh, samples_mesh, amplitude_mesh, cmap = "Spectral", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
-        plt.xlabel("Time (s)")
+        plt.subplot(2, 1, 2)
+        neural_pulse = expected_signal.neural_pulses[0]
+        plt.pcolormesh(time_mesh*1e3, samples_mesh, amplitude_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.xlabel("Time (ms)")
         plt.ylabel("Number of samples")
-        plt.colorbar()
+        plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
+        colour_bar = plt.colorbar()
+        colour_bar.set_label("Amplitude (Hz)")
+
+        plt.subplot(2, 1, 1)
+        plt.pcolormesh(time_mesh*1e3, samples_mesh, amplitude_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.ylabel("Number of samples")
+
         if archive:
             archive.write_plot(f"Sweeping the number of samples used in reconstruction\n{evaluation_method_labels[evaluation_method]}", f"number_of_samples_{evaluation_method}")
+        plt.draw()
+
+        plt.figure()
+        plt.subplot(2, 1, 2)
+        neural_pulse = expected_signal.neural_pulses[0]
+        plt.pcolormesh(time_mesh*1e3, samples_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.xlabel("Time (ms)")
+        plt.ylabel("Number of samples")
+        plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
+        colour_bar = plt.colorbar()
+        colour_bar.set_label("Residual (Hz)")
+
+        plt.subplot(2, 1, 1)
+        plt.pcolormesh(time_mesh*1e3, samples_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.ylabel("Number of samples")
+
+        if archive:
+            archive.write_plot(f"Sweeping the number of samples used in reconstruction\n{evaluation_method_labels[evaluation_method]}, Residual", f"number_of_samples_{evaluation_method}_residual")
         plt.draw()
 
     plt.figure()
