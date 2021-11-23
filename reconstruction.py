@@ -893,8 +893,88 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
     plt.draw()
 
+def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (0.5, 5, 0.5), archive:Archive = None, number_of_samples = 10000, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None):
+    reconstruction = Reconstruction(expected_signal.time_properties)
 
+    random_seeds = np.array(random_seeds)
+    # scale_factor_modifiers = np.arange(sweep_parameters[0], sweep_parameters[1], sweep_parameters[2])
+    scale_factor_modifiers = np.linspace(sweep_parameters[0], sweep_parameters[1], sweep_parameters[2])
 
+    C.starting("Norm scale factor sweep")
+
+    amplitudes = []
+    norm_scale_factors = []
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+        for reconstruction_index, norm_scale_factor_modifier in enumerate(scale_factor_modifiers):
+            for random_index, random_seed in enumerate(random_seeds):
+                reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples, frequency_cutoff_low = frequency_cutoff_low, frequency_cutoff_high = frequency_cutoff_high, random_seed = random_seed)
+                if evaluation_method == "fista_ayanzadeh":
+                    reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
+                elif evaluation_method == "fista_fit":
+                    reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier)
+                else:
+                    reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+                reconstruction.write_to_file(archive.archive_file, (scale_factor_modifiers.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
+
+                amplitudes.append(reconstruction.amplitude.copy())
+            if evaluation_method_index == 0:
+                norm_scale_factors.append(reconstruction.norm_scale_factor)
+    norm_scale_factors = np.array(norm_scale_factors)
+
+    C.finished("Norm scale factor sweep")
+
+    evaluation_method_labels = {
+        "least_squares" : "Least squares",
+        "fista_ayanzadeh" : "FISTA (Ayanzadeh)",
+        "fista_backtracking" : "FISTA (Backtracking)",
+        "fista_fit" : "FISTA (Line noise fit)",
+        "fista" : "FISTA",
+        "ista_backtracking" : "ISTA (Backtracking)",
+        "ista" : "ISTA",
+    }
+    time_mesh, scale_factors_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, (norm_scale_factors))
+    amplitude_mesh = np.empty((norm_scale_factors.size, amplitudes[0].size))
+    residual_mesh = np.empty_like(amplitude_mesh)
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+        for reconstruction_index, number_of_samples in enumerate(norm_scale_factors):
+                amplitude_mesh[reconstruction_index, :] = amplitudes[(norm_scale_factors.size*evaluation_method_index + reconstruction_index)*random_seeds.size]
+                residual_mesh[reconstruction_index, :] = amplitudes[(norm_scale_factors.size*evaluation_method_index + reconstruction_index)*random_seeds.size] - expected_signal.amplitude
+        
+        plt.figure()
+        plt.subplot(2, 1, 2)
+        neural_pulse = expected_signal.neural_pulses[0]
+        plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, amplitude_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.xlabel("Time (ms)")
+        plt.ylabel("Regularisation\nparameter (Hz)")
+        plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
+        colour_bar = plt.colorbar()
+        colour_bar.set_label("Amplitude (Hz)")
+
+        plt.subplot(2, 1, 1)
+        plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, amplitude_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.ylabel("Regularisation\nparameter (Hz)")
+
+        if archive:
+            archive.write_plot(f"Sweeping the regularisation parameter used in reconstruction\n{evaluation_method_labels[evaluation_method]}", f"norm_scale_factor_{evaluation_method}")
+        plt.draw()
+
+        plt.figure()
+        plt.subplot(2, 1, 2)
+        neural_pulse = expected_signal.neural_pulses[0]
+        plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.xlabel("Time (ms)")
+        plt.ylabel("Regularisation\nparameter (Hz)")
+        plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
+        colour_bar = plt.colorbar()
+        colour_bar.set_label("Residual (Hz)")
+
+        plt.subplot(2, 1, 1)
+        plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
+        plt.ylabel("Regularisation\nparameter (Hz)")
+
+        if archive:
+            archive.write_plot(f"Sweeping the regularisation parameter used in reconstruction\n{evaluation_method_labels[evaluation_method]}, Residual", f"norm_scale_factor_{evaluation_method}_residual")
+        plt.draw()
 #     def evaluate_ista_complete(self):
 #         """
 #         Run compressive sensing based on the Iterative Shrinkage Thresholding Algorithm (ISTA)
