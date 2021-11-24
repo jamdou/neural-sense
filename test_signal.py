@@ -233,6 +233,40 @@ class PeriodicNoise:
         archive["shape"] = np.asarray(self.shape, dtype='|S32')
         archive["type"] = np.asarray(self.type, dtype='|S32')
 
+class LineNoiseModel:
+    def __init__(self, c = None, s = None, a = None, p = None, fundamental = 50):
+        if a is not None:
+            self.a = np.array(a)
+            self.p = np.array(p)
+            self.c = self.a*np.cos(self.p)
+            self.s = self.a*np.sin(self.p)
+        elif c is not None:
+            self.c = np.array(c)
+            self.s = np.array(s)
+            self.a = np.sqrt(self.c**2 + self.s**2)
+            self.p = np.arctan2(self.s, self.c)
+        self.fundamental = fundamental
+        self.h = self.fundamental*(np.arange(self.a.size) + 1)
+
+    @staticmethod
+    def new_from_experiment_time(archive_time):
+        line_noise_model = None
+        if (archive_time == "20211117T123323") or (archive_time == "20211117T155508"):
+            line_noise_model = LineNoiseModel(
+                c = [170.41, 0, -9.5, 0, 12.6, 0, 1.8],
+                s = [514.65, 0, 34.2, 0, 41.2, 0, -5.6]
+            )
+        return line_noise_model
+
+    def generate_sinusoidal_noise(self):
+        noise = []
+        harmonic = 1
+        for na, np in zip(self.a, self.p):
+            if na > 0:
+                noise.append(SinusoidalNoise([0, 0, na], [0.0, 0.0, (harmonic + 1)*self.fundamental], [0.0, 0.0, math.pi/2 + np]))
+            harmonic += 1
+        return noise
+
 class TestSignal:
     """
     Details for a simulated neural pulse sequence and noise (no control signals).

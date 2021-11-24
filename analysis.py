@@ -7,6 +7,7 @@ from numpy.lib.function_base import gradient
 import archive as arch
 import util
 from util import PrettyTritty as C
+import test_signal
 
 def find_neural_signal_size(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None):
     print(f"{C.y}Starting fit...{C.d}")
@@ -375,6 +376,57 @@ def add_shot_noise(experiment_results:arch.ExperimentResults, scaled:util.Scaled
     plt.legend()
     if archive:
         archive.write_plot("Added shot noise", "added_shot_noise")
+    plt.draw()
+
+    return modified_experiment_results
+
+def remove_line_noise_from_model(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, line_noise_model:test_signal.LineNoiseModel, archive:arch.Archive = None):
+    rabi = experiment_results.frequency
+
+    tilt = np.sum(line_noise_model.a*np.cos(math.tau*line_noise_model.h*scaled.time_end + line_noise_model.p))/rabi
+    
+    phase = np.zeros_like(rabi)
+    time_step = scaled.time_step/100
+    time = np.arange(0, scaled.time_end, time_step)
+    for time_sample in time:
+        phase += math.tau*np.sqrt(rabi**2 + (np.sum(line_noise_model.a*np.cos(math.tau*line_noise_model.h*time_sample + line_noise_model.p)))**2)*time_step
+
+    error = -1/(math.tau*scaled.time_end)*np.cos(phase)*np.sin(tilt)
+    modified_experiment_results = arch.ExperimentResults(frequency = experiment_results.frequency.copy(), frequency_amplitude = experiment_results.frequency_amplitude - error, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected feed forward")
+
+    plt.figure()
+    plt.plot(experiment_results.frequency, experiment_results.frequency_amplitude, "r--", label = "Unmodified")
+    plt.plot(modified_experiment_results.frequency, modified_experiment_results.frequency_amplitude, "bx", label = "Modified")
+    plt.plot(modified_experiment_results.frequency, error, "y+", label = "\"Noise\" removed")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Frequency amplitude (Hz)")
+    plt.legend()
+    if archive:
+        archive.write_plot("Removed line noise", "removed_line_noise")
+    plt.draw()
+
+    return modified_experiment_results
+
+def remove_line_noise_from_evaluation(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, evaluation_experiment_results:arch.ExperimentResults, archive:arch.Archive = None):
+
+    error_raw = evaluation_experiment_results.frequency_amplitude
+    error = []
+    for error_instance, frequency_instance in zip(error_raw, evaluation_experiment_results.frequency):
+        if frequency_instance in experiment_results.frequency:
+            error.append(error_instance)
+    error = np.array(error)
+    
+    modified_experiment_results = arch.ExperimentResults(frequency = experiment_results.frequency.copy(), frequency_amplitude = experiment_results.frequency_amplitude - error, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected feed forward evaluation")
+
+    plt.figure()
+    plt.plot(experiment_results.frequency, experiment_results.frequency_amplitude, "r--", label = "Unmodified")
+    plt.plot(modified_experiment_results.frequency, modified_experiment_results.frequency_amplitude, "bx", label = "Modified")
+    plt.plot(modified_experiment_results.frequency, error, "y+", label = "\"Noise\" removed")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Frequency amplitude (Hz)")
+    plt.legend()
+    if archive:
+        archive.write_plot("Removed line noise", "removed_line_noise")
     plt.draw()
 
     return modified_experiment_results

@@ -194,6 +194,10 @@ class ScaledParameters():
         print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
         print(f"{self.frequency:10.4e} {1/self.frequency:10.4e} {self.pulse_time:10.4e} {self.density:10.4e} {self.samples:10.4e} {self.sweep[0]:10.4e} {self.sweep[1]:10.4e} {self.frequency_step:10.4e} {self.time_end:10.4e}")
 
+def get_noise_evaluation(archive_time):
+    if archive_time == "20211117T155508":
+        return "20211124T161452"
+
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
     """
 
