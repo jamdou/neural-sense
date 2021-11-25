@@ -310,8 +310,8 @@ class Reconstruction():
 
         # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
-        # self.reconstruction_step = 1e-4/self.fourier_scale
-        self.reconstruction_step = 1e-1/self.fourier_scale
+        self.reconstruction_step = 2e-2/self.fourier_scale
+        # self.reconstruction_step = 1e-1/self.fourier_scale
         # self.reconstruction_step = 5e-2/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
@@ -339,7 +339,7 @@ class Reconstruction():
         norm = 0
         norm_previous = np.infty
         reconstruction_step_backtrack = self.reconstruction_step
-        moving_away_strike_max = 3
+        moving_away_strike_max = 2
         moving_away_strike = moving_away_strike_max
 
         fast_step_size = 1

@@ -179,7 +179,7 @@ class ScaledParameters():
                 scaled_frequency_step = (1/100)*5000,
                 scaled_stagger_constant = math.tau
             )
-        elif (archive_time == "20211117T123323") or (archive_time == "20211117T155508"):
+        elif archive_time in ["20211117T123323", "20211117T155508", "20211125T124842"]:
             scaled = ScaledParameters(
                 scaled_frequency = 5000,
                 scaled_density = 1/25,
@@ -196,7 +196,8 @@ class ScaledParameters():
 
 def get_noise_evaluation(archive_time):
     if archive_time == "20211117T155508":
-        return "20211124T161452"
+        return "20211125T170254"
+        # return "20211124T161452"
 
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
     """
