@@ -26,7 +26,7 @@ def find_neural_signal_size(experiment_results:arch.ExperimentResults, scaled:ut
 
     frequency_amplitude_measured = np.copy(experiment_results.frequency_amplitude)
 
-    scaled.amplitude = 100
+    scaled.amplitude = 1000
     decent_step_size = 1e-6
     mean_squared_errors = []
     for epoch in range(1000000):

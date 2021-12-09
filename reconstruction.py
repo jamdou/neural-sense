@@ -308,15 +308,30 @@ class Reconstruction():
         self.expected_error_measurement = expected_error_measurement
         self.backtrack_scale = backtrack_scale
 
-        # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
-        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
-        self.reconstruction_step = 2e-2/self.fourier_scale
-        # self.reconstruction_step = 1e-1/self.fourier_scale
-        # self.reconstruction_step = 5e-2/self.fourier_scale
-        expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
-        # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
-        self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
-        self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
+        tolerable_error = 2*expected_error_measurement
+        gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        self.reconstruction_step = 1/gradient_lipschitz
+        self.fourier_scale = gradient_lipschitz
+        expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
+
+        iteration_max_rate_ista = 0.5*gradient_lipschitz*expected_signal_energy
+        iteration_max_rate_fista = 2*np.sqrt(iteration_max_rate_ista)
+        self.iteration_max = int(np.ceil(iteration_max_rate_fista/tolerable_error))
+        
+
+        # # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        # # self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        # # self.reconstruction_step = 2e-2/self.fourier_scale
+        # # self.reconstruction_step = 1e-1/self.fourier_scale
+        # # self.reconstruction_step = 5e-2/self.fourier_scale
+        # expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
+        # # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
+        # self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
+        # # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
+        # # self.iteration_max = int(math.ceil(2*np.sqrt((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
+        self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz
+
+
         self.shrink_size_max = 1e2
 
         C.print(f"reconstruction_step: {self.reconstruction_step}\niteration_max: {self.iteration_max}\nnorm_scale_factor: {self.norm_scale_factor}")
@@ -339,7 +354,7 @@ class Reconstruction():
         norm = 0
         norm_previous = np.infty
         reconstruction_step_backtrack = self.reconstruction_step
-        moving_away_strike_max = 2
+        moving_away_strike_max = 0
         moving_away_strike = moving_away_strike_max
 
         fast_step_size = 1
@@ -347,7 +362,7 @@ class Reconstruction():
         fast_step_size_previous_previous = 1
 
         for iteration_index in range(self.iteration_max):
-            if reconstruction_step_backtrack < 1e-10:
+            if reconstruction_step_backtrack < 1e-6:
                 break
             do_backtrack = True
             while do_backtrack:
@@ -362,6 +377,7 @@ class Reconstruction():
                     shrink_scale = shrink_scale/shrink_scale_denominator
                     if shrink_scale > self.shrink_size_max:
                         shrink_scale = self.shrink_size_max
+                shrink_scale = 1
                 evaluate_next_iteration_ista_shrink_scale[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.norm_scale_factor, reconstruction_step_backtrack, shrink_scale)
                 fast_step_size_previous_previous = fast_step_size_previous
                 fast_step_size_previous = fast_step_size
@@ -380,7 +396,7 @@ class Reconstruction():
                         norm = norm_previous
                         fast_step_size = fast_step_size_previous
                         fast_step_size_previous = fast_step_size_previous_previous
-                        if reconstruction_step_backtrack < 1e-10:
+                        if reconstruction_step_backtrack < 1e-6:
                             break
                     else:
                         do_backtrack = False

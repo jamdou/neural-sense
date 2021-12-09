@@ -179,7 +179,7 @@ class ScaledParameters():
                 scaled_frequency_step = (1/100)*5000,
                 scaled_stagger_constant = math.tau
             )
-        elif archive_time in ["20211117T123323", "20211117T155508", "20211125T124842"]:
+        elif archive_time in ["20211202T153620", "20211117T123323", "20211117T155508", "20211125T124842"]:
             scaled = ScaledParameters(
                 scaled_frequency = 5000,
                 scaled_density = 1/25,
