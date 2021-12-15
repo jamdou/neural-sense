@@ -188,6 +188,15 @@ class ScaledParameters():
                 scaled_sweep = [1000, 14000],
                 scaled_pulse_time_fraction = 0.2333333
             )
+        elif archive_time in ["20211209T143732"]:
+            scaled = ScaledParameters(
+                scaled_frequency = 5000,
+                scaled_density = 1/25,
+                scaled_samples = 10,
+                scaled_amplitude = 1000,
+                scaled_sweep = [100, 25001],
+                scaled_pulse_time_fraction = 0.2333333
+            )
         return scaled
 
     def print(self):

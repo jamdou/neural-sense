@@ -43,7 +43,7 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # === Scaled protocol ===
-        experiment_time = "20211117T155508" #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
+        experiment_time = "20211209T143732" #"20211117T155508" #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
         scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
         # scaled = util.ScaledParameters(
         #     scaled_frequency = 5000,
@@ -160,7 +160,13 @@ if __name__ == "__main__":
         # #     expected_frequency = scaled.frequency,
         # #     expected_error_measurement = 11.87
         # # )
-        # reconstruction.evaluate_fista_backtracking(
+        # # reconstruction.evaluate_fista_backtracking(
+        # #     expected_amplitude = scaled.amplitude,
+        # #     expected_frequency = scaled.frequency,
+        # #     expected_error_measurement = 0.5, #5,#5.5,#0.25,#11.87e-2,
+        # #     norm_scale_factor_modifier = 1 #0.0001
+        # # )
+        # reconstruction.evaluate_fista_adaptive(
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
         #     expected_error_measurement = 0.5, #5,#5.5,#0.25,#11.87e-2,
@@ -224,12 +230,13 @@ if __name__ == "__main__":
         #     archive = archive,
         #     random_seeds = np.arange(10)*util.Seeds.metroid,
         #     evaluation_methods = [
-        #         # "least_squares",
-        #         "fista_backtracking"
+        #         "least_squares",
+        #         "fista_backtracking",
+        #         "fista_adaptive"
         #     ],
         #     expected_amplitude = scaled.amplitude,
         #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 5.5,#5.5, #3, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
+        #     expected_error_measurement = 0.3, #5.5, #3, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
         #     norm_scale_factor_modifier = 1,#1,#3,#0.001,
         #     frequency_line_noise = 50,
         #     rabi_frequency_readout = 2e3
@@ -243,11 +250,12 @@ if __name__ == "__main__":
             archive = archive,
             random_seeds = np.arange(1)*util.Seeds.metroid,
             evaluation_methods = [
-                "fista_backtracking"
+                # "fista_backtracking",
+                "fista_adaptive"
             ],
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
-            expected_error_measurement = 0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
+            expected_error_measurement = 0.3, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
             frequency_line_noise = 50,
             rabi_frequency_readout = 2e3,
             number_of_samples = 10000
