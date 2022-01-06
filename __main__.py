@@ -43,7 +43,7 @@ if __name__ == "__main__":
         archive.new_archive_file()
 
         # === Scaled protocol ===
-        experiment_time = "20211209T143732" #"20211117T155508" #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
+        experiment_time = "20211216T161624" #"20211209T143732" #"20211117T155508" #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
         scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
         # scaled = util.ScaledParameters(
         #     scaled_frequency = 5000,
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         scaled.print()
         scaled.write_to_file(archive)
 
-        # line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
+        line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
 
         # # print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
         # # print(f"{scaled.frequency:10.4e} {1/scaled.frequency:10.4e} {scaled.pulse_time:10.4e} {scaled.density:10.4e} {scaled.samples:10.4e} {scaled.sweep[0]:10.4e} {scaled.sweep[1]:10.4e} {scaled.frequency_step:10.4e} {scaled.time_end:10.4e}")
@@ -71,16 +71,16 @@ if __name__ == "__main__":
         # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
 
         time_properties = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [0, scaled.time_end + 0.02])
-        time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [0, scaled.time_end])
+        time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [scaled.time_step, scaled.time_end])
 
         signal = test_signal.TestSignal(
             [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
             # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
-            [],
+            # [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
-            # line_noise_model.generate_sinusoidal_noise(),
+            line_noise_model.generate_sinusoidal_noise(),
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
             # [
             #     test_signal.SinusoidalNoise([0, 0, 170.41], [0.0, 0.0, 50], [0.0, 0.0, math.pi/2]),
@@ -241,7 +241,7 @@ if __name__ == "__main__":
         #     frequency_line_noise = 50,
         #     rabi_frequency_readout = 2e3
         # )
-        # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
+        experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
         
         recon.run_reconstruction_norm_scale_factor_sweep(
             expected_signal = signal_reconstruction,
@@ -255,10 +255,12 @@ if __name__ == "__main__":
             ],
             expected_amplitude = scaled.amplitude,
             expected_frequency = scaled.frequency,
-            expected_error_measurement = 0.3, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
+            expected_error_measurement = 0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
             frequency_line_noise = 50,
             rabi_frequency_readout = 2e3,
-            number_of_samples = 10000
+            number_of_samples = 10000,
+            frequency_cutoff_low = 1e3,
+            frequency_cutoff_high = 14e3
             # number_of_samples = 50
         )
 

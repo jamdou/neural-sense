@@ -391,7 +391,7 @@ def remove_line_noise_from_model(experiment_results:arch.ExperimentResults, scal
     for time_sample in time:
         phase += math.tau*np.sqrt(rabi**2 + (np.sum(line_noise_model.a*np.cos(math.tau*line_noise_model.h*time_sample + line_noise_model.p)))**2)*time_step
 
-    error = -1/(math.tau*scaled.time_end)*np.cos(phase)*np.sin(tilt)
+    error = -1/(math.tau*scaled.time_end)*np.cos(phase)*np.sin(tilt)*-1
     modified_experiment_results = arch.ExperimentResults(frequency = experiment_results.frequency.copy(), frequency_amplitude = experiment_results.frequency_amplitude - error, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected feed forward")
 
     plt.figure()

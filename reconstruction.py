@@ -449,7 +449,7 @@ class Reconstruction():
 
         self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
 
-        refinement_level = 5
+        refinement_level = 1
         weight_maximum = 10000 #10000
         for refinement_index in range(refinement_level):
             weights = np.abs(self.amplitude)
