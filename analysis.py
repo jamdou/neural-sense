@@ -440,6 +440,9 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
     coherences_equidistant = np.empty_like(sampleses, dtype = np.float64)
     coherences_lowpass = np.empty_like(sampleses, dtype = np.float64)
     coherences_highpass = np.empty_like(sampleses, dtype = np.float64)
+    coherences_flower = np.empty_like(sampleses, dtype = np.float64)
+    coherences_flower_reverse = np.empty_like(sampleses, dtype = np.float64)
+    coherences_flower_lucas = np.empty_like(sampleses, dtype = np.float64)
     coherences_random_on_axis = np.empty_like(sampleses, dtype = np.float64)
     coherences_random_on_axis_min = np.empty_like(sampleses, dtype = np.float64)
     coherences_random_on_axis_max = np.empty_like(sampleses, dtype = np.float64)
@@ -501,6 +504,33 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
         coherence = reconstruction.evaluate_coherence()
         coherences_highpass[samples_index] = coherence
 
+        # Flower
+        frequency = np.arange(d_frequency_min, frequency_max - d_frequency_min/2, d_frequency_min)
+        flower_indices = flower_picker(time_properties.time_coarse.size, ratio_type = "golden")
+        frequency = frequency[flower_indices]
+        frequency = frequency[0:samples]
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences_flower[samples_index] = coherence
+
+        # Reverse Flower
+        frequency = np.arange(d_frequency_min, frequency_max - d_frequency_min/2, d_frequency_min)
+        flower_indices = flower_picker(time_properties.time_coarse.size, ratio_type = "golden reverse")
+        frequency = frequency[flower_indices]
+        frequency = frequency[0:samples]
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences_flower_reverse[samples_index] = coherence
+
+        # Lucas flower
+        frequency = np.arange(d_frequency_min, frequency_max - d_frequency_min/2, d_frequency_min)
+        flower_indices = flower_picker(time_properties.time_coarse.size, ratio_type = "lucas")
+        frequency = frequency[flower_indices]
+        frequency = frequency[0:samples]
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences_flower_lucas[samples_index] = coherence
+
     # print(time_properties.time_coarse)
     # print(time_properties.time_coarse.size)
     # print(sweep_parameters[1])
@@ -510,12 +540,15 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
 
     plt.figure()
     plt.plot(sampleses, coherences_equidistant, "k-", label = "Equidistant")
-    plt.plot(sampleses, coherences_random_on_axis, "m-", label = "Random (on axis)")
-    plt.fill_between(sampleses, coherences_random_on_axis_min, coherences_random_on_axis_max, color = (1, 0, 1, 0.25))
-    plt.plot(sampleses, coherences_random_off_axis, "y-", label = "Random (off axis)")
-    plt.fill_between(sampleses, coherences_random_off_axis_min, coherences_random_off_axis_max, color = (1, 1, 0, 0.25))
+    plt.plot(sampleses, coherences_random_on_axis, "c-", label = "Random (on axis)")
+    plt.fill_between(sampleses, coherences_random_on_axis_min, coherences_random_on_axis_max, color = (0, 1, 1, 0.25))
+    plt.plot(sampleses, coherences_random_off_axis, "g-", label = "Random (off axis)")
+    plt.fill_between(sampleses, coherences_random_off_axis_min, coherences_random_off_axis_max, color = (0, 1, 0, 0.25))
     plt.plot(sampleses, coherences_lowpass, "b-", label = "Low pass")
-    plt.plot(sampleses, coherences_highpass, "r-", label = "High pass")
+    plt.plot(sampleses, coherences_highpass, "r:", label = "High pass")
+    plt.plot(sampleses, coherences_flower, "y-", label = "Flower (golden)")
+    plt.plot(sampleses, coherences_flower_reverse, "y:", label = "Flower (golden reverse)")
+    plt.plot(sampleses, coherences_flower_lucas, "m-", label = "Flower (Lucas)")
     plt.legend()
     plt.xlabel("Number of samples")
     plt.ylabel("Sampling coherence")
@@ -526,12 +559,15 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
     plt.figure()
     plt.subplot(2, 1, 2)
     plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_equidistant)), 0, sweep_parameters[1]), "k-", label = "Equidistant")
-    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis)), 0, sweep_parameters[1]), "m-", label = "Random (on axis)")
-    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_on_axis_max)), 0, sweep_parameters[1]), color = (1, 0, 1, 0.25))
-    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis)), 0, sweep_parameters[1]), "y-", label = "Random (off axis)")
-    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_off_axis_max)), 0, sweep_parameters[1]), color = (1, 1, 0, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis)), 0, sweep_parameters[1]), "c-", label = "Random (on axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_on_axis_max)), 0, sweep_parameters[1]), color = (0, 1, 1, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis)), 0, sweep_parameters[1]), "g-", label = "Random (off axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_off_axis_max)), 0, sweep_parameters[1]), color = (0, 1, 0, 0.25))
     plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_lowpass)), 0, sweep_parameters[1]), "b-", label = "Low pass")
-    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_highpass)), 0, sweep_parameters[1]), "r-", label = "High pass")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_highpass)), 0, sweep_parameters[1]), "r:", label = "High pass")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_flower)), 0, sweep_parameters[1]), "y-", label = "Flower (golden)")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_flower_reverse)), 0, sweep_parameters[1]), "y:", label = "Flower (golden reverse)")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_flower_lucas)), 0, sweep_parameters[1]), "m-", label = "Flower (Lucas)")
     # plt.legend()
     plt.xlabel("Number of samples")
     # plt.ylabel("Maximum guaranteed sparsity")
@@ -539,35 +575,46 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
 
     plt.subplot(2, 1, 1)
     plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_equidistant)), 0, sweep_parameters[1]), "k-", label = "Equidistant")
-    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis)), 0, sweep_parameters[1]), "m-", label = "Random (on axis)")
-    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_on_axis_max)), 0, sweep_parameters[1]), color = (1, 0, 1, 0.25))
-    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis)), 0, sweep_parameters[1]), "y-", label = "Random (off axis)")
-    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_off_axis_max)), 0, sweep_parameters[1]), color = (1, 1, 0, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis)), 0, sweep_parameters[1]), "c-", label = "Random (on axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_on_axis_max)), 0, sweep_parameters[1]), color = (0, 1, 1, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis)), 0, sweep_parameters[1]), "g-", label = "Random (off axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_off_axis_max)), 0, sweep_parameters[1]), color = (0, 1, 0, 0.25))
     plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_lowpass)), 0, sweep_parameters[1]), "b-", label = "Low pass")
-    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_highpass)), 0, sweep_parameters[1]), "r-", label = "High pass")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_highpass)), 0, sweep_parameters[1]), "r:", label = "High pass")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_flower)), 0, sweep_parameters[1]), "y-", label = "Flower (golden)")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_flower_reverse)), 0, sweep_parameters[1]), "y:", label = "Flower (golden reverse)")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_flower_lucas)), 0, sweep_parameters[1]), "m-", label = "Flower (Lucas)")
     plt.legend()
     plt.ylabel("Maximum guaranteed sparsity")
     if archive:
         archive.write_plot("Maximum guaranteed sparsity", "guaranteed_sparsity_sweep")
     plt.draw()
 
-def sweep_sensing_coherence_lowpass(archive:arch.Archive, time_properties:test_signal.TimeProperties, sweep_parameters = [30, None, 10]):
-    sweep_parameters[1] = sweep_parameters[1] or (time_properties.time_coarse.size)
-    sampleses = np.arange(sweep_parameters[1], sweep_parameters[0], -sweep_parameters[2])
-    frequency_max = 1/(2*time_properties.time_step_coarse)
-    d_frequency = frequency_max/(time_properties.time_coarse.size + 1)
-    coherences = np.empty_like(sampleses)
-    reconstruction = recon.Reconstruction(time_properties)
-    for samples_index, samples in enumerate(sampleses):
-        frequency = np.arange(d_frequency, d_frequency*sampleses + d_frequency/2, d_frequency)
-        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = 0*frequency, frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
-        coherence = reconstruction.evaluate_coherence()
-        coherences[samples_index] = coherence
+def flower_picker(samples_max, start = 0, ratio_type = "golden"):
+    if ratio_type == "lucas":
+        golden_ratio = 1/((1 + math.sqrt(5))/2 + 2)
+    elif ratio_type == "golden":
+        golden_ratio = (1 + math.sqrt(5))/2 - 1
+    elif ratio_type == "golden reverse":
+        golden_ratio = 2 - (1 + math.sqrt(5))/2
+    current_proportion = start
+    flower_indices = np.zeros(samples_max, int) - 1
+    for samples_index in range(samples_max):
+        new_index_original = int(math.floor(current_proportion*samples_max))
+        new_index = new_index_original
+        step = int(1)
+        while new_index in flower_indices:
+            new_index = new_index_original + step
+            while new_index >= samples_max:
+                new_index -= samples_max
+            while new_index < 0:
+                new_index += samples_max
+            step *= -1
+            if step > 0:
+                step += 1
+        flower_indices[samples_index] = new_index
+        current_proportion += golden_ratio
+        while current_proportion > 1:
+            current_proportion -= 1
 
-    plt.figure()
-    plt.plot(sampleses, coherences, "-k")
-    plt.xlabel("Number of samples")
-    plt.ylabel("Sampling coherence")
-    if archive:
-        archive.write_plot("Coherence sweep (lowpass)", "coherence_sweep_lowpass")
-    plt.draw()
+    return flower_indices
