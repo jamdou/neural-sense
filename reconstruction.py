@@ -5,6 +5,7 @@ import math
 from numba import cuda
 import numba as nb
 import time as tm
+import scipy.optimize
 
 import util
 from util import PrettyTritty as C
@@ -187,14 +188,16 @@ class Reconstruction():
         # iteration_max = 100
         # scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
-        self.fourier_scale = self.time_properties.time_step_coarse/((self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # ((self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.reconstruction_step = 1e-4/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         # self.norm_scale_factor = 0.25*((11.87*self.frequency_amplitude.size)**2)/3169
         self.norm_scale_factor = ((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
         # self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
         # self.iteration_max = int(417)
-        self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
+        # self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
+        self.iteration_max = int(math.ceil((expected_amplitude**2)/((4*(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))*expected_frequency)*(2*expected_error_measurement))))
 
         C.print(f"reconstruction_step: {self.reconstruction_step}\n\titeration_max: {self.iteration_max}\n\tnorm_scale_factor: {self.norm_scale_factor}")
         
@@ -236,11 +239,14 @@ class Reconstruction():
         self.backtrack_scale = backtrack_scale
 
         # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
-        self.fourier_scale = self.time_properties.time_step_coarse/((self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # ((self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
         self.reconstruction_step = 1e-1/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         self.norm_scale_factor = 0.2*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
-        self.iteration_max = int(math.ceil(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
+        
+        # self.iteration_max = int(math.ceil(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement))))
+        self.iteration_max = int(math.ceil(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))*expected_frequency)*(2*expected_error_measurement))))
 
         C.print(f"reconstruction_step: {self.reconstruction_step}\n\titeration_max: {self.iteration_max}\n\tnorm_scale_factor: {self.norm_scale_factor}")
         
@@ -309,7 +315,8 @@ class Reconstruction():
         self.backtrack_scale = backtrack_scale
 
         tolerable_error = 2*expected_error_measurement
-        gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         self.reconstruction_step = 1/gradient_lipschitz
         self.fourier_scale = gradient_lipschitz
         expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
@@ -428,7 +435,8 @@ class Reconstruction():
         self.backtrack_scale = backtrack_scale
 
         tolerable_error = 2*expected_error_measurement
-        gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # (self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         self.reconstruction_step = 1/gradient_lipschitz
         self.fourier_scale = gradient_lipschitz
         expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
@@ -533,14 +541,16 @@ class Reconstruction():
         self.expected_error_measurement = expected_error_measurement
         self.backtrack_scale = backtrack_scale
 
-        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # (self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
 
         # self.reconstruction_step = 1e-4/self.fourier_scale
         self.reconstruction_step = 1e-1/self.fourier_scale
         expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
         # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
         self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
-        self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
+        # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
+        self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))*expected_frequency)*(2*expected_error_measurement)))))
         self.shrink_size_max = 1e2
 
         C.print(f"reconstruction_step: {self.reconstruction_step}\niteration_max: {self.iteration_max}\nnorm_scale_factor: {self.norm_scale_factor}")
@@ -627,7 +637,8 @@ class Reconstruction():
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
         # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
-        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # (self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
 
         fourier_transform = np.empty((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
         evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
@@ -662,7 +673,8 @@ class Reconstruction():
         blocks_per_grid_frequency = (self.frequency.size + (threads_per_block - 1)) // threads_per_block
 
         iteration_max = 100
-        scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # (self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         
         fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
         evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, scale)
@@ -694,12 +706,84 @@ class Reconstruction():
 
         C.finished("reconstruction (FISTA)")
 
+    def evaluate_coherence(self):
+        # C.starting("sensing coherence evaluation")
+        coherence_size = int(self.time_properties.time_coarse.size*(self.time_properties.time_coarse.size - 1)/2)
+        # time_indices = np.empty((coherence_size, 2), np.int32)
+        # for coherence_index in range(coherence_size):
+        #     time_index_high = coherence_index
+        #     time_indices_to_check = self.time_properties.time_coarse.size - 1
+        #     time_index_low = 0
+        #     while time_index_high >= time_indices_to_check:
+        #         time_index_high -= time_indices_to_check
+        #         time_indices_to_check -= 1
+        #         time_index_low += 1
+        #     time_index_high += time_index_low + 1
+        #     time_indices[coherence_index, :] = np.array([time_index_low, time_index_high])
+        #     # C.print(f"{time_index_low}, {time_index_high}")
+
+        # C.print(f"coherence size = {coherence_size}")
+        threads_per_block = 128
+        blocks_per_grid_time = (self.time_properties.time_coarse.size + (threads_per_block - 1)) // threads_per_block
+        blocks_per_grid_coherence = (coherence_size + (threads_per_block - 1)) // threads_per_block
+
+        fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+        # (self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+        fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
+        coherence = cuda.device_array((coherence_size), np.float64)
+        # C.print(f"Init")
+        evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, fourier_scale)
+        # C.print(f"FT")
+        evaluate_fourier_transform_unit[blocks_per_grid_time, threads_per_block](fourier_transform)
+        # C.print(f"Unit")
+        evaluate_coherence[blocks_per_grid_coherence, threads_per_block](fourier_transform, coherence)
+        # C.print(f"Coherence")
+        coherence = coherence.copy_to_host()
+        # print(coherence)
+        # C.finished("sensing coherence evaluation")
+        return np.max(coherence)
+
+        # fourier_transform = fourier_transform.copy_to_host()
+
+        
+
 @cuda.jit()
 def evaluate_fourier_transform(frequency, time_coarse, fourier_transform, scale):
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
     if time_index < time_coarse.size:
         for frequency_index in range(frequency.size):
             fourier_transform[frequency_index, time_index] = scale*math.sin(math.tau*frequency[frequency_index]*time_coarse[time_index])
+
+@cuda.jit()
+def evaluate_coherence(fourier_transform, coherence):
+    coherence_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if coherence_index < coherence.size:
+        time_index_high = coherence_index
+        time_indices_to_check = fourier_transform.shape[1] - 1
+        time_index_low = 0
+        while time_index_high >= time_indices_to_check:
+            time_index_high -= time_indices_to_check
+            time_indices_to_check -= 1
+            time_index_low += 1
+        time_index_high += time_index_low + 1
+
+        coherence[coherence_index] = 0
+        coherence_temp = 0
+        for frequency_index in range(fourier_transform.shape[0]):
+            # coherence_temp += fourier_transform[frequency_index, time_indices[coherence_index, 0]]*fourier_transform[frequency_index, time_indices[coherence_index, 1]]
+            coherence_temp += fourier_transform[frequency_index, time_index_low]*fourier_transform[frequency_index, time_index_high]
+        coherence[coherence_index] = abs(coherence_temp)
+
+@cuda.jit()
+def evaluate_fourier_transform_unit(fourier_transform):
+    time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x
+    if time_index < fourier_transform.shape[1]:
+        norm = 0
+        for frequency_index in range(fourier_transform.shape[0]):
+            norm += fourier_transform[frequency_index, time_index]**2
+        norm = math.sqrt(norm)
+        for frequency_index in range(fourier_transform.shape[0]):
+            fourier_transform[frequency_index, time_index] /= norm
 
 @cuda.jit()
 def evaluate_frequency_amplitude_prediction(amplitude, fourier_transform, frequency_amplitude_prediction):
@@ -871,11 +955,19 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     C.starting("number of samples sweep")
     # numbers_of_samples = []
     amplitudes = []
+    coherence = [[] for random_seed in random_seeds]
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
         for reconstruction_index, number_of_samples in enumerate(sweep_samples):
             # numbers_of_samples.append(number_of_samples)
             for random_index, random_seed in enumerate(random_seeds):
+                # Initialise reconstruction
                 reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples, frequency_cutoff_low = frequency_cutoff_low, frequency_cutoff_high = frequency_cutoff_high, random_seed = random_seed)
+
+                # Evaluate measurement coherence
+                if evaluation_method_index == 0:
+                    coherence[random_index].append(reconstruction.evaluate_coherence())
+                
+                # Evaluate resconstructions
                 if evaluation_method == "least_squares":
                     reconstruction.evaluate_least_squares()
                 elif evaluation_method == "fista_ayanzadeh":
@@ -889,9 +981,24 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
                 reconstruction.write_to_file(archive.archive_file, (numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
 
                 amplitudes.append(reconstruction.amplitude.copy())
-        #         if reconstruction_index + random_index == 0:
-        #             reconstruction.plot(None, expected_signal)
-        # reconstruction.plot(None, expected_signal)
+
+        # Fit coherence
+        arcsech_densities = []
+        for random_index, random_seed in enumerate(random_seeds):
+            coherence[random_index] = np.array(coherence[random_index])
+            max_number = max(expected_signal.time_properties.time_coarse.size, np.max(numbers_of_samples))
+            arcsech_density = np.arccosh(max_number/numbers_of_samples)
+            arcsech_densities.append(arcsech_density)
+        
+        arcsech_density_full = np.array(arcsech_densities)
+        arcsech_density_full = arcsech_density_full.flatten() #.reshape((arcsech_density_full.size, 1))
+        coherence_full = np.array(coherence)
+        coherence_full = coherence_full.flatten()
+
+        # coherence_coefficient = np.linalg.lstsq(arcsech_density_full, coherence_full)[0][0]
+        coherence_coefficient = np.dot(arcsech_density_full, coherence_full)/np.dot(arcsech_density_full, arcsech_density_full)
+
+
     C.finished("number of samples sweep")
 
     C.starting("error analysis")
@@ -918,11 +1025,12 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         errors_method_1.append(np.array(errors_1))
         errors_method_2.append(np.array(errors_2))
         errors_method_sup.append(np.array(errors_sup))
-    C.finished("error analysis")
+    C.finished("error analysis")     
 
     if archive:
         sweep_group = archive.archive_file.require_group("reconstruction_sweeps/number_of_samples")
         sweep_group["number_of_samples"] = numbers_of_samples
+        sweep_group["coherence_coefficient"] = [coherence_coefficient]
         for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
             evaluation_group = sweep_group.require_group(evaluation_method)
             evaluation_group["error_1"] = errors_method_1[evaluation_method_index]
@@ -1029,6 +1137,20 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     plt.legend(legend)
     if archive:
         archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
+    plt.draw()
+
+    plt.figure()
+    plt.subplot()
+    coherence[random_index]
+    for random_index, random_seed in enumerate(random_seeds):
+        plt.plot(numbers_of_samples, coherence[random_index], "--")
+    plt.plot(numbers_of_samples, coherence_coefficient*arcsech_densities[0], "k-", label = "asech fit")
+    plt.ylim(bottom = 0, top = 1)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel("Sensing coherence")
+    plt.legend()
+    if archive:
+        archive.write_plot(f"Sensing coherence for matrices used in reconstructions\nFit coefficient of {coherence_coefficient}", "number_of_samples_coherence")
     plt.draw()
 
 def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (0.5, 5, 0.5), archive:Archive = None, number_of_samples = 10000, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None):

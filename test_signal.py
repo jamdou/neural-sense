@@ -42,7 +42,7 @@ class TimeProperties:
         self.time_step_fine = time_step_fine
         self.time_step_source = time_step_source
         self.time_end_points = np.asarray(time_end_points, np.double)
-        self.time_index_max = int((self.time_end_points[1] - self.time_end_points[0])/self.time_step_coarse)
+        self.time_index_max = int(round((self.time_end_points[1] - self.time_end_points[0])/self.time_step_coarse))
         self.time_coarse = np.empty(self.time_index_max)
         # self.time_source = np.arange(self.time_end_points[0], self.time_end_points[1], self.time_step_source, np.double)
 
@@ -438,7 +438,7 @@ def get_amplitude(
     time_index = cuda.threadIdx.x + cuda.blockIdx.x*cuda.blockDim.x  # The time array index the current thread is working on
     if time_index < time_coarse.size:                                 # Check we haven't overflowed the array
         # Evaluate time
-        time_coarse[time_index] = time_index*time_step_coarse
+        time_coarse[time_index] = time_end_points[0] + time_index*time_step_coarse
 
         # Evaluate signal
         time_amplitude[time_index] = 0

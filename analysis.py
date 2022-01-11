@@ -8,6 +8,7 @@ import archive as arch
 import util
 from util import PrettyTritty as C
 import test_signal
+import reconstruction as recon
 
 def find_neural_signal_size(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, archive:arch.Archive = None):
     print(f"{C.y}Starting fit...{C.d}")
@@ -430,3 +431,143 @@ def remove_line_noise_from_evaluation(experiment_results:arch.ExperimentResults,
     plt.draw()
 
     return modified_experiment_results
+
+def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.TimeProperties, sweep_parameters = [30, None, 10]):
+    sweep_parameters[1] = sweep_parameters[1] or (time_properties.time_coarse.size)
+    sampleses = np.arange(sweep_parameters[1], sweep_parameters[0] - 1, -sweep_parameters[2])
+    frequency_max = 1/(2*time_properties.time_step_coarse)
+    d_frequency_min = frequency_max/(time_properties.time_coarse.size + 1)
+    coherences_equidistant = np.empty_like(sampleses, dtype = np.float64)
+    coherences_lowpass = np.empty_like(sampleses, dtype = np.float64)
+    coherences_highpass = np.empty_like(sampleses, dtype = np.float64)
+    coherences_random_on_axis = np.empty_like(sampleses, dtype = np.float64)
+    coherences_random_on_axis_min = np.empty_like(sampleses, dtype = np.float64)
+    coherences_random_on_axis_max = np.empty_like(sampleses, dtype = np.float64)
+    coherences_random_off_axis = np.empty_like(sampleses, dtype = np.float64)
+    coherences_random_off_axis_min = np.empty_like(sampleses, dtype = np.float64)
+    coherences_random_off_axis_max = np.empty_like(sampleses, dtype = np.float64)
+    reconstruction = recon.Reconstruction(time_properties)
+
+    for samples_index, samples in enumerate(sampleses):
+        # Equidistant
+        d_frequency = frequency_max/(samples + 1)
+        frequency = np.arange(d_frequency, frequency_max - d_frequency/2, d_frequency)
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences_equidistant[samples_index] = coherence
+
+        # Random (on axis)
+        frequency = np.arange(d_frequency_min, frequency_max - d_frequency_min/2, d_frequency_min)
+        coherence_max = 0
+        coherence_min = 1
+        for repeat_index in range(50):
+            reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid*repeat_index, number_of_samples = samples)
+            coherence = reconstruction.evaluate_coherence()
+            if repeat_index == 0:
+                coherences_random_on_axis[samples_index] = coherence
+            if coherence < coherence_min:
+                coherence_min = coherence
+            if coherence > coherence_max:
+                coherence_max = coherence
+        coherences_random_on_axis_min[samples_index] = coherence_min
+        coherences_random_on_axis_max[samples_index] = coherence_max
+
+        # Random (off axis)
+        coherence_max = 0
+        coherence_min = 1
+        for repeat_index in range(10):
+            np.random.seed(util.Seeds.metroid*repeat_index)
+            frequency = np.random.uniform(0, frequency_max, samples)
+            reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid*repeat_index, number_of_samples = samples)
+            coherence = reconstruction.evaluate_coherence()
+            if repeat_index == 0:
+                coherences_random_off_axis[samples_index] = coherence
+            if coherence < coherence_min:
+                coherence_min = coherence
+            if coherence > coherence_max:
+                coherence_max = coherence
+        coherences_random_off_axis_min[samples_index] = coherence_min
+        coherences_random_off_axis_max[samples_index] = coherence_max
+
+        # Low pass
+        frequency = np.arange(d_frequency_min, d_frequency_min*(samples + 1) - d_frequency_min/2, d_frequency_min)
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences_lowpass[samples_index] = coherence
+
+        # High pass
+        frequency += frequency_max - d_frequency_min*(samples + 1)
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences_highpass[samples_index] = coherence
+
+    # print(time_properties.time_coarse)
+    # print(time_properties.time_coarse.size)
+    # print(sweep_parameters[1])
+    # print(d_frequency_min)
+    # print(frequency_max)
+    print(frequency)
+
+    plt.figure()
+    plt.plot(sampleses, coherences_equidistant, "k-", label = "Equidistant")
+    plt.plot(sampleses, coherences_random_on_axis, "m-", label = "Random (on axis)")
+    plt.fill_between(sampleses, coherences_random_on_axis_min, coherences_random_on_axis_max, color = (1, 0, 1, 0.25))
+    plt.plot(sampleses, coherences_random_off_axis, "y-", label = "Random (off axis)")
+    plt.fill_between(sampleses, coherences_random_off_axis_min, coherences_random_off_axis_max, color = (1, 1, 0, 0.25))
+    plt.plot(sampleses, coherences_lowpass, "b-", label = "Low pass")
+    plt.plot(sampleses, coherences_highpass, "r-", label = "High pass")
+    plt.legend()
+    plt.xlabel("Number of samples")
+    plt.ylabel("Sampling coherence")
+    if archive:
+        archive.write_plot("Sampling coherence", "coherence_sweep")
+    plt.draw()
+
+    plt.figure()
+    plt.subplot(2, 1, 2)
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_equidistant)), 0, sweep_parameters[1]), "k-", label = "Equidistant")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis)), 0, sweep_parameters[1]), "m-", label = "Random (on axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_on_axis_max)), 0, sweep_parameters[1]), color = (1, 0, 1, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis)), 0, sweep_parameters[1]), "y-", label = "Random (off axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_off_axis_max)), 0, sweep_parameters[1]), color = (1, 1, 0, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_lowpass)), 0, sweep_parameters[1]), "b-", label = "Low pass")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_highpass)), 0, sweep_parameters[1]), "r-", label = "High pass")
+    # plt.legend()
+    plt.xlabel("Number of samples")
+    # plt.ylabel("Maximum guaranteed sparsity")
+    plt.ylim([0, 15])
+
+    plt.subplot(2, 1, 1)
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_equidistant)), 0, sweep_parameters[1]), "k-", label = "Equidistant")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis)), 0, sweep_parameters[1]), "m-", label = "Random (on axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_on_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_on_axis_max)), 0, sweep_parameters[1]), color = (1, 0, 1, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis)), 0, sweep_parameters[1]), "y-", label = "Random (off axis)")
+    plt.fill_between(sampleses, np.clip(np.floor(1/(3*coherences_random_off_axis_min)), 0, sweep_parameters[1]), np.clip(np.floor(1/(3*coherences_random_off_axis_max)), 0, sweep_parameters[1]), color = (1, 1, 0, 0.25))
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_lowpass)), 0, sweep_parameters[1]), "b-", label = "Low pass")
+    plt.plot(sampleses, np.clip(np.floor(1/(3*coherences_highpass)), 0, sweep_parameters[1]), "r-", label = "High pass")
+    plt.legend()
+    plt.ylabel("Maximum guaranteed sparsity")
+    if archive:
+        archive.write_plot("Maximum guaranteed sparsity", "guaranteed_sparsity_sweep")
+    plt.draw()
+
+def sweep_sensing_coherence_lowpass(archive:arch.Archive, time_properties:test_signal.TimeProperties, sweep_parameters = [30, None, 10]):
+    sweep_parameters[1] = sweep_parameters[1] or (time_properties.time_coarse.size)
+    sampleses = np.arange(sweep_parameters[1], sweep_parameters[0], -sweep_parameters[2])
+    frequency_max = 1/(2*time_properties.time_step_coarse)
+    d_frequency = frequency_max/(time_properties.time_coarse.size + 1)
+    coherences = np.empty_like(sampleses)
+    reconstruction = recon.Reconstruction(time_properties)
+    for samples_index, samples in enumerate(sampleses):
+        frequency = np.arange(d_frequency, d_frequency*sampleses + d_frequency/2, d_frequency)
+        reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = 0*frequency, frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid, number_of_samples = samples)
+        coherence = reconstruction.evaluate_coherence()
+        coherences[samples_index] = coherence
+
+    plt.figure()
+    plt.plot(sampleses, coherences, "-k")
+    plt.xlabel("Number of samples")
+    plt.ylabel("Sampling coherence")
+    if archive:
+        archive.write_plot("Coherence sweep (lowpass)", "coherence_sweep_lowpass")
+    plt.draw()
