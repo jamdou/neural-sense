@@ -618,3 +618,99 @@ def flower_picker(samples_max, start = 0, ratio_type = "golden"):
             current_proportion -= 1
 
     return flower_indices
+
+def analyse_overall_noise(experiment_results:arch.ExperimentResults, experiment_results_empty:arch.ExperimentResults, archive:arch.Archive = None):
+    C.starting("fitting overall noise")
+
+    frequency_empty = experiment_results_empty.frequency.copy()
+    frequency_amplitude_empty = experiment_results_empty.frequency_amplitude.copy()
+
+    def noise_model(frequency, amplitude, decay, offset):
+        return amplitude*np.exp(-decay*frequency) + offset
+        
+
+    fit_results = scipy.optimize.curve_fit(noise_model, frequency_empty, frequency_amplitude_empty, [30, 1e-4, 0])
+    amplitude = fit_results[0][0]
+    u_amplitude = np.sqrt(fit_results[1][0, 0])
+    decay = fit_results[0][1]
+    u_decay = np.sqrt(fit_results[1][1, 1])
+    offset = fit_results[0][2]
+    u_offset = np.sqrt(fit_results[1][2, 2])
+
+    C.print(f"Amplitude: {amplitude} ± {u_amplitude}")
+    C.print(f"Decay: {decay} ± {u_decay}")
+    C.print(f"Offset: {offset} ± {u_offset}")
+
+    frequency_amplitude_offset = noise_model(frequency_empty, amplitude, decay, offset)
+    frequency_amplitude_offset_residual = frequency_amplitude_empty - frequency_amplitude_offset
+    error_rms = np.sqrt(np.mean(frequency_amplitude_offset_residual**2))
+    C.print(f"RMS error: {error_rms}")
+
+    lab_noise_group = archive.archive_file.require_group("lab_noise")
+    lab_noise_noise_group = lab_noise_group.require_group("noise")
+    lab_noise_noise_group["frequency"] = frequency_empty
+    lab_noise_noise_group["unmodified"] = frequency_amplitude_empty
+    lab_noise_noise_group["residual"] = frequency_amplitude_offset_residual
+    lab_noise_noise_group.attrs["rms"] = error_rms
+    lab_noise_noise_group.attrs["amplitude"] = amplitude
+    lab_noise_noise_group.attrs["decay"] = decay
+    lab_noise_noise_group.attrs["offset"] = offset
+    lab_noise_noise_group.attrs["u_amplitude"] = u_amplitude
+    lab_noise_noise_group.attrs["u_decay"] = u_decay
+    lab_noise_noise_group.attrs["u_offset"] = u_offset
+
+    plt.figure()
+    plt.plot(frequency_empty, frequency_amplitude_empty, "rx", label = "Data")
+
+    plt.plot(frequency_empty, frequency_amplitude_offset, "b-", label = "Fit")
+    plt.plot(frequency_empty, frequency_amplitude_offset + error_rms, "b--", label = "Fit uncertainty")
+    plt.plot(frequency_empty, frequency_amplitude_offset - error_rms, "b--")
+
+    plt.plot(frequency_empty, frequency_amplitude_offset_residual, "yx", label = "Residual")
+    plt.plot(frequency_empty, 0*frequency_amplitude_offset_residual + error_rms, "y--", label = "Residual uncertainty")
+    plt.plot(frequency_empty, 0*frequency_amplitude_offset_residual - error_rms, "y--")
+    
+    plt.legend()
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Frequency amplitude (Hz)")
+    if archive:
+        archive.write_plot("Lab noise fit", "lab_noise_fit")
+    plt.draw()
+
+    C.finished("fitting overall noise")
+
+    C.starting("removing noise offset")
+
+    frequency = experiment_results.frequency.copy()
+    frequency_amplitude = experiment_results.frequency_amplitude.copy()
+    frequency_amplitude_offset = noise_model(frequency, amplitude, decay, offset)
+    frequency_amplitude_modified = frequency_amplitude - frequency_amplitude_offset
+
+    plt.figure()
+    plt.plot(frequency, frequency_amplitude, "rx", label = "Data")
+
+    plt.plot(frequency, frequency_amplitude_offset, "b-", label = "Fit")
+    # plt.plot(frequency_empty, frequency_amplitude_offset + error_rms, "b--", label = "Fit uncertainty")
+    # plt.plot(frequency_empty, frequency_amplitude_offset - error_rms, "b--")
+
+    plt.plot(frequency, frequency_amplitude_modified, "yx", label = "Modified")
+    # plt.plot(frequency_empty, 0*frequency_amplitude_offset_residual + error_rms, "y--", label = "Residual uncertainty")
+    # plt.plot(frequency_empty, 0*frequency_amplitude_offset_residual - error_rms, "y--")
+    
+    plt.legend()
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Frequency amplitude (Hz)")
+    if archive:
+        archive.write_plot("Lab data", "lab_noise_data")
+    plt.draw()
+
+    experiment_results_modified = arch.ExperimentResults(frequency = frequency, frequency_amplitude = frequency_amplitude_modified, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, lab noise offset removed")
+    lab_noise_data_group = lab_noise_group.require_group("data")
+    lab_noise_data_group["frequency"] = frequency
+    lab_noise_data_group["unmodified"] = frequency_amplitude
+    lab_noise_data_group["offset"] = offset
+    lab_noise_data_group["modified"] = frequency_amplitude_modified
+
+    C.finished("removing noise offset")
+
+    return experiment_results_modified
