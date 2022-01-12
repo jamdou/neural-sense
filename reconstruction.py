@@ -319,7 +319,8 @@ class Reconstruction():
         # gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
         self.reconstruction_step = 1/gradient_lipschitz
         self.fourier_scale = gradient_lipschitz
-        expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
+        expected_sparsity = 1/(expected_frequency*self.time_properties.time_step_coarse)
+        expected_signal_energy = 0.5*(expected_amplitude**2)*expected_sparsity
 
         iteration_max_rate_ista = 0.5*gradient_lipschitz*expected_signal_energy
         iteration_max_rate_fista = 2*np.sqrt(iteration_max_rate_ista)
@@ -336,7 +337,9 @@ class Reconstruction():
         # self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
         # # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
         # # self.iteration_max = int(math.ceil(2*np.sqrt((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
-        self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz
+        
+        # self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+        self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
 
 
         self.shrink_size_max = 1e2
@@ -647,6 +650,18 @@ class Reconstruction():
 
         self.reconstruction_type = "least squares"
         C.finished("reconstruction (least squares)")
+
+    def evaluate_informed_least_squares(self, informed_type = "fista", expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0):
+        C.starting("Informed least squares")
+        if informed_type == "fista":
+            self.evaluate_fista_backtracking(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier)
+        elif informed_type == "fista_adaptive":
+            self.evaluate_fista_adaptive(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier)
+        support = self.amplitude != 0
+        self.evaluate_least_squares()
+        self.amplitude *= support
+        self.reconstruction_type = "FISTA informed least squares"
+        C.finished("Informed least squares")
 
     def evaluate_fista_ayanzadeh(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifiers = np.geomspace(1.0, 3.0, 10)):
         C.starting("FISTA (Ayanzadeh)")
@@ -976,27 +991,31 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
                     reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 elif evaluation_method == "fista_adaptive":
                     reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+                elif evaluation_method == "fista_informed_least_squares":
+                    reconstruction.evaluate_informed_least_squares(informed_type = "fista", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+                elif evaluation_method == "adaptive_informed_least_squares":
+                    reconstruction.evaluate_informed_least_squares(informed_type = "fista_adaptive", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 else:
                     reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 reconstruction.write_to_file(archive.archive_file, (numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
 
                 amplitudes.append(reconstruction.amplitude.copy())
 
-        # Fit coherence
-        arcsech_densities = []
-        for random_index, random_seed in enumerate(random_seeds):
-            coherence[random_index] = np.array(coherence[random_index])
-            max_number = max(expected_signal.time_properties.time_coarse.size, np.max(numbers_of_samples))
-            arcsech_density = np.arccosh(max_number/numbers_of_samples)
-            arcsech_densities.append(arcsech_density)
+        # # Fit coherence
+        # arcsech_densities = []
+        # for random_index, random_seed in enumerate(random_seeds):
+        #     coherence[random_index] = np.array(coherence[random_index])
+        #     max_number = max(expected_signal.time_properties.time_coarse.size, np.max(numbers_of_samples))
+        #     arcsech_density = np.arccosh(max_number/numbers_of_samples)
+        #     arcsech_densities.append(arcsech_density)
         
-        arcsech_density_full = np.array(arcsech_densities)
-        arcsech_density_full = arcsech_density_full.flatten() #.reshape((arcsech_density_full.size, 1))
-        coherence_full = np.array(coherence)
-        coherence_full = coherence_full.flatten()
+        # arcsech_density_full = np.array(arcsech_densities)
+        # arcsech_density_full = arcsech_density_full.flatten() #.reshape((arcsech_density_full.size, 1))
+        # coherence_full = np.array(coherence)
+        # coherence_full = coherence_full.flatten()
 
-        # coherence_coefficient = np.linalg.lstsq(arcsech_density_full, coherence_full)[0][0]
-        coherence_coefficient = np.dot(arcsech_density_full, coherence_full)/np.dot(arcsech_density_full, arcsech_density_full)
+        # # coherence_coefficient = np.linalg.lstsq(arcsech_density_full, coherence_full)[0][0]
+        # coherence_coefficient = np.dot(arcsech_density_full, coherence_full)/np.dot(arcsech_density_full, arcsech_density_full)
 
 
     C.finished("number of samples sweep")
@@ -1030,7 +1049,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     if archive:
         sweep_group = archive.archive_file.require_group("reconstruction_sweeps/number_of_samples")
         sweep_group["number_of_samples"] = numbers_of_samples
-        sweep_group["coherence_coefficient"] = [coherence_coefficient]
+        # sweep_group["coherence_coefficient"] = [coherence_coefficient]
         for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
             evaluation_group = sweep_group.require_group(evaluation_method)
             evaluation_group["error_1"] = errors_method_1[evaluation_method_index]
@@ -1046,6 +1065,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         "fista" : "FISTA",
         "ista_backtracking" : "ISTA (Backtracking)",
         "ista" : "ISTA",
+        "fista_informed_least_squares" : "FISTA informed least squares",
+        "adaptive_informed_least_squares" : "Sandwich"
     }
     legend = []
     for evaluation_method in evaluation_methods:
@@ -1059,6 +1080,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         "fista" : "c--",
         "ista_backtracking" : "k-",
         "ista" : "k--",
+        "fista_informed_least_squares" : "g--",
+        "adaptive_informed_least_squares" : "g-."
     }
     time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
     amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
@@ -1139,19 +1162,19 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
     plt.draw()
 
-    plt.figure()
-    plt.subplot()
-    coherence[random_index]
-    for random_index, random_seed in enumerate(random_seeds):
-        plt.plot(numbers_of_samples, coherence[random_index], "--")
-    plt.plot(numbers_of_samples, coherence_coefficient*arcsech_densities[0], "k-", label = "asech fit")
-    plt.ylim(bottom = 0, top = 1)
-    plt.xlabel("Number of samples used in the reconstruction")
-    plt.ylabel("Sensing coherence")
-    plt.legend()
-    if archive:
-        archive.write_plot(f"Sensing coherence for matrices used in reconstructions\nFit coefficient of {coherence_coefficient}", "number_of_samples_coherence")
-    plt.draw()
+    # plt.figure()
+    # plt.subplot()
+    # coherence[random_index]
+    # for random_index, random_seed in enumerate(random_seeds):
+    #     plt.plot(numbers_of_samples, coherence[random_index], "--")
+    # plt.plot(numbers_of_samples, coherence_coefficient*arcsech_densities[0], "k-", label = "asech fit")
+    # plt.ylim(bottom = 0, top = 1)
+    # plt.xlabel("Number of samples used in the reconstruction")
+    # plt.ylabel("Sensing coherence")
+    # plt.legend()
+    # if archive:
+    #     archive.write_plot(f"Sensing coherence for matrices used in reconstructions\nFit coefficient of {coherence_coefficient}", "number_of_samples_coherence")
+    # plt.draw()
 
 def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (0.5, 5, 0.5), archive:Archive = None, number_of_samples = 10000, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None):
     reconstruction = Reconstruction(expected_signal.time_properties)
@@ -1174,6 +1197,10 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
                     reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 elif evaluation_method == "fista_adaptive":
                     reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+                elif evaluation_method == "fista_informed_least_squares":
+                    reconstruction.evaluate_informed_least_squares(informed_type = "fista", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+                elif evaluation_method == "adaptive_informed_least_squares":
+                    reconstruction.evaluate_informed_least_squares(informed_type = "fista_adaptive", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 else:
                     reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
                 reconstruction.write_to_file(archive.archive_file, (scale_factor_modifiers.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
@@ -1194,6 +1221,8 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
         "fista" : "FISTA",
         "ista_backtracking" : "ISTA (Backtracking)",
         "ista" : "ISTA",
+        "fista_informed_least_squares" : "FISTA informed least squares",
+        "adaptive_informed_least_squares" : "Sandwich"
     }
     time_mesh, scale_factors_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, (norm_scale_factors))
     amplitude_mesh = np.empty((norm_scale_factors.size, amplitudes[0].size))
