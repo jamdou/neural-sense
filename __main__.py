@@ -45,9 +45,10 @@ if __name__ == "__main__":
         # === Scaled protocol ===
         # experiment_time = "20211216T113507" # No signal, all shots
         # experiment_time = "20211209T143732" # One signal, all shots
-        # experiment_time = "20211216T161624" # Two signals, all shots
-        experiment_time = "20211117T155508" # One signal, up to 14kHz
-        #"20211209T143732" #"20211216T161624" #"20211117T155508" #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
+        experiment_time = "20211216T161624" # Two signals, all shots
+        # experiment_time = "20211117T155508" # One signal, up to 14kHz
+        # experiment_time = "20211202T124902" # Ramsey measurements
+        #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
         scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
         # scaled = util.ScaledParameters(
         #     scaled_frequency = 5000,
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         scaled.print()
         scaled.write_to_file(archive)
 
-        # line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
+        line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
 
         # # print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
         # # print(f"{scaled.frequency:10.4e} {1/scaled.frequency:10.4e} {scaled.pulse_time:10.4e} {scaled.density:10.4e} {scaled.samples:10.4e} {scaled.sweep[0]:10.4e} {scaled.sweep[1]:10.4e} {scaled.frequency_step:10.4e} {scaled.time_end:10.4e}")
@@ -82,10 +83,11 @@ if __name__ == "__main__":
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
-            [],
+            # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
+            scaled.get_neural_pulses(),
+            # [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
-            # line_noise_model.generate_sinusoidal_noise(),
+            line_noise_model.generate_sinusoidal_noise(),
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
             # [
             #     test_signal.SinusoidalNoise([0, 0, 170.41], [0.0, 0.0, 50], [0.0, 0.0, math.pi/2]),
@@ -105,7 +107,8 @@ if __name__ == "__main__":
             # [],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
             # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-            [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
+            # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
+            scaled.get_neural_pulses(),
             [],
             # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
             time_properties_reconstruction
@@ -196,41 +199,41 @@ if __name__ == "__main__":
         # reconstruction.write_to_file(archive.archive_file)
 
 
-        # === ===                       === ===
-        # === === Reconstruction sweeps === ===
-        # === ===                       === ===
+        # # === ===                       === ===
+        # # === === Reconstruction sweeps === ===
+        # # === ===                       === ===
 
-        # recon.run_reconstruction_subsample_sweep(
-        #     expected_signal = signal_reconstruction,
-        #     experiment_results = experiment_results,
-        #     sweep_parameters = (0, 10000, 10),
-        #     archive = archive,
-        #     random_seeds = np.arange(10)*util.Seeds.metroid,
-        #     evaluation_methods = ["least_squares"]
-        # )
-        # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
-        # recon.run_reconstruction_subsample_sweep(
-        #     expected_signal = signal_reconstruction,
-        #     experiment_results = experiment_results,
-        #     sweep_parameters = (0, 10000, 10),
-        #     archive = archive,
-        #     random_seeds = np.arange(10)*util.Seeds.metroid,
-        #     evaluation_methods = [
-        #         "least_squares",
-        #         # "fista_backtracking"
-        #     ],
-        #     expected_amplitude = scaled.amplitude,
-        #     expected_frequency = scaled.frequency,
-        #     expected_error_measurement = 0.3,#0.40,#0.25,#0.05,#0.2,#11.87,
-        #     norm_scale_factor_modifier = 0.5,#0.001,
-        #     frequency_line_noise = 50,
-        #     rabi_frequency_readout = 2e3,
-        #     # frequency_cutoff_low = 1e3,
-        #     frequency_cutoff_high = 25e3 - 1
-        # )
-        # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
+        # # recon.run_reconstruction_subsample_sweep(
+        # #     expected_signal = signal_reconstruction,
+        # #     experiment_results = experiment_results,
+        # #     sweep_parameters = (0, 10000, 10),
+        # #     archive = archive,
+        # #     random_seeds = np.arange(10)*util.Seeds.metroid,
+        # #     evaluation_methods = ["least_squares"]
+        # # )
+        # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
+        # # recon.run_reconstruction_subsample_sweep(
+        # #     expected_signal = signal_reconstruction,
+        # #     experiment_results = experiment_results,
+        # #     sweep_parameters = (0, 10000, 10),
+        # #     archive = archive,
+        # #     random_seeds = np.arange(10)*util.Seeds.metroid,
+        # #     evaluation_methods = [
+        # #         "least_squares",
+        # #         # "fista_backtracking"
+        # #     ],
+        # #     expected_amplitude = scaled.amplitude,
+        # #     expected_frequency = scaled.frequency,
+        # #     expected_error_measurement = 0.3,#0.40,#0.25,#0.05,#0.2,#11.87,
+        # #     norm_scale_factor_modifier = 0.5,#0.001,
+        # #     frequency_line_noise = 50,
+        # #     rabi_frequency_readout = 2e3,
+        # #     # frequency_cutoff_low = 1e3,
+        # #     frequency_cutoff_high = 25e3 - 1
+        # # )
+        experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
 
-        # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
+        experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
         # archive_empty = arch.Archive(archive_path, "")
         # archive_empty.open_archive_file("20211216T113507")
         # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
@@ -250,11 +253,12 @@ if __name__ == "__main__":
                 "adaptive_informed_least_squares"
             ],
             expected_amplitude = scaled.amplitude,
-            expected_frequency = scaled.frequency,
+            expected_frequency = scaled.frequency/2,
             expected_error_measurement = 5, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-            norm_scale_factor_modifier = 0.1, #0.05, # 0.5, #1, #3, #0.001,
+            norm_scale_factor_modifier = 0.05, #0.085, #0.1, #0.5, #1, #3, #0.001,
             frequency_line_noise = 50,
-            rabi_frequency_readout = 2e3
+            rabi_frequency_readout = 2e3,
+            frequency_cutoff_high = 25e3 - 1
         )
         # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
         # recon.run_reconstruction_norm_scale_factor_sweep(
@@ -270,7 +274,7 @@ if __name__ == "__main__":
         #         # "fista_adaptive"
         #     ],
         #     expected_amplitude = scaled.amplitude,
-        #     expected_frequency = scaled.frequency,
+        #     expected_frequency = scaled.frequency/2,
         #     expected_error_measurement = 5, #0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
         #     frequency_line_noise = 50,
         #     rabi_frequency_readout = 2e3,
@@ -302,7 +306,25 @@ if __name__ == "__main__":
         # # === ===                 === ===
         # # === === Non compressive === ===
         # # === ===                 === ===
-        # sim.ramsey.simulate_ramsey(scaled, archive)
+        # # ramsey_results = sim.ramsey.simulate_ramsey(
+        # #     scaled,
+        # #     archive,
+        # #     line_noise_model
+        # # )
+        # # ramsey_results.write_to_archive(archive)
+        # # ramsey_results.plot(archive)
+        # ramsey_results = arch.RamseyResults.new_from_archive_time(
+        #     archive,
+        #     "20211202T124902" # Lab
+        # )
+        # empty_results = arch.RamseyResults.new_from_archive_time(
+        #     archive,
+        #     "20220113T201129" # Simulation
+        # )
+        # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
+        # ramsey_results.write_to_archive(archive)
+        # ramsey_results.plot(archive)
+        # sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
 
         # === ===                      === ===
         # === === Benchmarks and tests === ===

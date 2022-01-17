@@ -251,14 +251,14 @@ class LineNoiseModel:
     @staticmethod
     def new_from_experiment_time(archive_time):
         line_noise_model = None
-        if archive_time in ["20211117T123323", "20211117T155508", "20211216T161624"]:
+        if archive_time in ["20211117T123323", "20211117T155508", "20211216T161624", "20211216T113507", "20211209T143732", "20211216T161624"]:
             # line_noise_model = LineNoiseModel(
             #     c = [170.41, 0, -9.5, 0, 12.6, 0, 1.8],
             #     s = [514.65, 0, 34.2, 0, 41.2, 0, -5.6]
             # )
             line_noise_model = LineNoiseModel(
-                c = [339, 0, 63, 0, 24],
-                s = [-190, 0,  -2, 0, 1]
+                c = [339, 0, -63, 0, 24],
+                s = [-190, 0,  2, 0, 1]
             )
         return line_noise_model
 

@@ -19,8 +19,9 @@ def find_neural_signal_size(experiment_results:arch.ExperimentResults, scaled:ut
     
     amplitude_approximated_normalised = np.zeros_like(time)
     for time_index in range(time.size):
-        if time[time_index] >= scaled.pulse_time and time[time_index] < scaled.pulse_time + 1/scaled.frequency:
-            amplitude_approximated_normalised[time_index] = np.sin(math.tau*scaled.frequency*(time[time_index] - scaled.pulse_time))
+        for pulse_time_instance in scaled.pulse_time:
+            if time[time_index] >= pulse_time_instance and time[time_index] < pulse_time_instance + 1/scaled.frequency:
+                amplitude_approximated_normalised[time_index] = np.sin(math.tau*scaled.frequency*(time[time_index] - pulse_time_instance))
     frequency_mesh, time_mesh = np.meshgrid(frequency, time)
     frequency_mesh, amplitude_approximated_normalised_mesh = np.meshgrid(frequency, amplitude_approximated_normalised)
     frequency_amplitude_approximated_normalised = np.sum(np.sin(math.tau*frequency_mesh*time_mesh)*amplitude_approximated_normalised_mesh, axis = 0)*scaled.time_step/scaled.time_end
@@ -410,14 +411,20 @@ def remove_line_noise_from_model(experiment_results:arch.ExperimentResults, scal
 
 def remove_line_noise_from_evaluation(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, evaluation_experiment_results:arch.ExperimentResults, archive:arch.Archive = None):
 
-    error_raw = evaluation_experiment_results.frequency_amplitude
     error = []
-    for error_instance, frequency_instance in zip(error_raw, evaluation_experiment_results.frequency):
-        if frequency_instance in experiment_results.frequency:
-            error.append(error_instance)
+    frequency = []
+    frequency_amplitude = []
+    for frequency_instance, error_instance in zip(evaluation_experiment_results.frequency, evaluation_experiment_results.frequency_amplitude):
+        for measured_frequency_instance, frequency_amplitude_instance in zip(experiment_results.frequency, experiment_results.frequency_amplitude):
+            if np.isclose(measured_frequency_instance, frequency_instance):
+                error.append(error_instance)
+                frequency.append(frequency_instance)
+                frequency_amplitude.append(frequency_amplitude_instance - error_instance)
     error = np.array(error)
+    frequency = np.array(frequency)
+    frequency_amplitude = np.array(frequency_amplitude)
     
-    modified_experiment_results = arch.ExperimentResults(frequency = experiment_results.frequency.copy(), frequency_amplitude = experiment_results.frequency_amplitude - error, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected feed forward evaluation")
+    modified_experiment_results = arch.ExperimentResults(frequency = frequency, frequency_amplitude = frequency_amplitude, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, 50Hz corrected feed forward evaluation")
 
     plt.figure()
     plt.plot(experiment_results.frequency, experiment_results.frequency_amplitude, "r--", label = "Unmodified")

@@ -330,9 +330,9 @@ class ExperimentResults:
         archive_group_experiment_results = archive.archive_file.require_group("experiment_results")
         archive_group_experiment_results["frequency"] = self.frequency
         archive_group_experiment_results["frequency_amplitude"] = self.frequency_amplitude
-        if self.archive_time:
+        if self.archive_time is not None:
             archive_group_experiment_results.attrs["archive_time"] = self.archive_time
-        if self.experiment_type:
+        if self.experiment_type is not None:
             archive_group_experiment_results.attrs["experiment_type"] = self.experiment_type
     
     @staticmethod
@@ -355,3 +355,48 @@ class ExperimentResults:
         # archive_previous.close_archive_file(False)
 
         return ExperimentResults(frequency, frequency_amplitude, archive_time = archive_time_real, experiment_type = experiment_type)
+
+class RamseyResults:
+    def __init__(self, time:np.ndarray = None, amplitude:np.ndarray = None, archive_time:str = None, experiment_type:str = "unknown") -> None:
+        self.time = time.copy()
+        self.amplitude = amplitude.copy()
+        
+        self.archive_time = archive_time
+        self.experiment_type = experiment_type
+
+    def plot(self, archive:Archive):
+        plt.figure()
+        plt.plot(self.time, self.amplitude, "k-")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Amplitude (Hz)")
+        if archive:
+            archive.write_plot("Ramsey sampling", "ramsey_sampling")
+        plt.draw()
+
+    def write_to_archive(self, archive:Archive):
+        archive_group_ramsey_results = archive.archive_file.require_group("ramsey_results")
+        archive_group_ramsey_results["time"] = self.time
+        archive_group_ramsey_results["amplitude"] = self.amplitude
+        if self.archive_time is not None:
+            archive_group_ramsey_results.attrs["archive_time"] = self.archive_time
+        if self.experiment_type is not None:
+            archive_group_ramsey_results.attrs["experiment_type"] = self.experiment_type
+    
+    @staticmethod
+    def new_from_archive_time(archive:Archive, archive_time):
+        archive_previous = Archive(archive.archive_path[:-25], "")
+        archive_previous.open_archive_file(archive_time)
+        archive_group_ramsey_results = archive_previous.archive_file.require_group("ramsey_results")
+
+        time = np.asarray(archive_group_ramsey_results["time"])
+        amplitude = np.asarray(archive_group_ramsey_results["amplitude"])
+        if "archive_time" in archive_group_ramsey_results.attrs:
+            archive_time_real = archive_group_ramsey_results.attrs["archive_time"]
+        else:
+            archive_time_real = archive_time
+        if "experiment_type" in archive_group_ramsey_results.attrs:
+            experiment_type = archive_group_ramsey_results.attrs["experiment_type"]
+        else:
+            experiment_type = "unknown"
+
+        return RamseyResults(time, amplitude, archive_time = archive_time_real, experiment_type = experiment_type)

@@ -60,9 +60,9 @@ class ScaledParameters():
         else:
             self.time_end = 1/(self.frequency*self.density)
         if scaled_pulse_time is not None:
-            self.pulse_time = scaled_pulse_time
+            self.pulse_time = np.array(scaled_pulse_time)
         else:
-            self.pulse_time = scaled_pulse_time_fraction*self.time_end
+            self.pulse_time = np.array(scaled_pulse_time_fraction)*self.time_end
         if scaled_frequency_step is not None:
             self.frequency_step = scaled_frequency_step
         else:
@@ -91,6 +91,13 @@ class ScaledParameters():
         archive.archive_file["scaled_parameters"].attrs["pulse_time"] = self.pulse_time
         archive.archive_file["scaled_parameters"].attrs["frequency_step"] = self.frequency_step
         archive.archive_file["scaled_parameters"].attrs["stagger_constant"] = self.stagger_constant
+
+    def get_neural_pulses(self):
+        neural_pulses = []
+        for pulse_time_instance in self.pulse_time:
+            neural_pulses.append(test_signal.NeuralPulse(pulse_time_instance, self.amplitude, self.frequency))
+        return neural_pulses
+
 
     @staticmethod
     def new_from_archive_time(archive:arch.Archive, archive_time):
@@ -188,7 +195,8 @@ class ScaledParameters():
                 scaled_sweep = [1000, 14000],
                 scaled_pulse_time_fraction = 0.2333333
             )
-        elif archive_time in ["20211209T143732"]:
+        # One signal, 150 shots
+        elif archive_time in ["20211209T143732", "20211202T124902"]:
             scaled = ScaledParameters(
                 scaled_frequency = 5000,
                 scaled_density = 1/25,
@@ -215,13 +223,13 @@ class ScaledParameters():
                 scaled_samples = 10,
                 scaled_amplitude = 1000,
                 scaled_sweep = [100, 25001],
-                scaled_pulse_time_fraction = 0.4333333 #, 0.64999995
+                scaled_pulse_time_fraction = [0.4333333, 0.64999995]
             )
         return scaled
 
     def print(self):
         print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
-        print(f"{self.frequency:10.4e} {1/self.frequency:10.4e} {self.pulse_time:10.4e} {self.density:10.4e} {self.samples:10.4e} {self.sweep[0]:10.4e} {self.sweep[1]:10.4e} {self.frequency_step:10.4e} {self.time_end:10.4e}")
+        print(f"{self.frequency:10.4e} {1/self.frequency:10.4e} {self.pulse_time[0]:10.4e} {self.density:10.4e} {self.samples:10.4e} {self.sweep[0]:10.4e} {self.sweep[1]:10.4e} {self.frequency_step:10.4e} {self.time_end:10.4e}")
 
 def get_noise_evaluation(archive_time):
     if archive_time == "20211117T155508":
@@ -229,6 +237,8 @@ def get_noise_evaluation(archive_time):
     if archive_time in ["20211216T161624"]:
         return "20211217T111849"
         # return "20211124T161452"
+    if archive_time in ["20211216T113507", "20211209T143732", "20211216T161624"]:
+        return "20220113T104353"
 
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
     """
