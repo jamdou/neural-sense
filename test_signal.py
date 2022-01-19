@@ -260,6 +260,11 @@ class LineNoiseModel:
                 c = [339, 0, -63, 0, 24],
                 s = [-190, 0,  2, 0, 1]
             )
+        elif archive_time in ["20220118T124831"]:
+            line_noise_model = LineNoiseModel(
+                c = [122, 0, 15, 0, 4],
+                s = [427, 0,  74, 0, 38]
+            )
         return line_noise_model
 
     def generate_sinusoidal_noise(self):

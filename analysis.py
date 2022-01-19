@@ -420,6 +420,7 @@ def remove_line_noise_from_evaluation(experiment_results:arch.ExperimentResults,
                 error.append(error_instance)
                 frequency.append(frequency_instance)
                 frequency_amplitude.append(frequency_amplitude_instance - error_instance)
+                # frequency_amplitude.append(frequency_amplitude_instance + error_instance)
     error = np.array(error)
     frequency = np.array(frequency)
     frequency_amplitude = np.array(frequency_amplitude)

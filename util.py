@@ -216,7 +216,7 @@ class ScaledParameters():
                 scaled_pulse_time_fraction = 0
             )
         # Two signals, 250 shots
-        elif archive_time in ["20211216T161624"]:
+        elif archive_time in ["20220118T124831", "20211216T161624"]:
             scaled = ScaledParameters(
                 scaled_frequency = 5000,
                 scaled_density = 1/25,
@@ -234,11 +234,13 @@ class ScaledParameters():
 def get_noise_evaluation(archive_time):
     if archive_time == "20211117T155508":
         return "20211125T170254"
-    if archive_time in ["20211216T161624"]:
+    elif archive_time in ["20211216T161624"]:
         return "20211217T111849"
         # return "20211124T161452"
-    if archive_time in ["20211216T113507", "20211209T143732", "20211216T161624"]:
+    elif archive_time in ["20211216T113507", "20211209T143732", "20211216T161624"]:
         return "20220113T104353"
+    elif archive_time in ["20220118T124831"]:
+        return "20220118T172329"
 
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
     """
