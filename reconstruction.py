@@ -615,7 +615,7 @@ class Reconstruction():
         do_backtrack = True
         while do_backtrack:
           copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous)
-          if iteration_index > self.iteration_max/2:
+          if True:#iteration_index > self.iteration_max/2:
             frequency_fit_step_size_use = frequency_fit_step_size*reconstruction_step_backtrack
           else:
             frequency_fit_step_size_use = 0
@@ -954,8 +954,8 @@ def evaluate_frequency_amplitude_prediction_frequency_fit(amplitude, frequency, 
       frequency_amplitude_prediction[frequency_index] += fourier_transform[frequency_index, time_index]*amplitude[time_index]
       derivative_frequency_amplitude_prediction += derivative_fourier_transform[frequency_index, time_index]*amplitude[time_index]
 
-    # frequency_shift_step = frequency_fit_step_size*2*derivative_frequency_amplitude_prediction*(frequency_amplitude_prediction[frequency_index] - frequency_amplitude[frequency_index])
-    frequency_shift_step = frequency_fit_step_size*derivative_frequency_amplitude_prediction
+    frequency_shift_step = frequency_fit_step_size*2*derivative_frequency_amplitude_prediction*(frequency_amplitude_prediction[frequency_index] - frequency_amplitude[frequency_index])
+    # frequency_shift_step = frequency_fit_step_size*derivative_frequency_amplitude_prediction
     frequency[frequency_index] -= frequency_shift_step
     for time_index in range(amplitude.size):
       fourier_transform[frequency_index, time_index] -= frequency_shift_step*derivative_fourier_transform[frequency_index, time_index]

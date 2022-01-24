@@ -135,6 +135,7 @@ if __name__ == "__main__":
     # # frequency = np.arange(0, 1000000, 1)
     # # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
     # frequency = scaled.sample_frequencies
+    # # frequency += 100#*(np.sin(frequency)**2)
 
     # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
     # simulation_manager.evaluate(False, False)
@@ -242,8 +243,9 @@ if __name__ == "__main__":
     # # )
     # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
 
-    experiment_results = analysis.reverse_polarity(experiment_results)
-    experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
+    # experiment_results = analysis.reverse_polarity(experiment_results)
+    # experiment_results.frequency -= 100
+    # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
     # archive_empty = arch.Archive(archive_path, "")
     # archive_empty.open_archive_file("20211216T113507")
     # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
@@ -281,22 +283,22 @@ if __name__ == "__main__":
       evaluation_methods = [
         # "fista_backtracking",
         # "fista_informed_least_squares",
-        # "adaptive_informed_least_squares",
+        "adaptive_informed_least_squares",
         # "fista_adaptive"
-        "adaptive_frequency_fit"
+        # "adaptive_frequency_fit"
       ],
       expected_amplitude = scaled.amplitude,
-      expected_frequency = scaled.frequency/2,
+      expected_frequency = scaled.frequency,
       expected_error_measurement = 5, #0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
       frequency_line_noise = 50,
-      rabi_frequency_readout = 2e3,
+      rabi_frequency_readout = 20e3,
       number_of_samples = 10000,
       # frequency_cutoff_low = 0,
-      frequency_cutoff_low = 1e3,
-      # frequency_cutoff_high = 25e3 - 1,
+      frequency_cutoff_low = 20e3,
+      frequency_cutoff_high = 25e3 - 1,
       # frequency_cutoff_high = 12.5e3 - 1,
-      frequency_cutoff_high = 10e3 - 1,
-      frequency_fit_step_size = 1e-2
+      # frequency_cutoff_high = 10e3 - 1,
+      frequency_fit_step_size = 1e-1
       # number_of_samples = 50
     )
 
