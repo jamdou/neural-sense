@@ -627,6 +627,30 @@ def flower_picker(samples_max, start = 0, ratio_type = "golden"):
 
   return flower_indices
 
+def draw_dst(archive:arch.Archive, time_properties:test_signal.TimeProperties):
+  time_step = time_properties.time_step_coarse
+  time = np.arange(time_step, time_properties.time_end_points[1], time_step)
+  samples = time.size
+  frequency_max = 1/(2*time_step)
+  d_frequency_min = frequency_max/(time.size + 1)
+  # frequency = np.arange(d_frequency_min*math.floor(0.9*(samples + 1)), d_frequency_min*(samples + 1) - d_frequency_min/2, d_frequency_min)
+  frequency = np.arange(d_frequency_min, d_frequency_min*(samples + 1) - d_frequency_min/2, d_frequency_min)
+  for time_step, label in zip([time_properties.time_step_coarse, time_properties.time_step_fine], ["discrete", "continuous"]):
+    time = np.arange(time_step, time_properties.time_end_points[1], time_step)
+    # samples = time.size
+    # frequency_max = 1/(2*time_step)
+    # d_frequency_min = frequency_max/(time.size + 1)
+    # frequency = np.arange(d_frequency_min, d_frequency_min*(samples + 1) - d_frequency_min/2, d_frequency_min)
+    time_mesh, frequency_mesh = np.meshgrid(time, frequency)
+    dst = np.sin(math.tau*frequency_mesh*time_mesh)
+    plt.figure()
+    plt.pcolormesh(time_mesh, frequency_mesh, dst, cmap = "spring", vmin = -1, vmax = 1)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Frequency (Hz)")
+    if archive:
+      archive.write_plot(f"DST ({label})", f"dst_{label}")
+    plt.draw()
+
 def analyse_overall_noise(experiment_results:arch.ExperimentResults, experiment_results_empty:arch.ExperimentResults, archive:arch.Archive = None):
   C.starting("fitting overall noise")
 
