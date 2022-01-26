@@ -754,3 +754,27 @@ def reverse_polarity(experiment_results:arch.ExperimentResults):
     archive_time = experiment_results.archive_time,
     experiment_type = experiment_results.experiment_type
   )
+
+def mode_filter(experiment_results:arch.ExperimentResults, frequency_mode = 4e3):
+  frequency_amplitude = experiment_results.frequency_amplitude.copy()
+  frequency = experiment_results.frequency.copy()
+  frequency_amplitude[frequency < frequency_mode] = frequency_amplitude[frequency < frequency_mode]*(frequency[frequency < frequency_mode]/np.max(frequency[frequency < frequency_mode]))
+  frequency_amplitude[frequency >= frequency_mode] = frequency_amplitude[frequency >= frequency_mode]*(1 + (frequency[frequency >= frequency_mode] - np.max(frequency[frequency < frequency_mode]))/(np.max(frequency[frequency < frequency_mode]) - np.max(frequency)))**2
+
+  return arch.ExperimentResults(
+    frequency = experiment_results.frequency.copy(),
+    frequency_amplitude = frequency_amplitude,
+    archive_time = experiment_results.archive_time,
+    experiment_type = experiment_results.experiment_type
+  )
+
+def whitening_filter(experiment_results:arch.ExperimentResults):
+  frequency_amplitude = experiment_results.frequency_amplitude.copy()
+  frequency_amplitude_max = np.max(np.abs(frequency_amplitude))
+  frequency_amplitude = np.sign(frequency_amplitude)*frequency_amplitude_max
+  return arch.ExperimentResults(
+    frequency = experiment_results.frequency.copy(),
+    frequency_amplitude = frequency_amplitude,
+    archive_time = experiment_results.archive_time,
+    experiment_type = experiment_results.experiment_type
+  )

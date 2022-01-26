@@ -51,12 +51,14 @@ class Reconstruction():
     """
     Import arbitrary frequency values for reconstruction
     """
-    if number_of_samples > np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high)):
-      number_of_samples = np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))
+    number_of_samples_max = np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))
+    if number_of_samples > number_of_samples_max:
+      number_of_samples = number_of_samples_max
       C.print(f"{C.r}number_of_samples is greater than the total number of samples input. Resetting{C.d}")
     if random_seed:
       np.random.seed(random_seed)
-    permutation = np.random.choice(range(np.sum(np.logical_and(frequency_cutoff_low < frequency, frequency < frequency_cutoff_high))), number_of_samples, replace = False)
+    permutation = np.random.choice(range(number_of_samples_max), number_of_samples_max, replace = False)
+    permutation = permutation[0:number_of_samples]
     self.frequency = np.ascontiguousarray(frequency[permutation])
     self.frequency_amplitude = np.ascontiguousarray(frequency_amplitude[permutation])
 
