@@ -317,7 +317,7 @@ class Reconstruction():
     self.reconstruction_type = "ISTA with backtracking"
     C.finished("reconstruction (ISTA with backtracking)")
 
-  def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0):
+  def evaluate_fista_backtracking(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, is_fast = False):
     C.starting("reconstruction (FISTA with backtracking)")
     execution_time_endpoints = np.zeros(2, np.float64)
     execution_time_endpoints[0] = tm.time()
@@ -339,9 +339,10 @@ class Reconstruction():
     expected_sparsity = 1/(expected_frequency*self.time_properties.time_step_coarse)
     expected_signal_energy = 0.5*(expected_amplitude**2)*expected_sparsity
 
-    iteration_max_rate_ista = 0.5*gradient_lipschitz*expected_signal_energy
-    iteration_max_rate_fista = 2*np.sqrt(iteration_max_rate_ista)
-    self.iteration_max = int(np.ceil(iteration_max_rate_fista/tolerable_error))
+    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy
+    if is_fast:
+      iteration_max_rate = 2*np.sqrt(iteration_max_rate)
+    self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
     
 
     # # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
@@ -409,7 +410,8 @@ class Reconstruction():
         fast_step_size_previous_previous = fast_step_size_previous
         fast_step_size_previous = fast_step_size
         fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
-        evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
+        if is_fast:
+          evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
         norm_previous = norm
         norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
         if iteration_index > 0:#-1:
@@ -440,7 +442,7 @@ class Reconstruction():
     self.reconstruction_type = "FISTA with backtracking"
     C.finished("reconstruction (FISTA with backtracking)")
 
-  def evaluate_fista_adaptive(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0):
+  def evaluate_fista_adaptive(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, is_fast = False):
     C.starting("reconstruction (FISTA adaptive)")
     execution_time_endpoints = np.zeros(2, np.float64)
     execution_time_endpoints[0] = tm.time()
@@ -461,9 +463,10 @@ class Reconstruction():
     self.fourier_scale = gradient_lipschitz
     expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
 
-    iteration_max_rate_ista = 0.5*gradient_lipschitz*expected_signal_energy
-    iteration_max_rate_fista = 2*np.sqrt(iteration_max_rate_ista)
-    self.iteration_max = int(np.ceil(iteration_max_rate_fista/tolerable_error))
+    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy
+    if is_fast:
+      iteration_max_rate = 2*np.sqrt(iteration_max_rate)
+    self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
 
     self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz
 
@@ -511,10 +514,11 @@ class Reconstruction():
           copy_amplitude[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous)
           evaluate_frequency_amplitude_prediction[blocks_per_grid_frequency, threads_per_block](amplitude, fourier_transform, frequency_amplitude_prediction)
           evaluate_next_iteration_ista_adaptive[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.norm_scale_factor, reconstruction_step_backtrack, weights)
-          fast_step_size_previous_previous = fast_step_size_previous
-          fast_step_size_previous = fast_step_size
-          fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
-          evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
+          if is_fast:
+            fast_step_size_previous_previous = fast_step_size_previous
+            fast_step_size_previous = fast_step_size
+            fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
+            evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
           norm_previous = norm
           norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
           if iteration_index > 0:
@@ -545,7 +549,7 @@ class Reconstruction():
     self.reconstruction_type = "FISTA adaptive"
     C.finished("reconstruction (FISTA adaptive)")
 
-  def evaluate_fista_frequency_fit(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, frequency_fit_step_size = 1):
+  def evaluate_fista_frequency_fit(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, frequency_fit_step_size = 1, is_fast = False):
     C.starting("reconstruction (FISTA frequency fit)")
     execution_time_endpoints = np.zeros(2, np.float64)
     execution_time_endpoints[0] = tm.time()
@@ -565,9 +569,10 @@ class Reconstruction():
     self.fourier_scale = gradient_lipschitz
     expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
 
-    iteration_max_rate_ista = 0.5*gradient_lipschitz*expected_signal_energy
-    iteration_max_rate_fista = 2*np.sqrt(iteration_max_rate_ista)
-    self.iteration_max = int(np.ceil(iteration_max_rate_fista/tolerable_error))
+    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy
+    if is_fast:
+      iteration_max_rate = 2*np.sqrt(iteration_max_rate)
+    self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
 
     self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz
 
@@ -623,10 +628,11 @@ class Reconstruction():
             frequency_fit_step_size_use = 0
           evaluate_frequency_amplitude_prediction_frequency_fit[blocks_per_grid_frequency, threads_per_block](amplitude, frequency, frequency_amplitude, fourier_transform, derivative_fourier_transform, frequency_amplitude_prediction, frequency_fit_step_size_use)
           evaluate_next_iteration_ista_adaptive[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.norm_scale_factor, reconstruction_step_backtrack, weights)
-          fast_step_size_previous_previous = fast_step_size_previous
-          fast_step_size_previous = fast_step_size
-          fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
-          evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
+          if is_fast:
+            fast_step_size_previous_previous = fast_step_size_previous
+            fast_step_size_previous = fast_step_size
+            fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
+            evaluate_fista_fast_step[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous)
           norm_previous = norm
           norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
           if iteration_index > 0:
@@ -657,7 +663,7 @@ class Reconstruction():
     self.reconstruction_type = "FISTA frequency fit"
     C.finished("reconstruction (FISTA frequency fit)")
 
-  def evaluate_fista_fit(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, rabi_frequency_readout = 2e4, frequency_line_noise = 50):
+  def evaluate_fista_fit(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, rabi_frequency_readout = 2e4, frequency_line_noise = 50, is_fast = False):
     C.starting("reconstruction (FISTA with noise fitting)")
     execution_time_endpoints = np.zeros(2, np.float64)
     execution_time_endpoints[0] = tm.time()
@@ -731,10 +737,11 @@ class Reconstruction():
             shrink_scale = self.shrink_size_max
         # shrink_scale = 1
         evaluate_next_iteration_ista_fit[blocks_per_grid_time, threads_per_block](amplitude, frequency_amplitude, frequency_amplitude_prediction, fourier_transform, self.norm_scale_factor, reconstruction_step_backtrack, shrink_scale, fit_parameters, line_noise_derivative_amplitude)
-        fast_step_size_previous_previous = fast_step_size_previous
-        fast_step_size_previous = fast_step_size
-        fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
-        evaluate_fista_fast_step_fit[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous, fit_parameters, fit_parameters_previous)
+        if is_fast:
+          fast_step_size_previous_previous = fast_step_size_previous
+          fast_step_size_previous = fast_step_size
+          fast_step_size = (1 + math.sqrt(1 + 4*fast_step_size**2))/2
+          evaluate_fista_fast_step_fit[blocks_per_grid_time, threads_per_block](amplitude, amplitude_previous, fast_step_size, fast_step_size_previous, fit_parameters, fit_parameters_previous)
         norm_previous = norm
         norm = self.norm_scale_factor*np.sum(np.abs(amplitude.copy_to_host())) + np.sqrt(np.sum((frequency_amplitude_prediction.copy_to_host() - frequency_amplitude.copy_to_host())**2))
         if iteration_index > 0:
@@ -783,15 +790,21 @@ class Reconstruction():
   def evaluate_informed_least_squares(self, informed_type = "fista", expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, frequency_fit_step_size = 1):
     C.starting("Informed least squares")
     if informed_type == "fista":
-      self.evaluate_fista_backtracking(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier)
+      self.evaluate_fista_backtracking(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, is_fast = True)
+    elif informed_type == "ista":
+      self.evaluate_fista_backtracking(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, is_fast = False)
     elif informed_type == "fista_adaptive":
-      self.evaluate_fista_adaptive(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier)
+      self.evaluate_fista_adaptive(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, is_fast = True)
+    elif informed_type == "ista_adaptive":
+      self.evaluate_fista_adaptive(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, is_fast = False)
     elif informed_type == "fista_frequency_fit":
-      self.evaluate_fista_frequency_fit(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size)
+      self.evaluate_fista_frequency_fit(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size, is_fast = True)
+    elif informed_type == "ista_frequency_fit":
+      self.evaluate_fista_frequency_fit(expected_amplitude, expected_frequency, expected_error_measurement, backtrack_scale, norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size, is_fast = False)
     support = self.amplitude != 0
     self.evaluate_least_squares()
     self.amplitude *= support
-    self.reconstruction_type = "FISTA informed least squares"
+    self.reconstruction_type = "Informed least squares"
     C.finished("Informed least squares")
 
   def evaluate_fista_ayanzadeh(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifiers = np.geomspace(1.0, 3.0, 10)):
@@ -1140,19 +1153,33 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         if evaluation_method == "least_squares":
           reconstruction.evaluate_least_squares()
         elif evaluation_method == "fista_ayanzadeh":
-          reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
+          reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, is_fast = True)
+        elif evaluation_method == "ista_ayanzadeh":
+          reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, is_fast = False)
         elif evaluation_method == "fista_fit":
-          reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier)
+          reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+        elif evaluation_method == "ista_fit":
+          reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = False)
         elif evaluation_method == "fista_adaptive":
-          reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+          reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+        elif evaluation_method == "ista_adaptive":
+          reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = False)
         elif evaluation_method == "fista_informed_least_squares":
           reconstruction.evaluate_informed_least_squares(informed_type = "fista", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
-        elif evaluation_method == "adaptive_informed_least_squares":
+        elif evaluation_method == "ista_informed_least_squares":
+          reconstruction.evaluate_informed_least_squares(informed_type = "ista", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+        elif evaluation_method == "fadaptive_informed_least_squares":
           reconstruction.evaluate_informed_least_squares(informed_type = "fista_adaptive", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
-        elif evaluation_method == "adaptive_frequency_fit":
+        elif evaluation_method == "adaptive_informed_least_squares":
+          reconstruction.evaluate_informed_least_squares(informed_type = "ista_adaptive", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+        elif evaluation_method == "fadaptive_frequency_fit":
           reconstruction.evaluate_informed_least_squares(informed_type = "fista_frequency_fit", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size)
-        else:
-          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+        elif evaluation_method == "adaptive_frequency_fit":
+          reconstruction.evaluate_informed_least_squares(informed_type = "ista_frequency_fit", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size)
+        elif evaluation_method == "fista_backtracking":
+          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+        elif evaluation_method == "ista_backtracking":
+          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
         reconstruction.write_to_file(archive.archive_file, (numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
 
         amplitudes.append(reconstruction.amplitude.copy())
@@ -1214,14 +1241,22 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
+
     "fista_ayanzadeh" : "FISTA (Ayanzadeh)",
     "fista_adaptive" : "FISTA (Adaptive)",
     "fista_backtracking" : "FISTA (Backtracking)",
     "fista_fit" : "FISTA (Line noise fit)",
     "fista" : "FISTA",
-    "ista_backtracking" : "ISTA (Backtracking)",
-    "ista" : "ISTA",
     "fista_informed_least_squares" : "FISTA informed least squares",
+    "fadaptive_informed_least_squares" : "Sandwich (fast)",
+    "fadaptive_frequency_fit" : "Sandwich frequency fit (fast)",
+
+    "ista_ayanzadeh" : "ISTA (Ayanzadeh)",
+    "ista_adaptive" : "ISTA (Adaptive)",
+    "ista_backtracking" : "ISTA (Backtracking)",
+    "ista_fit" : "ISTA (Line noise fit)",
+    "ista" : "ISTA",
+    "ista_informed_least_squares" : "ISTA informed least squares",
     "adaptive_informed_least_squares" : "Sandwich",
     "adaptive_frequency_fit" : "Sandwich frequency fit"
   }
@@ -1230,16 +1265,24 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     legend.append(evaluation_method_labels[evaluation_method])
   evaluation_method_legend = {
     "least_squares" : "b-",
-    "fista_backtracking" : "c-",
-    "fista_fit" : "r-",
-    "fista_ayanzadeh" : "y-",
-    "fista_adaptive" : "g-",
-    "fista" : "c--",
-    "ista_backtracking" : "k-",
-    "ista" : "k--",
-    "fista_informed_least_squares" : "g--",
-    "adaptive_informed_least_squares" : "g-.",
-    "adaptive_frequency_fit" : "r-."
+
+    "fista_backtracking" : "c-x",
+    "fista_fit" : "r-x",
+    "fista_ayanzadeh" : "y-x",
+    "fista_adaptive" : "g-x",
+    "fista" : "c--x",
+    "fista_informed_least_squares" : "g--x",
+    "fadaptive_informed_least_squares" : "g-.x",
+    "fadaptive_frequency_fit" : "r-.x",
+
+    "ista_backtracking" : "c-+",
+    "ista_fit" : "r-+",
+    "ista_ayanzadeh" : "y-+",
+    "ista_adaptive" : "g-+",
+    "ista" : "c--+",
+    "ista_informed_least_squares" : "g--+",
+    "adaptive_informed_least_squares" : "g-.+",
+    "adaptive_frequency_fit" : "r-.+",
   }
   time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
   amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
@@ -1352,17 +1395,29 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
         if evaluation_method == "fista_ayanzadeh":
           reconstruction.evaluate_fista_ayanzadeh(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement)
         elif evaluation_method == "fista_fit":
-          reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier)
+          reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+        elif evaluation_method == "ista_fit":
+          reconstruction.evaluate_fista_fit(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, rabi_frequency_readout = rabi_frequency_readout, frequency_line_noise = frequency_line_noise, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = False)
         elif evaluation_method == "fista_adaptive":
-          reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+          reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+        elif evaluation_method == "ista_adaptive":
+          reconstruction.evaluate_fista_adaptive(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = False)
         elif evaluation_method == "fista_informed_least_squares":
           reconstruction.evaluate_informed_least_squares(informed_type = "fista", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
-        elif evaluation_method == "adaptive_informed_least_squares":
+        elif evaluation_method == "ista_informed_least_squares":
+          reconstruction.evaluate_informed_least_squares(informed_type = "ista", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+        elif evaluation_method == "fadaptive_informed_least_squares":
           reconstruction.evaluate_informed_least_squares(informed_type = "fista_adaptive", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
-        elif evaluation_method == "adaptive_frequency_fit":
+        elif evaluation_method == "adaptive_informed_least_squares":
+          reconstruction.evaluate_informed_least_squares(informed_type = "ista_adaptive", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+        elif evaluation_method == "fadaptive_frequency_fit":
           reconstruction.evaluate_informed_least_squares(informed_type = "fista_frequency_fit", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size)
-        else:
-          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier)
+        elif evaluation_method == "adaptive_frequency_fit":
+          reconstruction.evaluate_informed_least_squares(informed_type = "ista_frequency_fit", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size)
+        elif evaluation_method == "fista_backtracking":
+          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+        elif evaluation_method == "ista_backtracking":
+          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = False)
         reconstruction.write_to_file(archive.archive_file, (scale_factor_modifiers.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)
 
         amplitudes.append(reconstruction.amplitude.copy())
@@ -1374,14 +1429,22 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
+    
     "fista_ayanzadeh" : "FISTA (Ayanzadeh)",
     "fista_adaptive" : "FISTA (Adaptive)",
     "fista_backtracking" : "FISTA (Backtracking)",
     "fista_fit" : "FISTA (Line noise fit)",
     "fista" : "FISTA",
-    "ista_backtracking" : "ISTA (Backtracking)",
-    "ista" : "ISTA",
     "fista_informed_least_squares" : "FISTA informed least squares",
+    "adaptive_informed_least_squares" : "Sandwich (fast)",
+    "adaptive_frequency_fit" : "Sandwich frequency fit (fast)",
+
+    "ista_ayanzadeh" : "ISTA (Ayanzadeh)",
+    "ista_adaptive" : "ISTA (Adaptive)",
+    "ista_backtracking" : "ISTA (Backtracking)",
+    "ista_fit" : "ISTA (Line noise fit)",
+    "ista" : "ISTA",
+    "ista_informed_least_squares" : "ISTA informed least squares",
     "adaptive_informed_least_squares" : "Sandwich",
     "adaptive_frequency_fit" : "Sandwich frequency fit"
   }
