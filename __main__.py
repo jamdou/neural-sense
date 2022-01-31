@@ -155,10 +155,10 @@ if __name__ == "__main__":
 
     # experiment_results.frequency -= 100
     # experiment_results = analysis.reverse_polarity(experiment_results)
-    experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
+    # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15])), archive)
     # experiment_results = analysis.mode_filter(experiment_results)
     # experiment_results = analysis.whitening_filter(experiment_results)
-    experiment_results = analysis.mode_filter(experiment_results)
+    # experiment_results = analysis.mode_filter(experiment_results)
     # archive_empty = arch.Archive(archive_path, "")
     # archive_empty.open_archive_file("20211216T113507")
     # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     recon.run_reconstruction_norm_scale_factor_sweep(
       expected_signal = signal_reconstruction,
       experiment_results = experiment_results,
-      sweep_parameters = (0.001, 0.2, 50), #(0.01, 2, 50), #(1, 75, 100),
+      sweep_parameters = (0.001, 0.2, 25), #(0.01, 2, 50), #(1, 75, 100),
       archive = archive,
       random_seeds = np.arange(1)*util.Seeds.metroid,
       evaluation_methods = [
