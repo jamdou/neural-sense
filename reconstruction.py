@@ -1436,8 +1436,8 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
     "fista_fit" : "FISTA (Line noise fit)",
     "fista" : "FISTA",
     "fista_informed_least_squares" : "FISTA informed least squares",
-    "adaptive_informed_least_squares" : "Sandwich (fast)",
-    "adaptive_frequency_fit" : "Sandwich frequency fit (fast)",
+    "fadaptive_informed_least_squares" : "Sandwich (fast)",
+    "fadaptive_frequency_fit" : "Sandwich frequency fit (fast)",
 
     "ista_ayanzadeh" : "ISTA (Ayanzadeh)",
     "ista_adaptive" : "ISTA (Adaptive)",

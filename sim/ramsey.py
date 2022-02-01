@@ -7,6 +7,7 @@ import util
 from util import PrettyTritty as C
 import archive as arch
 import test_signal
+import analysis
 
 def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, line_noise_model:test_signal.LineNoiseModel = None):
   bias = 600e3
@@ -36,9 +37,9 @@ def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, l
     field_strength[1] = 0
     field_strength[2] = math.tau*bias
     # field_strength[2] += math.tau*amplitude_line*math.sin(math.tau*50*time_sample)
-    for time_neural_instance in time_neural:
-      if time_neural_instance <= time_sample and time_sample < time_neural_instance + 1/frequency_neural:
-        field_strength[2] += math.tau*amplitude_neural*math.sin(math.tau*frequency_neural*(time_sample - time_neural_instance))
+    # for time_neural_instance in time_neural:
+    #   if time_neural_instance <= time_sample and time_sample < time_neural_instance + 1/frequency_neural:
+    #     field_strength[2] += math.tau*amplitude_neural*math.sin(math.tau*frequency_neural*(time_sample - time_neural_instance))
     for line_noise_index, (line_noise_amplitude, line_noise_phase) in enumerate(zip(line_noise_amplitudes, line_noise_phases)):
       if line_noise_amplitude > 0:
         field_strength[2] += math.tau*line_noise_amplitude*math.cos(math.tau*50*(line_noise_index + 1)*time_sample + line_noise_phase)
@@ -101,3 +102,24 @@ def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSi
   if archive:
     archive.write_plot("Ramsey comparison", "ramsey_comparison")
   plt.draw()
+
+def mode_filter(results:arch.RamseyResults):
+  amplitude = results.amplitude.copy()
+  time = results.time.copy()
+  time_step = time[1] - time[0]
+  frequency_max = 1/(2*time_step)
+  d_frequency_min = frequency_max/(time.size + 1)
+  frequency = np.arange(d_frequency_min, frequency_max - d_frequency_min/2, d_frequency_min)
+
+  frequency_mesh, time_mesh = np.meshgrid(frequency, time)
+  fourier_transform = np.sin(math.tau*frequency_mesh*time_mesh)
+  frequency_amplitude = fourier_transform@amplitude
+
+  experiment_results = arch.ExperimentResults(frequency = frequency, frequency_amplitude = frequency_amplitude)
+  experiment_results = analysis.mode_filter(experiment_results)
+
+  frequency_amplitude = experiment_results.frequency_amplitude
+  amplitude_modified = np.linalg.lstsq(fourier_transform, frequency_amplitude, rcond = None)[0]
+
+  results_modified = arch.RamseyResults(time = time, amplitude = amplitude_modified, archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, mode filer")
+  return results_modified

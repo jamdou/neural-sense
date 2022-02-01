@@ -51,7 +51,7 @@ class StateProperties:
       The state (spin wavefunction) of the system at the start of the simulation.
     """
     self.spin_quantum_number = spin_quantum_number
-    if state_init:
+    if state_init is not None:
       self.state_init = np.asarray(state_init, np.complex128)
     else:
       if self.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
@@ -274,7 +274,8 @@ class SourceProperties:
       # source_time_end_points[1, 0] = source_time_end_points[1, 1] - 1/(4*readout_amplitude)
       source_amplitude[1, 0] = 2*readout_amplitude
       source_frequency[1, 0] = bias_amplitude# + 3*((readout_amplitude**2)/bias_amplitude)/4
-      source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+      # source_phase[1, 0] = math.tau*math.fmod(0.5 + bias_amplitude*(source_time_end_points[1, 0]), 1)
+      source_phase[1, 0] = math.tau*math.fmod(bias_amplitude*(source_time_end_points[1, 0]), 1)
       # source_amplitude[1, 1] = readout_amplitude
       # source_frequency[1, 1] = bias_amplitude# - (readout_amplitude**2/bias_amplitude)/4
       # source_phase[1, 1] = math.tau*math.fmod(0.25 + bias_amplitude*(source_time_end_points[1, 0]), 1)
@@ -835,6 +836,8 @@ class Simulation:
     self.simulation_results.sensed_frequency_amplitude = self.simulation_results.spin[self.simulation_results.spin.shape[0] - 1, 2]
     # print(self.simulation_results.sensed_frequency_amplitude)
     self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal_reconstruction.time_properties.time_end_points[1] - self.signal_reconstruction.time_properties.time_end_points[0]))
+    # self.simulation_results.sensed_frequency_amplitude *= -1/(2*math.pi*(self.signal_reconstruction.time_properties.time_end_points[1] - self.signal_reconstruction.time_properties.time_end_points[0]))
+    
 
     if self.state_properties.spin_quantum_number == spinsim.SpinQuantumNumber.HALF:
       self.simulation_results.sensed_frequency_amplitude *= 2

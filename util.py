@@ -241,7 +241,8 @@ def get_noise_evaluation(archive_time):
   elif archive_time in ["20211216T113507", "20211209T143732", "20211216T161624"]:
     return "20220113T104353"
   elif archive_time in ["20220118T124831", "20220118T131910", "20220127T131147"]:
-    return "20220118T172329"
+    # return "20220118T172329"
+    return "20220201T125920"
 
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
   """
