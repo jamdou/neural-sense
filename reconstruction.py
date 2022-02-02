@@ -356,8 +356,8 @@ class Reconstruction():
     # # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     # # self.iteration_max = int(math.ceil(2*np.sqrt((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     
-    # self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
-    self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
+    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
 
 
     self.shrink_size_max = 1e2
@@ -468,7 +468,8 @@ class Reconstruction():
       iteration_max_rate = 2*np.sqrt(iteration_max_rate)
     self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
 
-    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz
+    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
 
 
     self.shrink_size_max = 1e2
@@ -574,7 +575,8 @@ class Reconstruction():
       iteration_max_rate = 2*np.sqrt(iteration_max_rate)
     self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
 
-    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz
+    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
 
 
     self.shrink_size_max = 1e2
@@ -686,7 +688,11 @@ class Reconstruction():
     self.reconstruction_step = 1e-1/self.fourier_scale
     expected_error_density = expected_amplitude/(math.pi*expected_frequency*self.time_properties.time_step_coarse)
     # self.norm_scale_factor = norm_scale_factor_modifier*((expected_error_measurement*self.frequency_amplitude.size)**2)/expected_error_density
-    self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
+    # self.norm_scale_factor = norm_scale_factor_modifier*self.frequency_amplitude.size*(expected_error_measurement**2)/expected_error_density
+
+    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
+    
     # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))*expected_frequency)*(2*expected_error_measurement)))))
     self.shrink_size_max = 1e2
@@ -1204,26 +1210,32 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   C.finished("number of samples sweep")
 
   C.starting("error analysis")
+  errors_method_0 = []
   errors_method_1 = []
   errors_method_2 = []
   errors_method_sup = []
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    errors_0 = []
     errors_1 = []
     errors_2 = []
     errors_sup = []
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
+      error_0 = 0
       error_1 = 0
       error_2 = 0
       error_sup = 0
       for random_index, random_seed in enumerate(random_seeds):
         amplitude = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index]
+        error_0 += np.mean((amplitude == 0)*(expected_signal.amplitude != 0) + (amplitude != 0)*(expected_signal.amplitude == 0))
         error_1 += np.mean(np.abs(amplitude - expected_signal.amplitude))
         error_2 += math.sqrt(np.mean((amplitude - expected_signal.amplitude)**2))
         error_sup += np.max(np.abs(amplitude - expected_signal.amplitude))
+      errors_0.append(error_0/random_seeds.size)
       errors_1.append(error_1/random_seeds.size)
       errors_2.append(error_2/random_seeds.size)
       errors_sup.append(error_sup/random_seeds.size)
-      
+    
+    errors_method_0.append(np.array(errors_0))
     errors_method_1.append(np.array(errors_1))
     errors_method_2.append(np.array(errors_2))
     errors_method_sup.append(np.array(errors_sup))
@@ -1235,6 +1247,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     # sweep_group["coherence_coefficient"] = [coherence_coefficient]
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
       evaluation_group = sweep_group.require_group(evaluation_method)
+      evaluation_group["error_0"] = errors_method_0[evaluation_method_index]
       evaluation_group["error_1"] = errors_method_1[evaluation_method_index]
       evaluation_group["error_2"] = errors_method_2[evaluation_method_index]
       evaluation_group["error_sup"] = errors_method_sup[evaluation_method_index]
@@ -1327,6 +1340,17 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     if archive:
       archive.write_plot(f"Sweeping the number of samples used in reconstruction\n{evaluation_method_labels[evaluation_method]}, Residual", f"number_of_samples_{evaluation_method}_residual")
     plt.draw()
+  
+  plt.figure()
+  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    plt.plot(numbers_of_samples, errors_method_0[evaluation_method_index], evaluation_method_legend[evaluation_method])
+  plt.ylim(bottom = 0)
+  plt.xlabel("Number of samples used in the reconstruction")
+  plt.ylabel("Proportion of points incorrectly classified")
+  plt.legend(legend)
+  if archive:
+    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Determing the support)", "number_of_samples_error_0")
+  plt.draw()
 
   plt.figure()
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):

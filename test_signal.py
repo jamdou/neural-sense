@@ -260,6 +260,10 @@ class LineNoiseModel:
         c = [339, 0, -63, 0, 24],
         s = [-190, 0,  2, 0, 1]
       )
+      # line_noise_model = LineNoiseModel(
+      #   c = [-339, 0, 63, 0, -24],
+      #   s = [190, 0,  -2, 0, -1]
+      # )
     elif archive_time in ["20220118T124831", "20220127T131147"]:
       line_noise_model = LineNoiseModel(
         c = [122, 0, 15, 0, 4],

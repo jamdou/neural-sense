@@ -18,12 +18,14 @@ class PrettyTritty:
   k = "\033[30m"
 
   level = 0
+  level_max = 1
 
   @classmethod
   def starting(cls, message:str):
     tabs = cls.level*"  "
     message = message.replace('\n', f'\n{tabs}')
-    print(f"{tabs}{cls.y}Starting {message}...{cls.d}")
+    if cls.level < cls.level_max:
+      print(f"{tabs}{cls.y}Starting {message}...{cls.d}")
     cls.level += 1
 
   @classmethod
@@ -31,13 +33,15 @@ class PrettyTritty:
     cls.level = max(cls.level - 1, 0)
     tabs = cls.level*"  "
     message = message.replace('\n', f'\n{tabs}')
-    print(f"{tabs}{cls.g}Finished {message}!{cls.d}")
+    if cls.level < cls.level_max:
+      print(f"{tabs}{cls.g}Finished {message}!{cls.d}")
 
   @classmethod
   def print(cls, message:str, end = "\n"):
     tabs = cls.level*"  "
     message = message.replace('\n', f'\n{tabs}')
-    print(f"{tabs}{message}", end = end)
+    if cls.level < cls.level_max:
+      print(f"{tabs}{message}", end = end)
 
 C = PrettyTritty
 class Seeds:
@@ -196,7 +200,7 @@ class ScaledParameters():
         scaled_pulse_time_fraction = [0.2333333]
       )
     # One signal, 150 shots
-    elif archive_time in ["20220118T131910", "20211209T143732", "20211202T124902"]:
+    elif archive_time in ["20220118T131910", "20211209T143732"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
@@ -215,6 +219,16 @@ class ScaledParameters():
         scaled_sweep = [100, 25001],
         scaled_pulse_time_fraction = [0]
       )
+    # Ramsey that's delayed for some reason
+    elif archive_time in ["20211202T124902"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 10,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 25001],
+        scaled_pulse_time_fraction = [0.2333333 - 0.06/5]
+      )
     # Two signals, 250 shots
     elif archive_time in ["20220118T124831", "20211216T161624", "20220127T131147"]:
       scaled = ScaledParameters(
@@ -224,7 +238,8 @@ class ScaledParameters():
         scaled_amplitude = 1000,
         scaled_sweep = [100, 25001],
         # scaled_pulse_time_fraction = [0.4333333, 0.64999995]
-        scaled_pulse_time = [0.0021666, 0.0031749]
+        # scaled_pulse_time = [0.0021666, 0.0031749]
+        scaled_pulse_time = [2.1666e-3, 3.1749e-3]
       )
     return scaled
 

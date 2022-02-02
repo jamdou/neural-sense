@@ -43,8 +43,8 @@ if __name__ == "__main__":
     archive.new_archive_file()
 
     # === Scaled protocol ===
-    # experiment_time = "20220127T131147" # Two signals, DDS, frequency corrected
-    experiment_time = "20220118T131910" # One signals, all shots, DDS
+    experiment_time = "20220127T131147" # Two signals, DDS, frequency corrected
+    # experiment_time = "20220118T131910" # One signals, all shots, DDS
     # experiment_time = "20220118T124831" # Two signals, all shots, DDS
     # experiment_time = "20211216T113507" # No signal, all shots
     # experiment_time = "20211209T143732" # One signal, all shots
@@ -65,7 +65,9 @@ if __name__ == "__main__":
     scaled.print()
     scaled.write_to_file(archive)
 
-    # line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
+    line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
+    # print(line_noise_model.a)
+    # print(line_noise_model.p)
 
     # === Make signal ===
     # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
@@ -155,7 +157,7 @@ if __name__ == "__main__":
 
     # experiment_results.frequency -= 100
     # experiment_results = analysis.reverse_polarity(experiment_results)
-    experiment_results = analysis.arcsin_filter(experiment_results)
+    # experiment_results = analysis.arcsin_filter(experiment_results)
     experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15])), archive)
     # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
     experiment_results = analysis.mode_filter(experiment_results)
@@ -187,9 +189,9 @@ if __name__ == "__main__":
         # "adaptive_frequency_fit"
       ],
       expected_amplitude = scaled.amplitude,
-      expected_frequency = scaled.frequency,
+      expected_frequency = scaled.frequency/2,
       expected_error_measurement = 5, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-      norm_scale_factor_modifier = 0.05, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      norm_scale_factor_modifier = 0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,
       frequency_cutoff_high = 25e3 - 1
@@ -259,8 +261,10 @@ if __name__ == "__main__":
     # )
     # empty_results = arch.RamseyResults.new_from_archive_time(
     #   archive,
-    #   # "20220113T201129" # Simulation
-    #   "20220201T132717" # Simulation
+    #   # "20220113T201129" # Simulation 1
+    #   # "20220201T132717" # Simulation 2
+    #   # "20220202T135356" # Simulation 3
+    #   "20220202T184548" # Simulation 4
     # )
     # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
     # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
