@@ -251,7 +251,7 @@ class LineNoiseModel:
   @staticmethod
   def new_from_experiment_time(archive_time):
     line_noise_model = None
-    if archive_time in ["20211117T123323", "20211117T155508", "20211216T161624", "20211216T113507", "20211209T143732", "20211216T161624"]:
+    if archive_time in ["20211202T124902", "20211117T123323", "20211117T155508", "20211216T161624", "20211216T113507", "20211209T143732", "20211216T161624"]:
       # line_noise_model = LineNoiseModel(
       #   c = [170.41, 0, -9.5, 0, 12.6, 0, 1.8],
       #   s = [514.65, 0, 34.2, 0, 41.2, 0, -5.6]
@@ -260,7 +260,11 @@ class LineNoiseModel:
         c = [339, 0, -63, 0, 24],
         s = [-190, 0,  2, 0, 1]
       )
-    elif archive_time in ["20220118T124831"]:
+      # line_noise_model = LineNoiseModel(
+      #   c = [-339, 0, 63, 0, -24],
+      #   s = [190, 0,  -2, 0, -1]
+      # )
+    elif archive_time in ["20220118T124831", "20220127T131147"]:
       line_noise_model = LineNoiseModel(
         c = [122, 0, 15, 0, 4],
         s = [427, 0,  74, 0, 38]
@@ -272,7 +276,8 @@ class LineNoiseModel:
     harmonic = 1
     for na, np in zip(self.a, self.p):
       if na > 0:
-        noise.append(SinusoidalNoise([0, 0, na], [0.0, 0.0, (harmonic + 1)*self.fundamental], [0.0, 0.0, math.pi/2 + np]))
+        # noise.append(SinusoidalNoise([0, 0, na], [0.0, 0.0, (harmonic + 1)*self.fundamental], [0.0, 0.0, math.pi/2 - np]))
+        noise.append(SinusoidalNoise([0, 0, na], [0.0, 0.0, harmonic*self.fundamental], [0.0, 0.0, math.pi/2 - np]))
       harmonic += 1
     return noise
 

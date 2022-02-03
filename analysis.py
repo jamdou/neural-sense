@@ -758,14 +758,18 @@ def reverse_polarity(experiment_results:arch.ExperimentResults):
 def mode_filter(experiment_results:arch.ExperimentResults, frequency_mode = 4e3):
   frequency_amplitude = experiment_results.frequency_amplitude.copy()
   frequency = experiment_results.frequency.copy()
-  frequency_amplitude[frequency < frequency_mode] = frequency_amplitude[frequency < frequency_mode]*(frequency[frequency < frequency_mode]/np.max(frequency[frequency < frequency_mode]))
-  frequency_amplitude[frequency >= frequency_mode] = frequency_amplitude[frequency >= frequency_mode]*(1 + (frequency[frequency >= frequency_mode] - np.max(frequency[frequency < frequency_mode]))/(np.max(frequency[frequency < frequency_mode]) - np.max(frequency)))**2
+
+  frequency_filter = experiment_results.frequency_amplitude.copy()
+  frequency_filter[frequency < frequency_mode] = (frequency[frequency < frequency_mode]/np.max(frequency[frequency < frequency_mode]))**2
+  frequency_filter[frequency >= frequency_mode] = (1 + (frequency[frequency >= frequency_mode] - np.max(frequency[frequency < frequency_mode]))/(np.max(frequency[frequency < frequency_mode]) - np.max(frequency)))**2
+  # frequency_filter /= np.mean(frequency_filter**2)
+  frequency_amplitude *= frequency_filter*2#math.sqrt(2)
 
   return arch.ExperimentResults(
     frequency = experiment_results.frequency.copy(),
     frequency_amplitude = frequency_amplitude,
     archive_time = experiment_results.archive_time,
-    experiment_type = experiment_results.experiment_type
+    experiment_type = f"{experiment_results.experiment_type}, mode filter"
   )
 
 def whitening_filter(experiment_results:arch.ExperimentResults):
@@ -776,5 +780,15 @@ def whitening_filter(experiment_results:arch.ExperimentResults):
     frequency = experiment_results.frequency.copy(),
     frequency_amplitude = frequency_amplitude,
     archive_time = experiment_results.archive_time,
-    experiment_type = experiment_results.experiment_type
+    experiment_type = f"{experiment_results.experiment_type}, whitening filter"
+  )
+
+def arcsin_filter(experiment_results:arch.ExperimentResults, measurement_duration = 5e-3):
+  frequency_amplitude = experiment_results.frequency_amplitude.copy()
+  frequency_amplitude = np.arcsin(math.tau*measurement_duration*frequency_amplitude)/(math.tau*measurement_duration)
+  return arch.ExperimentResults(
+    frequency = experiment_results.frequency.copy(),
+    frequency_amplitude = frequency_amplitude,
+    archive_time = experiment_results.archive_time,
+    experiment_type = f"{experiment_results.experiment_type}, arcsin filter"
   )
