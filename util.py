@@ -220,7 +220,7 @@ class ScaledParameters():
         scaled_pulse_time_fraction = [0]
       )
     # Ramsey that's delayed for some reason
-    elif archive_time in ["20211202T124902"]:
+    elif archive_time in ["20211202T124902", "20220203T123716"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
@@ -255,9 +255,13 @@ def get_noise_evaluation(archive_time):
     # return "20211124T161452"
   elif archive_time in ["20211216T113507", "20211209T143732", "20211216T161624"]:
     return "20220113T104353"
-  elif archive_time in ["20220118T124831", "20220118T131910", "20220127T131147"]:
+  elif archive_time in ["20220118T124831", "20220118T131910"]:
     # return "20220118T172329"
     return "20220201T125920"
+  elif archive_time in ["20220127T131147"]:
+    return "20220204T110202"
+  elif archive_time in ["20220203T123716"]:
+    return "20220204T113117"
 
 def fit_frequency_shift(archive, signal, frequency, state_properties, do_plot = True, do_plot_individuals = False):
   """

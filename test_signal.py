@@ -257,17 +257,27 @@ class LineNoiseModel:
       #   s = [514.65, 0, 34.2, 0, 41.2, 0, -5.6]
       # )
       line_noise_model = LineNoiseModel(
-        c = [339, 0, -63, 0, 24],
-        s = [-190, 0,  2, 0, 1]
+        c = [ 339, 0, -63, 0, 24],
+        s = [-190, 0,   2, 0,  1]
       )
       # line_noise_model = LineNoiseModel(
       #   c = [-339, 0, 63, 0, -24],
       #   s = [190, 0,  -2, 0, -1]
       # )
-    elif archive_time in ["20220118T124831", "20220127T131147"]:
+    elif archive_time in ["20220118T124831"]:
       line_noise_model = LineNoiseModel(
-        c = [122, 0, 15, 0, 4],
-        s = [427, 0,  74, 0, 38]
+        c = [122, 0, 15, 0,  4],
+        s = [427, 0, 74, 0, 38]
+      )
+    elif archive_time in ["20220127T131147"]:
+      line_noise_model = LineNoiseModel(
+        c = [120, 0, -2, 0,  6],
+        s = [440, 0, 70, 0, 62]
+      )
+    elif archive_time in ["20220203T123716"]:
+      line_noise_model = LineNoiseModel(
+        c = [115, 0,  -7, 0,  6],
+        s = [408, 0,  70, 0, 62]
       )
     return line_noise_model
 

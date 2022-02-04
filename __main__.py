@@ -87,6 +87,7 @@ if __name__ == "__main__":
       # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
       # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
       scaled.get_neural_pulses(),
+
       [],
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
       # line_noise_model.generate_sinusoidal_noise(),
@@ -103,6 +104,7 @@ if __name__ == "__main__":
       # ],
       # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
       # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
+
       time_properties
     )
     signal_reconstruction = test_signal.TestSignal(
@@ -111,8 +113,10 @@ if __name__ == "__main__":
       # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
       # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
       scaled.get_neural_pulses(),
+
       [],
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+
       time_properties_reconstruction
     )
 
@@ -159,9 +163,9 @@ if __name__ == "__main__":
     # experiment_results.frequency -= 100
     # experiment_results = analysis.reverse_polarity(experiment_results)
     # experiment_results = analysis.arcsin_filter(experiment_results)
-    experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15])), archive)
-    # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
-    experiment_results = analysis.mode_filter(experiment_results)
+    # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15])), archive)
+    experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
+    # experiment_results = analysis.mode_filter(experiment_results)
     # experiment_results = analysis.whitening_filter(experiment_results)
     # experiment_results = analysis.mode_filter(experiment_results)
     # archive_empty = arch.Archive(archive_path, "")
@@ -190,9 +194,9 @@ if __name__ == "__main__":
         # "adaptive_frequency_fit"
       ],
       expected_amplitude = scaled.amplitude,
-      expected_frequency = scaled.frequency/2,
+      expected_frequency = scaled.frequency,
       expected_error_measurement = 5, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-      norm_scale_factor_modifier = 0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      norm_scale_factor_modifier = 0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,
       frequency_cutoff_high = 25e3 - 1
