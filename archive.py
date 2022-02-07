@@ -292,7 +292,7 @@ class ExperimentResults:
 
     return ExperimentResults(frequency, frequency_amplitude, experiment_type = "simulation")
 
-  def plot(self, archive:Archive = None, test_signal:TestSignal = None):
+  def plot(self, archive:Archive = None, test_signal:TestSignal = None, units = "Hz"):
     """
     Plots the experiment results contained in the object. Optionally saves the plots, as well as compares the results to numerically calculated values.
 
@@ -303,20 +303,32 @@ class ExperimentResults:
     test_signal : :class:`test_signal:TestSignal`, optional
       The signal that was being measured during the experiment. If specified, this function will plot the sine Fourier transform of the signal behind the measured coefficients of the experiment results.
     """
+    if "Hz" in units:
+      unit_factor = 1
+    elif "T" in units:
+      unit_factor = 1/7e9
+    if "n" in units:
+      unit_factor *= 1e9
+    elif "μ" in units:
+      unit_factor *= 1e6
+    elif "m" in units:
+      unit_factor *= 1e3
+
     plt.figure()
     if test_signal:
-      plt.plot(test_signal.frequency, test_signal.frequency_amplitude, "-k")
-    plt.plot(self.frequency, self.frequency_amplitude, "xr")
+      plt.plot(test_signal.frequency, test_signal.frequency_amplitude*unit_factor, "-k")
+    plt.plot(self.frequency, self.frequency_amplitude*unit_factor, "xr")
     if test_signal:
       plt.legend(["Fourier Transform", "Measured"])
     plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Amplitude (Hz)")
+    plt.ylabel(f"Amplitude ({units})")
     plt.xlim([0, np.max(self.frequency)])
     # plt.ylim([-0.08, 0.08])
     plt.grid()
     if archive:
       archive.write_plot("Measured Frequency Amplitude", "measured_frequency_amplitude")
     plt.draw()
+    
 
   def write_to_archive(self, archive:Archive):
     """

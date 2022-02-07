@@ -789,6 +789,7 @@ class Reconstruction():
     evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
     self.amplitude = np.linalg.lstsq(fourier_transform, self.frequency_amplitude, rcond = None)[0]
+    self.amplitude *= (self.time_properties.time_coarse.size/self.frequency.size)#*0.7
 
     self.reconstruction_type = "least squares"
     C.finished("reconstruction (least squares)")
@@ -1130,7 +1131,7 @@ def subtract_constant(amplitude, constant):
   if time_index < amplitude.size:
     amplitude[time_index] -= constant
 
-def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None, frequency_fit_step_size = 1):
+def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None, frequency_fit_step_size = 1, units = "Hz"):
   reconstruction = Reconstruction(expected_signal.time_properties)
 
   random_seeds = np.array(random_seeds)
@@ -1297,13 +1298,27 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     "adaptive_informed_least_squares" : "g-.+",
     "adaptive_frequency_fit" : "r-.+",
   }
+
+  if "Hz" in units:
+    unit_factor = 1
+  elif "T" in units:
+    unit_factor = 1/7e9
+  if "n" in units:
+    unit_factor *= 1e9
+  elif "μ" in units:
+    unit_factor *= 1e6
+  elif "m" in units:
+    unit_factor *= 1e3
+
+  expected_amplitude *= unit_factor
+
   time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
   amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
   residual_mesh = np.empty_like(amplitude_mesh)
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
-        amplitude_mesh[reconstruction_index, :] = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size]
-        residual_mesh[reconstruction_index, :] = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size] - expected_signal.amplitude
+        amplitude_mesh[reconstruction_index, :] = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size]*unit_factor
+        residual_mesh[reconstruction_index, :] = (amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size] - expected_signal.amplitude)*unit_factor
     
     plt.figure()
     plt.subplot(2, 1, 2)
@@ -1313,7 +1328,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     plt.ylabel("Number of samples")
     plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
     colour_bar = plt.colorbar()
-    colour_bar.set_label("Amplitude (Hz)")
+    colour_bar.set_label(f"Amplitude ({units})")
 
     plt.subplot(2, 1, 1)
     plt.pcolormesh(time_mesh*1e3, samples_mesh, amplitude_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
@@ -1331,7 +1346,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     plt.ylabel("Number of samples")
     plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
     colour_bar = plt.colorbar()
-    colour_bar.set_label("Residual (Hz)")
+    colour_bar.set_label(f"Residual ({units})")
 
     plt.subplot(2, 1, 1)
     plt.pcolormesh(time_mesh*1e3, samples_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
@@ -1354,10 +1369,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
   plt.figure()
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_1[evaluation_method_index], evaluation_method_legend[evaluation_method])
+    plt.plot(numbers_of_samples, errors_method_1[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
   plt.ylim(bottom = 0)
   plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel("Average error compared to expected signal (Hz)")
+  plt.ylabel(f"Average error compared to expected signal ({units})")
   plt.legend(legend)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(1-norm)", "number_of_samples_error_1")
@@ -1366,10 +1381,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   plt.figure()
   plt.subplot()
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_2[evaluation_method_index], evaluation_method_legend[evaluation_method])
+    plt.plot(numbers_of_samples, errors_method_2[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
   plt.ylim(bottom = 0)
   plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel("RMS error compared to expected signal (Hz)")
+  plt.ylabel(f"RMS error compared to expected signal ({units})")
   plt.legend(legend)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(2-norm)", "number_of_samples_error_2")
@@ -1378,10 +1393,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   plt.figure()
   plt.subplot()
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_sup[evaluation_method_index], evaluation_method_legend[evaluation_method])
+    plt.plot(numbers_of_samples, errors_method_sup[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
   plt.ylim(bottom = 0)
   plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel("Largest error compared to expected signal (Hz)")
+  plt.ylabel(f"Largest error compared to expected signal ({units})")
   plt.legend(legend)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
@@ -1401,7 +1416,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   #   archive.write_plot(f"Sensing coherence for matrices used in reconstructions\nFit coefficient of {coherence_coefficient}", "number_of_samples_coherence")
   # plt.draw()
 
-def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (0.5, 5, 0.5), archive:Archive = None, number_of_samples = 10000, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, frequency_fit_step_size = 1):
+def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (0.5, 5, 0.5), archive:Archive = None, number_of_samples = 10000, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, frequency_fit_step_size = 1, units = "Hz"):
   reconstruction = Reconstruction(expected_signal.time_properties)
 
   random_seeds = np.array(random_seeds)
@@ -1472,13 +1487,27 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
     "adaptive_informed_least_squares" : "Sandwich",
     "adaptive_frequency_fit" : "Sandwich frequency fit"
   }
-  time_mesh, scale_factors_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, (norm_scale_factors))
+
+  if "Hz" in units:
+    unit_factor = 1
+  elif "T" in units:
+    unit_factor = 1/7e9
+  if "n" in units:
+    unit_factor *= 1e9
+  elif "μ" in units:
+    unit_factor *= 1e6
+  elif "m" in units:
+    unit_factor *= 1e3
+
+  expected_amplitude *= unit_factor
+
+  time_mesh, scale_factors_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, (norm_scale_factors*unit_factor))
   amplitude_mesh = np.empty((norm_scale_factors.size, amplitudes[0].size))
   residual_mesh = np.empty_like(amplitude_mesh)
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     for reconstruction_index, number_of_samples in enumerate(norm_scale_factors):
-        amplitude_mesh[reconstruction_index, :] = amplitudes[(norm_scale_factors.size*evaluation_method_index + reconstruction_index)*random_seeds.size]
-        residual_mesh[reconstruction_index, :] = amplitudes[(norm_scale_factors.size*evaluation_method_index + reconstruction_index)*random_seeds.size] - expected_signal.amplitude
+        amplitude_mesh[reconstruction_index, :] = amplitudes[(norm_scale_factors.size*evaluation_method_index + reconstruction_index)*random_seeds.size]*unit_factor
+        residual_mesh[reconstruction_index, :] = (amplitudes[(norm_scale_factors.size*evaluation_method_index + reconstruction_index)*random_seeds.size] - expected_signal.amplitude)*unit_factor
     
     plt.figure()
     plt.subplot(2, 1, 2)
@@ -1488,11 +1517,11 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
     plt.ylabel("Regularisation\nparameter (Hz)")
     plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
     colour_bar = plt.colorbar()
-    colour_bar.set_label("Amplitude (Hz)")
+    colour_bar.set_label(f"Amplitude ({units})")
 
     plt.subplot(2, 1, 1)
     plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, amplitude_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
-    plt.ylabel("Regularisation\nparameter (Hz)")
+    plt.ylabel(f"Regularisation\nparameter ({units})")
 
     if archive:
       archive.write_plot(f"Sweeping the regularisation parameter used in reconstruction\n{evaluation_method_labels[evaluation_method]}", f"norm_scale_factor_{evaluation_method}")
@@ -1503,10 +1532,10 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
     neural_pulse = expected_signal.neural_pulses[0]
     plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
     plt.xlabel("Time (ms)")
-    plt.ylabel("Regularisation\nparameter (Hz)")
+    plt.ylabel(f"Regularisation\nparameter ({units})")
     plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
     colour_bar = plt.colorbar()
-    colour_bar.set_label("Residual (Hz)")
+    colour_bar.set_label(f"Residual ({units})")
 
     plt.subplot(2, 1, 1)
     plt.pcolormesh(time_mesh*1e3, scale_factors_mesh, residual_mesh, cmap = "seismic", vmin = -2*expected_amplitude, vmax = 2*expected_amplitude)
