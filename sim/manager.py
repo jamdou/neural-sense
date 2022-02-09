@@ -22,6 +22,61 @@ from util import PrettyTritty as C
 
 # from .benchmark.results import *
 
+def generate_interpolation_sampler(amplitude:np.ndarray, time:np.ndarray, order = 3, axis = 2, device = spinsim.Device.CUDA):
+  @device.CUDA.jit_device
+  def find_time_index(time_sample):
+    # See if in bounds
+    if time[0] <= time_sample and time_sample <= time[-1]:
+      # Find time index
+      # Start with assuming equal spacing
+      time_sample_index = int((time_sample - time[0])/(time[1] - time[0]))
+      low_enough = False
+      high_enough = True
+      if time_sample_index + 1 < time.size:
+        low_enough = time[time_sample_index] <= time_sample
+        high_enough = time_sample <= time[time_sample_index + 1]
+      else:
+        time_sample_index = time.size
+      if not (low_enough and high_enough):
+        # If it didn't work, use bisection rule
+        time_sample_index_max = time.size - 1
+        time_sample_index_min = 0
+        get_out_of_here = time.size #int(math.floor(math.log(float(time.size))/math.log(2))) + 1
+        while not (low_enough and high_enough):
+          if not low_enough:
+            time_sample_index_max = time_sample_index
+          else:
+            time_sample_index_min = time_sample_index
+          time_sample_index = int(float(time_sample_index_max + time_sample_index_min)/2)
+          low_enough = False
+          high_enough = True
+          if time_sample_index + 1 < time.size:
+            low_enough = time[time_sample_index] <= time_sample
+            high_enough = time_sample <= time[time_sample_index + 1]
+          get_out_of_here -= 1
+          if get_out_of_here == 0:
+            return -1, 0
+      interpolation_parameter = (time_sample - time[time_sample_index])/(time[time_sample_index + 1] - time[time_sample_index])
+      return time_sample_index, interpolation_parameter
+    return -1, 0
+  if amplitude.ndim == 2:
+    pass
+  elif amplitude.ndim == 1:
+    if order == 0:
+      @device.CUDA.jit_device
+      def sampler(time_sample, user_parameters, field_sample):
+        time_index, interpolation_parameter = find_time_index(time_sample)
+        if time_index > 0:
+          field_sample[axis] = amplitude[time_index]
+    elif order == 1:
+      @device.CUDA.jit_device
+      def sampler(time_sample, user_parameters, field_sample):
+        time_index, interpolation_parameter = find_time_index(time_sample)
+        if time_index > 0 and time_index + 1 < time.size:
+          field_sample[axis] = amplitude[time_index]*(1 - interpolation_parameter) + amplitude[time_index + 1]*interpolation_parameter
+
+  return sampler
+
 class MeasurementMethod(enum.Enum):
   FARADAY_DEMODULATION = "faraday demodulation"
   HARD_PULSE = "hard pulse"
@@ -1105,6 +1160,9 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
       if field_sample.size > 2:
         field_sample[3] = math.tau*source_quadratic_shift
   elif measurement_method == MeasurementMethod.HARD_PULSE or measurement_method == MeasurementMethod.CORPSE:
+    time_interpolation = np.sqrt(np.linspace(0.001**2, 0.004**2))
+    # time_interpolation = np.linspace(0.001, 0.004)
+    interpolation_sampler = generate_interpolation_sampler(1000*time_interpolation, time_interpolation, order = 1)
     def evaluate_dressing(time_sample, rabi_frequency, field_sample):
       field_sample[0] = 0
       field_sample[1] = 0
@@ -1120,6 +1178,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
             field_sample[spacial_index] += math.tau*amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
       if field_sample.size > 2:
         field_sample[3] = math.tau*source_quadratic_shift
+      interpolation_sampler(time_sample, rabi_frequency, field_sample)
   elif measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
     def evaluate_dressing(time_sample, detuning, field_sample):
       field_sample[0] = 0
