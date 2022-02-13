@@ -136,10 +136,10 @@ if __name__ == "__main__":
     # frequency = np.arange(990, 1010, 0.02)
     # frequency = np.arange(253, 3251, 30)
     # frequency = np.arange(1000, 1003, 1)
-    frequency = np.arange(1000, 1001, 1)
+    # frequency = np.arange(1000, 1001, 1)
     # frequency = np.arange(0, 1000000, 1)
     # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-    # frequency = scaled.sample_frequencies
+    frequency = scaled.sample_frequencies
     # frequency += 100#*(np.sin(frequency)**2)
 
     simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)

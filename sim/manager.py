@@ -22,7 +22,7 @@ from util import PrettyTritty as C
 
 # from .benchmark.results import *
 
-def generate_interpolation_sampler(amplitude:np.ndarray, time:np.ndarray, order = 3, axis = 2, device = spinsim.Device.CUDA):
+def generate_interpolation_sampler(amplitude:np.ndarray, time:np.ndarray, order = 3, axis = 2, device = spinsim.Device.CUDA, zero_boundary = True):
   @device.CUDA.jit_device
   def find_time_index(time_sample):
     # See if in bounds
@@ -65,15 +65,76 @@ def generate_interpolation_sampler(amplitude:np.ndarray, time:np.ndarray, order 
     if order == 0:
       @device.CUDA.jit_device
       def sampler(time_sample, user_parameters, field_sample):
+        if not zero_boundary:
+          if time_sample <= time[0]:
+            field_sample[axis] += amplitude[0]
+            return
+          if time_sample >= time[-1]:
+            field_sample[axis] += amplitude[-1]
+            return
         time_index, interpolation_parameter = find_time_index(time_sample)
         if time_index > 0:
-          field_sample[axis] = amplitude[time_index]
+          field_sample[axis] += amplitude[time_index]
     elif order == 1:
       @device.CUDA.jit_device
       def sampler(time_sample, user_parameters, field_sample):
+        if not zero_boundary:
+          if time_sample <= time[0]:
+            field_sample[axis] += amplitude[0]
+            return
+          if time_sample >= time[-1]:
+            field_sample[axis] += amplitude[-1]
+            return
         time_index, interpolation_parameter = find_time_index(time_sample)
         if time_index > 0 and time_index + 1 < time.size:
-          field_sample[axis] = amplitude[time_index]*(1 - interpolation_parameter) + amplitude[time_index + 1]*interpolation_parameter
+          field_sample[axis] += amplitude[time_index]*(1 - interpolation_parameter) + amplitude[time_index + 1]*interpolation_parameter
+    elif order == 3:
+      @device.CUDA.jit_device
+      def sampler(time_sample, user_parameters, field_sample):
+        # Implement boundary conditions:
+        if not zero_boundary:
+          if time_sample <= time[0]:
+            field_sample[axis] += amplitude[0]
+            return
+          if time_sample >= time[-1]:
+            field_sample[axis] += amplitude[-1]
+            return
+
+        # Find the indices to interpolate between:
+        time_index, interpolation_parameter = find_time_index(time_sample)
+        if time_index > 0 and time_index + 1 < time.size:
+          # See wikipedia entry https://en.wikipedia.org/wiki/Cubic_Hermite_spline under under the finite difference method to see how this works.
+          # Find the gradient used for linear interpolarion:
+          if time[time_index] != time[time_index + 1]:
+            gradient_mid = (amplitude[time_index + 1] - amplitude[time_index])/(time[time_index + 1] - time[time_index])
+          else:
+            gradient_mid = 0
+
+          # Find the gradient a step to the left:
+          if time_index == 0:
+            gradient_left = gradient_mid
+          elif time[time_index - 1] != time[time_index]:
+            gradient_left = 0.5*((amplitude[time_index] - amplitude[time_index - 1])/(time[time_index] - time[time_index - 1]) + gradient_mid)
+          else:
+            gradient_left = 0
+          gradient_left *= (time[time_index + 1] - time[time_index])
+
+          # ... and a step to the right:
+          if time_index + 2 == time.size:
+            gradient_right = gradient_mid
+          elif time[time_index + 1] != time[time_index + 2]:
+              gradient_right = 0.5*((amplitude[time_index + 2] - amplitude[time_index + 1])/(time[time_index + 2] - time[time_index + 1]) + gradient_mid)
+          else:
+            gradient_right = 0
+          gradient_right *= (time[time_index + 1] - time[time_index])
+
+          # Finally, interpolate:
+          field_sample[axis] += \
+            amplitude[time_index]*(2*interpolation_parameter**3 - 3*interpolation_parameter**2 + 1) \
+            + amplitude[time_index + 1]*(-2*interpolation_parameter**3 + 3*interpolation_parameter**2) \
+            + gradient_left*(interpolation_parameter**3 - 2*interpolation_parameter**2 + interpolation_parameter) \
+            + gradient_right*(interpolation_parameter**3 - interpolation_parameter**2)
+
 
   return sampler
 
@@ -1160,9 +1221,17 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
       if field_sample.size > 2:
         field_sample[3] = math.tau*source_quadratic_shift
   elif measurement_method == MeasurementMethod.HARD_PULSE or measurement_method == MeasurementMethod.CORPSE:
-    time_interpolation = np.sqrt(np.linspace(0.001**2, 0.004**2))
+    # time_interpolation = np.sqrt(np.linspace(0.001**2, 0.004**2))
     # time_interpolation = np.linspace(0.001, 0.004)
-    interpolation_sampler = generate_interpolation_sampler(1000*time_interpolation, time_interpolation, order = 1)
+    time_interpolation = np.arange(1e-3, 2e-3, 2e-6)
+    time_interpolation += 1e-6*np.sin(1e9*time_interpolation)
+    amplitude_interpolation = 1e3*math.tau*np.sin(math.tau*5e3*(time_interpolation - 1.5e-3))
+    amplitude_interpolation[time_interpolation < 1.5e-3] = 0
+    amplitude_interpolation[time_interpolation > 1.7e-3] = 0
+    # plt.figure()
+    # plt.plot(time_interpolation, amplitude_interpolation)
+    # plt.show()
+    interpolation_sampler = generate_interpolation_sampler(amplitude_interpolation, time_interpolation, order = 0)
     def evaluate_dressing(time_sample, rabi_frequency, field_sample):
       field_sample[0] = 0
       field_sample[1] = 0
