@@ -7,6 +7,7 @@ import math
 import matplotlib.pyplot as plt
 from numba import cuda
 import numba as nb
+# import archive as arch
 
 cuda_debug = False
 
@@ -499,3 +500,81 @@ def get_frequency_amplitude(time_end_points, time_coarse, time_step_coarse, time
     for time_index in nb.prange(time_coarse.size):
       frequency_amplitude_temporary += time_amplitude[time_index]*math.sin(2*math.pi*time_coarse[time_index]*frequency_temporary)  # Dot product
     frequency_amplitude[frequency_index] = frequency_amplitude_temporary*time_step_coarse/(time_end_points[1] - time_end_points[0])     # Scale to make an integral
+
+def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False):
+  data = open(path, "r")
+  started = False
+  time = []
+  amplitude = []
+  for line in data:
+    if not started:
+      if "TIME" in line:
+        started = True
+    else:
+      if line.strip() != "":
+        split = line.strip().split(sep = ",")
+        time.append(float(split[0]))
+        amplitude.append(float(split[1]))
+  time = np.array(time)
+  amplitude = np.array(amplitude)
+  time_step = time[1] - time[0]
+
+  oscilloscope_group = archive.archive_file.require_group("oscilloscope")
+  oscilloscope_group["time"] = time
+  oscilloscope_group["amplitude"] = amplitude
+
+  error = amplitude
+  if fit_matched_filter:
+    frequency_template = 5e3
+    time_template = time[time < 1/frequency_template]
+    amplitude_template = -np.sin(math.tau*frequency_template*time_template)
+    amplitude_template = amplitude_template/np.sum(amplitude_template**2)
+    amplitude_matched = np.convolve(amplitude, amplitude_template, mode = "same")
+    time_matched_start = time[np.argmax(amplitude_matched)] - 0.5/frequency_template
+    amplitude_matched_reconstructed = np.max(amplitude_matched)*np.sin(math.tau*frequency_template*(time - time_matched_start))
+    amplitude_matched_reconstructed[time < time_matched_start] = 0
+    amplitude_matched_reconstructed[time > time_matched_start + 1/frequency_template] = 0
+
+    error = amplitude - amplitude_matched_reconstructed
+
+    oscilloscope_group["amplitude_matched"] = amplitude_matched
+    oscilloscope_group["amplitude_matched_reconstructed"] = amplitude_matched_reconstructed
+    oscilloscope_group["amplitude_matched_reconstructed"].attrs["time_matched_start"] = time_matched_start
+
+    print(f"Signal time: {time_matched_start} s")
+
+  error_rms = np.sqrt(np.mean(error**2))
+  error_fft = np.fft.fft(error)*time_step/(time[-1] - time[0])
+  frequency = np.fft.fftfreq(time.size, d = time_step)
+  error_fft = error_fft[frequency >= 0]
+  frequency = frequency[frequency >= 0]
+
+  oscilloscope_group["amplitude"].attrs["error_rms"] = error_rms
+  print(f"RMS Error: {error_rms} A")
+
+  if fit_matched_filter:
+    signal_to_noise_ratio = 20*np.log10(np.max(amplitude_matched)/error_rms)
+    oscilloscope_group["amplitude"].attrs["signal_to_noise_ratio"] = signal_to_noise_ratio
+    print(f"SNR: {signal_to_noise_ratio} dB")
+
+  plt.figure()
+  plt.plot(time/1e-3, amplitude, "-r", label = "Oscilloscope")
+  plt.plot([time[0]/1e-3, time[-1]/1e-3], [error_rms]*2, "--y", label = "RMS Error")
+  plt.plot([time[0]/1e-3, time[-1]/1e-3], [-error_rms]*2, "--y")
+  if fit_matched_filter:
+    plt.plot(time/1e-3, amplitude_matched, "-g", label = "Matched filter")
+    plt.plot(time/1e-3, amplitude_matched_reconstructed, "-b", label = "Matched filter results")
+  plt.legend()
+  plt.xlabel("Time (ms)")
+  plt.ylabel("Amplitude (A)")
+  if archive:
+    archive.write_plot("Oscilloscope readout", "oscilloscope_readout")
+  plt.draw()
+
+  plt.figure()
+  plt.plot(frequency/1e3, abs(error_fft**2), "-r")
+  plt.xlabel("Frequency (kHz)")
+  plt.ylabel("Amplitude (A)")
+  if archive:
+    archive.write_plot("Oscilloscope readout FFT", "oscilloscope_readout_fft")
+  plt.draw()
