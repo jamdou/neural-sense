@@ -42,83 +42,83 @@ if __name__ == "__main__":
   if profile_state != arch.ProfileState.ARCHIVE:
     archive.new_archive_file()
 
-    # # === Scaled protocol ===
-    # # experiment_time = "20220203T123716" # One signal, DDS, frequency corrected
-    # # experiment_time = "20220127T131147" # Two signals, DDS, frequency corrected
-    # # experiment_time = "20220118T131910" # One signal, all shots, DDS
-    # # experiment_time = "20220118T124831" # Two signals, all shots, DDS
+    # === Scaled protocol ===
+    experiment_time = "20220203T123716q" # One signal, DDS, frequency corrected
+    # experiment_time = "20220127T131147q" # Two signals, DDS, frequency corrected
+    # experiment_time = "20220118T131910q" # One signal, all shots, DDS
+    # experiment_time = "20220118T124831" # Two signals, all shots, DDS
     # experiment_time = "20211216T113507" # No signal, all shots
-    # # experiment_time = "20211209T143732" # One signal, all shots
-    # # experiment_time = "20211216T161624" # Two signals, all shots
-    # # experiment_time = "20211117T155508" # One signal, up to 14kHz
-    # # experiment_time = "20211202T124902" # Ramsey measurements
-    # #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
-    # scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
-    # # scaled = util.ScaledParameters(
-    # #   scaled_frequency = 5000,
-    # #   scaled_density = 1/25,
-    # #   scaled_samples = 10,
-    # #   scaled_amplitude = 6000,#995.5/2,
-    # #   scaled_sweep = [5000/5, 25001],
-    # #   scaled_pulse_time_fraction = [0.2333333],
-    # #   # scaled_stagger_constant = math.sqrt(7)
-    # # )
-    # scaled.print()
-    # scaled.write_to_file(archive)
-
-    # # line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
-    # # print(line_noise_model.a)
-    # # print(line_noise_model.p)
-
-    # # === Make signal ===
-    # # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
-    # # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
-
-    # # # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
-    # # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.11])
-    # # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
-
-    # time_properties = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [0, scaled.time_end + 0.02])
-    # time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-5), 1e-8, [scaled.time_step, scaled.time_end])
-    # # time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [scaled.time_step, scaled.time_step*10])
-
-    # signal = test_signal.TestSignal(
-    #   # [],
-    #   # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-    #   # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-    #   scaled.get_neural_pulses(),
-
-    #   [],
-    #   # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
-    #   # line_noise_model.generate_sinusoidal_noise(),
-    #   # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
-    #   # [
-    #   #   test_signal.SinusoidalNoise([0, 0, 170.41], [0.0, 0.0, 50], [0.0, 0.0, math.pi/2]),
-    #   #   test_signal.SinusoidalNoise([0, 0, 514.65], [0.0, 0.0, 50], [0.0, 0.0, 0.0]),
-    #   #   test_signal.SinusoidalNoise([0, 0, -9.5], [0.0, 0.0, 150], [0.0, 0.0, math.pi/2]),
-    #   #   test_signal.SinusoidalNoise([0, 0, 34.2], [0.0, 0.0, 150], [0.0, 0.0, 0.0]),
-    #   #   test_signal.SinusoidalNoise([0, 0, 12.6], [0.0, 0.0, 250], [0.0, 0.0, math.pi/2]),
-    #   #   test_signal.SinusoidalNoise([0, 0, 41.2], [0.0, 0.0, 250], [0.0, 0.0, 0.0]),
-    #   #   test_signal.SinusoidalNoise([0, 0, 1.8], [0.0, 0.0, 350], [0.0, 0.0, math.pi/2]),
-    #   #   test_signal.SinusoidalNoise([0, 0, -5.6], [0.0, 0.0, 350], [0.0, 0.0, 0.0]),
-    #   # ],
-    #   # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
-    #   # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
-
-    #   time_properties
+    # experiment_time = "20211209T143732" # One signal, all shots
+    # experiment_time = "20211216T161624" # Two signals, all shots
+    # experiment_time = "20211117T155508" # One signal, up to 14kHz
+    # experiment_time = "20211202T124902" # Ramsey measurements
+    #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
+    scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
+    # scaled = util.ScaledParameters(
+    #   scaled_frequency = 5000,
+    #   scaled_density = 1/25,
+    #   scaled_samples = 10,
+    #   scaled_amplitude = 6000,#995.5/2,
+    #   scaled_sweep = [5000/5, 25001],
+    #   scaled_pulse_time_fraction = [0.2333333],
+    #   # scaled_stagger_constant = math.sqrt(7)
     # )
-    # signal_reconstruction = test_signal.TestSignal(
-    #   # [],
-    #   # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
-    #   # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
-    #   # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
-    #   scaled.get_neural_pulses(),
+    scaled.print()
+    scaled.write_to_file(archive)
 
-    #   [],
-    #   # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+    # line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time)
+    # print(line_noise_model.a)
+    # print(line_noise_model.p)
 
-    #   time_properties_reconstruction
-    # )
+    # === Make signal ===
+    # time_properties = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
+    # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-8, 1e-8, [0, 0.0001])
+
+    # # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+    # time_properties = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.11])
+    # time_properties_reconstruction = test_signal.TimeProperties(5e-7, 1e-7, 1e-8, [0, 0.1])
+
+    time_properties = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [0, scaled.time_end + 0.02])
+    time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-5), 1e-8, [scaled.time_step, scaled.time_end])
+    # time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [scaled.time_step, scaled.time_step*10])
+
+    signal = test_signal.TestSignal(
+      # [],
+      # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+      # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+      scaled.get_neural_pulses(),
+
+      [],
+      # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
+      # line_noise_model.generate_sinusoidal_noise(),
+      # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
+      # [
+      #   test_signal.SinusoidalNoise([0, 0, 170.41], [0.0, 0.0, 50], [0.0, 0.0, math.pi/2]),
+      #   test_signal.SinusoidalNoise([0, 0, 514.65], [0.0, 0.0, 50], [0.0, 0.0, 0.0]),
+      #   test_signal.SinusoidalNoise([0, 0, -9.5], [0.0, 0.0, 150], [0.0, 0.0, math.pi/2]),
+      #   test_signal.SinusoidalNoise([0, 0, 34.2], [0.0, 0.0, 150], [0.0, 0.0, 0.0]),
+      #   test_signal.SinusoidalNoise([0, 0, 12.6], [0.0, 0.0, 250], [0.0, 0.0, math.pi/2]),
+      #   test_signal.SinusoidalNoise([0, 0, 41.2], [0.0, 0.0, 250], [0.0, 0.0, 0.0]),
+      #   test_signal.SinusoidalNoise([0, 0, 1.8], [0.0, 0.0, 350], [0.0, 0.0, math.pi/2]),
+      #   test_signal.SinusoidalNoise([0, 0, -5.6], [0.0, 0.0, 350], [0.0, 0.0, 0.0]),
+      # ],
+      # [test_signal.PeriodicNoise(amplitude = [0, 0, 1000], resolution = 3)],
+      # [test_signal.PeriodicNoise.new_line_noise_sawtooth(amplitude = [0, 0, 1000], resolution = 3)],
+
+      time_properties
+    )
+    signal_reconstruction = test_signal.TestSignal(
+      # [],
+      # [test_signal.NeuralPulse(0.02333333, 70.0, 1000), test_signal.NeuralPulse(0.0444444444, 70.0, 1000)],
+      # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
+      # [test_signal.NeuralPulse(scaled.pulse_time, scaled.amplitude, scaled.frequency)],
+      scaled.get_neural_pulses(),
+
+      [],
+      # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500.0])],
+
+      time_properties_reconstruction
+    )
 
     # # === Make state ===
     # # [0.5, 1/np.sqrt(2), 0.5]
@@ -146,8 +146,8 @@ if __name__ == "__main__":
     # simulation_manager.evaluate(False, False)
 
     # # === Experiment results ===
-    # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-    # # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
+    # # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+    # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
     # experiment_results.write_to_archive(archive)
     # experiment_results.plot(archive, signal_reconstruction, units = "nT")
 
@@ -163,9 +163,9 @@ if __name__ == "__main__":
     # # experiment_results.frequency -= 100
     # # experiment_results = analysis.reverse_polarity(experiment_results)
     # # experiment_results = analysis.arcsin_filter(experiment_results)
-    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15])), archive)
-    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
-    # # experiment_results = analysis.mode_filter(experiment_results)
+    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
+    # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
+    # experiment_results = analysis.mode_filter(experiment_results)
     # # experiment_results = analysis.whitening_filter(experiment_results)
     # # experiment_results = analysis.mode_filter(experiment_results)
     # # archive_empty = arch.Archive(archive_path, "")
@@ -175,16 +175,20 @@ if __name__ == "__main__":
     # # experiment_results.plot(archive, signal_reconstruction)
     # recon.run_reconstruction_subsample_sweep(
     #   expected_signal = signal_reconstruction,
-    #   experiment_results = experiment_results,
+    #   # experiment_results = experiment_results,
+    #   experiment_results = arch.ExperimentResults(
+    #     frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
+    #     frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
+    #   ),
     #   sweep_parameters = (0, 10000, 10),
     #   archive = archive,
     #   random_seeds = np.arange(10)*util.Seeds.metroid,
     #   evaluation_methods = [
     #     "least_squares",
 
-    #     # "fista_backtracking",
-    #     # "fista_adaptive",
-    #     # "fista_informed_least_squares",
+    #     "fista_backtracking",
+    #     "fista_adaptive",
+    #     "fista_informed_least_squares",
     #     "fadaptive_informed_least_squares",
 
     #     # "ista_backtracking",
@@ -196,10 +200,10 @@ if __name__ == "__main__":
     #   expected_amplitude = scaled.amplitude,
     #   expected_frequency = scaled.frequency,
     #   expected_error_measurement = 5, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-    #   norm_scale_factor_modifier = 1/10, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+    #   norm_scale_factor_modifier = 1/4, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
     #   frequency_line_noise = 50,
     #   rabi_frequency_readout = 2e3,
-    #   frequency_cutoff_high = 25e3 - 1,
+    #   frequency_cutoff_high = scaled.sweep[1],
     #   units = "nT"
     # )
     # # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
@@ -250,11 +254,12 @@ if __name__ == "__main__":
     # archive_empty.open_archive_file("20211216T113507")
     # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
     # analysis.draw_dst(archive, time_properties_reconstruction)
-    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
+
+    test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
     # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_signal.csv", archive, fit_matched_filter = True)
     # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_no_signal.csv", archive)
     # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_static_zero.csv", archive)
-    test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
+    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
     
 
     # # === ===                 === ===

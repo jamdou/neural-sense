@@ -209,6 +209,15 @@ class ScaledParameters():
         scaled_sweep = [100, 25001],
         scaled_pulse_time_fraction = [0.2333333]
       )
+    elif archive_time in ["20220118T131910q", "20211209T143732q"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 10000],
+        scaled_pulse_time_fraction = [0.2333333]
+      )
     # No signal, 250 shots
     elif archive_time in ["20211216T113507"]:
       scaled = ScaledParameters(
@@ -229,6 +238,15 @@ class ScaledParameters():
         scaled_sweep = [100, 25001],
         scaled_pulse_time_fraction = [0.2333333 - 0.06/5]
       )
+    elif archive_time in ["20211202T124902q", "20220203T123716q"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 10000],
+        scaled_pulse_time_fraction = [0.2333333 - 0.06/5]
+      )
     # Two signals, 250 shots
     elif archive_time in ["20220118T124831", "20211216T161624", "20220127T131147"]:
       scaled = ScaledParameters(
@@ -237,6 +255,17 @@ class ScaledParameters():
         scaled_samples = 10,
         scaled_amplitude = 1000,
         scaled_sweep = [100, 25001],
+        # scaled_pulse_time_fraction = [0.4333333, 0.64999995]
+        # scaled_pulse_time = [0.0021666, 0.0031749]
+        scaled_pulse_time = [2.1666e-3, 3.1749e-3]
+      )
+    elif archive_time in ["20220118T124831q", "20211216T161624q", "20220127T131147q"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 10000],
         # scaled_pulse_time_fraction = [0.4333333, 0.64999995]
         # scaled_pulse_time = [0.0021666, 0.0031749]
         scaled_pulse_time = [2.1666e-3, 3.1749e-3]

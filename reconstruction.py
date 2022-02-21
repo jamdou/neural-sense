@@ -55,7 +55,7 @@ class Reconstruction():
     if number_of_samples > number_of_samples_max:
       number_of_samples = number_of_samples_max
       C.print(f"{C.r}number_of_samples is greater than the total number of samples input. Resetting{C.d}")
-    if random_seed:
+    if random_seed is not None:
       np.random.seed(random_seed)
     permutation = np.random.choice(range(number_of_samples_max), number_of_samples_max, replace = False)
     permutation = permutation[0:number_of_samples]

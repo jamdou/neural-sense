@@ -472,7 +472,7 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
     coherence_max = 0
     coherence_min = 1
     for repeat_index in range(50):
-      reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid*repeat_index, number_of_samples = samples)
+      reconstruction.read_frequencies_directly(frequency = frequency, frequency_amplitude = frequency.copy(), frequency_cutoff_low = 0, frequency_cutoff_high = 1e6, random_seed = util.Seeds.metroid*(repeat_index + 1), number_of_samples = samples)
       coherence = reconstruction.evaluate_coherence()
       if repeat_index == 0:
         coherences_random_on_axis[samples_index] = coherence
@@ -544,7 +544,7 @@ def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.Ti
   # print(sweep_parameters[1])
   # print(d_frequency_min)
   # print(frequency_max)
-  print(frequency)
+  # print(frequency)
 
   plt.figure()
   plt.plot(sampleses, coherences_equidistant, "k-", label = "Equidistant")
