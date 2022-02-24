@@ -522,7 +522,13 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
   time_step = time[1] - time[0]
   time_duration = time[-1] - time[0]
 
+  if "20220208" in path:
+    amplitude *= 10
+  # 1.9kHz / A
+  amplitude *= 1.9e3
+
   oscilloscope_group = archive.archive_file.require_group("oscilloscope")
+  oscilloscope_group.attrs["Units"] = "kHz"
   oscilloscope_group["time"] = time
   oscilloscope_group["amplitude"] = amplitude
 
@@ -549,7 +555,8 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
 
   error_rms = np.sqrt(np.mean(error**2))
   oscilloscope_group["amplitude"].attrs["error_rms"] = error_rms
-  print(f"RMS Error: {error_rms} A")
+  print(f"RMS Error: {error_rms} Hz")
+  # print(f"RMS Error: {error_rms} A")
   if fit_matched_filter:
     signal_to_noise_ratio = 20*np.log10(np.max(amplitude_matched)/error_rms)
     oscilloscope_group["amplitude"].attrs["signal_to_noise_ratio"] = signal_to_noise_ratio
@@ -572,15 +579,16 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
     amplitude_matched_reconstructed_coarse = np.real(np.fft.ifft(fft_amplitude_matched_reconstructed/(time_step_coarse/time_duration)))
     error_coarse = amplitude_coarse - amplitude_matched_reconstructed_coarse
   error_coarse_rms = np.sqrt(np.mean(error_coarse**2))
-  print(f"RMS Error (coarse): {error_coarse_rms} A")
+  print(f"RMS Error (coarse): {error_coarse_rms} Hz")
+  # print(f"RMS Error (coarse): {error_coarse_rms} A")
   if fit_matched_filter:
     signal_to_noise_ratio_coarse = 20*np.log10(np.max(amplitude_matched)/error_coarse_rms)
     print(f"SNR (coarse): {signal_to_noise_ratio_coarse} dB")
   fft_error = fft_error[fft_frequency >= 0]
   fft_frequency = fft_frequency[fft_frequency >= 0]
 
-  fft_error_log = 10*np.log10(abs(fft_error**2)/1e-6)
-  peaks = sig.find_peaks(fft_error_log, height = 7)[0]
+  fft_error_log = 10*np.log10(abs(fft_error**2)) # /1e6
+  peaks = sig.find_peaks(fft_error_log, height = 7 + 20*np.log10(10*1.9e3) - 60)[0]
   fft_error_log_peaks = fft_error_log[peaks]
   fft_frequency_peaks = fft_frequency[peaks]
   order = np.argsort(-fft_error_log_peaks)
@@ -598,7 +606,8 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
   oscilloscope_group["fft_frequency_peaks"] = fft_frequency_peaks
   oscilloscope_group["fft_error_log_peaks"] = fft_error_log_peaks
 
-  print(f"|{'Freq (kHz)':>10s}|{'Amp (dBmA)':>10s}|")
+  print(f"|{'Freq (kHz)':>10s}|{'Amp (dBHz)':>10s}|")
+  # print(f"|{'Freq (kHz)':>10s}|{'Amp (dBmA)':>10s}|")
   for fft_frequency_peak, fft_error_log_peak in zip(fft_frequency_peaks, fft_error_log_peaks):
     print(f"|{fft_frequency_peak/1e3:>10.3f}|{fft_error_log_peak:>10.3f}|")
 
@@ -609,19 +618,20 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
 
   # Plot results -----------------------------------------------------------
   plt.figure()
-  plt.plot(time/1e-3, amplitude/1e-3, "-r", label = "Oscilloscope")
-  plt.plot([time[0]/1e-3, time[-1]/1e-3], [error_rms/1e-3]*2, "--y", label = "RMS Error")
-  plt.plot([time[0]/1e-3, time[-1]/1e-3], [-error_rms/1e-3]*2, "--y")
+  plt.plot(time/1e-3, amplitude/1e3, "-r", label = "Oscilloscope")
+  plt.plot([time[0]/1e-3, time[-1]/1e-3], [error_rms/1e3]*2, "--y", label = "RMS Error")
+  plt.plot([time[0]/1e-3, time[-1]/1e-3], [-error_rms/1e3]*2, "--y")
   if fit_matched_filter:
-    plt.plot(time/1e-3, amplitude_matched/1e-3, "--g", label = "Matched filter")
-    plt.plot(time/1e-3, amplitude_matched_reconstructed/1e-3, "--b", label = "Matched filter fit")
-    plt.plot(time_coarse/1e-3, amplitude_matched_reconstructed_coarse/1e-3, "--m", label = "Matched filter fit, LPF")
-  plt.plot(time_coarse/1e-3, amplitude_coarse/1e-3, "-c", label = "LPF")
-  plt.plot([time_coarse[0]/1e-3, time_coarse[-1]/1e-3], [error_coarse_rms/1e-3]*2, "-.y", label = "RMS Error")
-  plt.plot([time_coarse[0]/1e-3, time_coarse[-1]/1e-3], [-error_coarse_rms/1e-3]*2, "-.y")
+    plt.plot(time/1e-3, amplitude_matched/1e3, "--g", label = "Matched filter")
+    plt.plot(time/1e-3, amplitude_matched_reconstructed/1e3, "--b", label = "Matched filter fit")
+    plt.plot(time_coarse/1e-3, amplitude_matched_reconstructed_coarse/1e3, "--m", label = "Matched filter fit, LPF")
+  plt.plot(time_coarse/1e-3, amplitude_coarse/1e3, "-c", label = "LPF")
+  plt.plot([time_coarse[0]/1e-3, time_coarse[-1]/1e-3], [error_coarse_rms/1e3]*2, "-.y", label = "RMS Error")
+  plt.plot([time_coarse[0]/1e-3, time_coarse[-1]/1e-3], [-error_coarse_rms/1e3]*2, "-.y")
   plt.legend()
   plt.xlabel("Time (ms)")
-  plt.ylabel("Amplitude (mA)")
+  plt.ylabel("Amplitude (kHz)")
+  # plt.ylabel("Amplitude (mA)")
   if archive:
     archive.write_plot("Oscilloscope readout", "oscilloscope_readout")
   plt.draw()
@@ -632,9 +642,10 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
   # plt.xlabel("Frequency (kHz)")
   # plt.ylabel("Phase (deg)")
   # plt.subplot(2, 1, 1)
-  plt.plot(fft_frequency/1e3, abs(fft_error**2)/1e-6, "-r")
+  plt.plot(fft_frequency/1e3, abs(fft_error**2), "-r")
   plt.xlabel("Frequency (kHz)")
-  plt.ylabel("Power (mA$^2$)")
+  plt.ylabel("Power (Hz$^2$)")
+  # plt.ylabel("Power (mA$^2$)")
   if archive:
     archive.write_plot("Oscilloscope readout power spectrum", "oscilloscope_readout_fft")
   plt.draw()
@@ -643,25 +654,28 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
   plt.semilogx(fft_frequency, fft_error_log, "-r")
   plt.semilogx(fft_frequency_peaks, fft_error_log_peaks, "bx")
   plt.xlabel("Frequency (Hz)")
-  plt.ylabel("Power (dBmA)")
+  plt.ylabel("Power (dBHz)")
+  # plt.ylabel("Power (dBmA)")
   if archive:
     archive.write_plot("Oscilloscope readout power spectrum", "oscilloscope_readout_fft_log")
   plt.draw()
 
   plt.figure()
-  plt.plot((fft_frequency[fft_frequency < 60e3])[1:]/1e3, abs((fft_error[fft_frequency < 60e3])[1:]**2)/1e-6, "-r")
+  plt.plot((fft_frequency[fft_frequency < 60e3])[1:]/1e3, abs((fft_error[fft_frequency < 60e3])[1:]**2), "-r")
   plt.xlabel("Frequency (kHz)")
-  plt.ylabel("Power (mA$^2$)")
+  plt.ylabel("Power (Hz$^2$)")
+  # plt.ylabel("Power (mA$^2$)")
   if archive:
     archive.write_plot("Oscilloscope readout power spectrum", "oscilloscope_readout_fft_zoom")
   plt.draw()
 
   plt.figure()
-  plt.plot(fft_frequency[np.abs(fft_frequency) < bandwidth]/1e3, abs(fft_amplitude[0:int((fft_amplitude.size + 1)/2)]**2)/1e-6, "-c", label = "Oscilloscope")
+  plt.plot(fft_frequency[np.abs(fft_frequency) < bandwidth]/1e3, abs(fft_amplitude[0:int((fft_amplitude.size + 1)/2)]**2), "-c", label = "Oscilloscope")
   if fit_matched_filter:
-    plt.plot(fft_frequency[np.abs(fft_frequency) < bandwidth]/1e3, abs(fft_amplitude_matched_reconstructed[0:int((fft_amplitude_matched_reconstructed.size + 1)/2)]**2)/1e-6, "--b", label = "Matched filter fit")
+    plt.plot(fft_frequency[np.abs(fft_frequency) < bandwidth]/1e3, abs(fft_amplitude_matched_reconstructed[0:int((fft_amplitude_matched_reconstructed.size + 1)/2)]**2), "--b", label = "Matched filter fit")
   plt.xlabel("Frequency (kHz)")
-  plt.ylabel("Power (mA$^2$)")
+  plt.ylabel("Power (Hz$^2$)")
+  # plt.ylabel("Power (mA$^2$)")
   plt.legend()
   if archive:
     archive.write_plot("Oscilloscope readout power spectrum (filtered)", "oscilloscope_readout_fft_coarse")
