@@ -270,7 +270,7 @@ class Reconstruction():
     fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
     evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
-    self.amplitude = np.linalg.lstsq(fourier_transform, self.frequency_amplitude, rcond = None)[0]
+    self.amplitude = 0*np.linalg.lstsq(fourier_transform, self.frequency_amplitude, rcond = None)[0]
     amplitude = cuda.to_device(self.amplitude)
     amplitude_previous = cuda.to_device(1*self.amplitude)
 

@@ -214,7 +214,7 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 1000,
+        scaled_amplitude = 104.63351052068842,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.2333333]
       )
@@ -243,9 +243,9 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 1000,
+        scaled_amplitude = 104.63351052068842,
         scaled_sweep = [100, 10000],
-        scaled_pulse_time_fraction = [0.2333333 - 0.06/5]
+        scaled_pulse_time_fraction = [0.0011176/0.005]
       )
     # Two signals, 250 shots
     elif archive_time in ["20220118T124831", "20211216T161624", "20220127T131147"]:
@@ -264,7 +264,7 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 1000,
+        scaled_amplitude = 104.63351052068842,
         scaled_sweep = [100, 10000],
         # scaled_pulse_time_fraction = [0.4333333, 0.64999995]
         # scaled_pulse_time = [0.0021666, 0.0031749]
