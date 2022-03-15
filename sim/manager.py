@@ -1231,7 +1231,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
     # plt.figure()
     # plt.plot(time_interpolation, amplitude_interpolation)
     # plt.show()
-    interpolation_sampler = generate_interpolation_sampler(amplitude_interpolation, time_interpolation, order = 0)
+    # interpolation_sampler = generate_interpolation_sampler(amplitude_interpolation, time_interpolation, order = 0)
     def evaluate_dressing(time_sample, rabi_frequency, field_sample):
       field_sample[0] = 0
       field_sample[1] = 0
@@ -1247,7 +1247,7 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
             field_sample[spacial_index] += math.tau*amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
       if field_sample.size > 2:
         field_sample[3] = math.tau*source_quadratic_shift
-      interpolation_sampler(time_sample, rabi_frequency, field_sample)
+      # interpolation_sampler(time_sample, rabi_frequency, field_sample)
   elif measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
     def evaluate_dressing(time_sample, detuning, field_sample):
       field_sample[0] = 0

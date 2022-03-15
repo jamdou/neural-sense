@@ -213,9 +213,9 @@ class ScaledParameters():
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
-        scaled_samples = 4,
+        scaled_samples = 5,
         scaled_amplitude = 104.63351052068842,
-        scaled_sweep = [100, 10000],
+        scaled_sweep = [100, 12500],
         scaled_pulse_time_fraction = [0.2333333]
       )
     # No signal, 250 shots
@@ -242,9 +242,9 @@ class ScaledParameters():
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
-        scaled_samples = 4,
+        scaled_samples = 5,
         scaled_amplitude = 104.63351052068842,
-        scaled_sweep = [100, 10000],
+        scaled_sweep = [100, 12500],
         scaled_pulse_time_fraction = [0.0011176/0.005]
       )
     # Two signals, 250 shots
@@ -263,9 +263,9 @@ class ScaledParameters():
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
-        scaled_samples = 4,
+        scaled_samples = 5,
         scaled_amplitude = 104.63351052068842,
-        scaled_sweep = [100, 10000],
+        scaled_sweep = [100, 12500],
         # scaled_pulse_time_fraction = [0.4333333, 0.64999995]
         # scaled_pulse_time = [0.0021666, 0.0031749]
         scaled_pulse_time = [2.1666e-3, 3.1749e-3]

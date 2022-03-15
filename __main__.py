@@ -43,15 +43,15 @@ if __name__ == "__main__":
     archive.new_archive_file()
 
     # === Scaled protocol ===
-    # experiment_time = "20220203T123716q" # One signal, DDS, frequency corrected
-    experiment_time = "20220127T131147q" # Two signals, DDS, frequency corrected
+    experiment_time = "20220203T123716q" # One signal, DDS, frequency corrected
+    # experiment_time = "20220127T131147q" # Two signals, DDS, frequency corrected
     # experiment_time = "20220118T131910q" # One signal, all shots, DDS
     # experiment_time = "20220118T124831" # Two signals, all shots, DDS
     # experiment_time = "20211216T113507" # No signal, all shots
     # experiment_time = "20211209T143732" # One signal, all shots
     # experiment_time = "20211216T161624" # Two signals, all shots
     # experiment_time = "20211117T155508" # One signal, up to 14kHz
-    # experiment_time = "20211202T124902" # Ramsey measurements
+    # experiment_time = "20211202T124902q" # Ramsey measurements
     #"20211202T153620" #"20210429T125734" #"20211125T124842" #"20210429T125734" #"20211117T123323"
     scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
     # scaled = util.ScaledParameters(
@@ -120,51 +120,51 @@ if __name__ == "__main__":
       time_properties_reconstruction
     )
 
-    # # === Make state ===
-    # # [0.5, 1/np.sqrt(2), 0.5]
-    # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
-    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE, state_init = spinsim.SpinQuantumNumber.ONE.minus_z)
-    # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
+    # === Make state ===
+    # [0.5, 1/np.sqrt(2), 0.5]
+    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+    state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE, state_init = spinsim.SpinQuantumNumber.ONE.minus_z)
+    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
-    # cuda.profile_start()
-    # # === Run simulations ===
-    # # frequency = np.arange(70, 3071, 30)
-    # # frequency = np.arange(250, 2251, 3)
-    # # frequency = np.arange(250, 2000, 10.0)
-    # # frequency = np.arange(250, 2251, 50)
-    # # frequency = np.arange(250, 2251, 460e3/1e5)
-    # # frequency = np.arange(990, 1010, 0.02)
-    # # frequency = np.arange(253, 3251, 30)
-    # # frequency = np.arange(1000, 1003, 1)
-    # # frequency = np.arange(1000, 1001, 1)
-    # # frequency = np.arange(0, 1000000, 1)
-    # # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-    # frequency = scaled.sample_frequencies
-    # # frequency += 100#*(np.sin(frequency)**2)
+    cuda.profile_start()
+    # === Run simulations ===
+    # frequency = np.arange(70, 3071, 30)
+    # frequency = np.arange(250, 2251, 3)
+    # frequency = np.arange(250, 2000, 10.0)
+    # frequency = np.arange(250, 2251, 50)
+    # frequency = np.arange(250, 2251, 460e3/1e5)
+    # frequency = np.arange(990, 1010, 0.02)
+    # frequency = np.arange(253, 3251, 30)
+    # frequency = np.arange(1000, 1003, 1)
+    # frequency = np.arange(1000, 1001, 1)
+    # frequency = np.arange(0, 1000000, 1)
+    # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
+    frequency = scaled.sample_frequencies
+    # frequency += 100#*(np.sin(frequency)**2)
 
-    # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-    # simulation_manager.evaluate(False, False)
+    simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+    simulation_manager.evaluate(False, False)
 
     # === Experiment results ===
-    # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-    experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
+    experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+    # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
     experiment_results.write_to_archive(archive)
     experiment_results.plot(archive, signal_reconstruction, units = "nT")
 
-    # # === Make reconstructions ===
-    # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-    # # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
-    # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
+    # === Make reconstructions ===
+    reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+    # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+    # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
 
     # === ===                       === ===
     # === === Sweep reconstructions === ===
     # === ===                       === ===
 
     # experiment_results.frequency -= 100
-    experiment_results = analysis.reverse_polarity(experiment_results)
+    # experiment_results = analysis.reverse_polarity(experiment_results)
     # experiment_results = analysis.arcsin_filter(experiment_results)
     # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
-    experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
+    # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
     # experiment_results = analysis.mode_filter(experiment_results)
     # experiment_results = analysis.whitening_filter(experiment_results)
     # experiment_results = analysis.mode_filter(experiment_results)
@@ -199,8 +199,8 @@ if __name__ == "__main__":
       ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
-      expected_error_measurement = 5, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-      norm_scale_factor_modifier = 0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      expected_error_measurement = 0.05,# 5, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      norm_scale_factor_modifier = 1, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,
       frequency_cutoff_high = scaled.sweep[1],
@@ -237,30 +237,30 @@ if __name__ == "__main__":
     #   units = "nT"
     # )
 
-    # === ===          === ===
-    # === === Analysis === ===
-    # === ===          === ===
+    # # === ===          === ===
+    # # === === Analysis === ===
+    # # === ===          === ===
 
-    # analysis.find_time_blind_spots(scaled, archive)
-    # analysis.find_neural_signal_size(experiment_results, scaled, archive)
-    # analysis.find_line_noise_size(experiment_results, scaled, archive)
-    # analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
-    # analysis.find_noise_size_from_fourier_transform(experiment_results, scaled, archive)
-    # analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
-    # analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
-    # analysis.find_neural_signal_size(analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive), scaled, archive)
-    # analysis.sweep_sensing_coherence(archive = archive, time_properties = time_properties_reconstruction, sweep_parameters = [2, None, 1])
-    # experiment_results_empty = arch.ExperimentResults.new_from_archive_time("20211216T113507")
-    # archive_empty = arch.Archive(archive_path, "")
-    # archive_empty.open_archive_file("20211216T113507")
-    # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
-    # analysis.draw_dst(archive, time_properties_reconstruction)
+    # # analysis.find_time_blind_spots(scaled, archive)
+    # # analysis.find_neural_signal_size(experiment_results, scaled, archive)
+    # # analysis.find_line_noise_size(experiment_results, scaled, archive)
+    # # analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+    # # analysis.find_noise_size_from_fourier_transform(experiment_results, scaled, archive)
+    # # analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
+    # # analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive)
+    # # analysis.find_neural_signal_size(analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive), scaled, archive)
+    # # analysis.sweep_sensing_coherence(archive = archive, time_properties = time_properties_reconstruction, sweep_parameters = [2, None, 1])
+    # # experiment_results_empty = arch.ExperimentResults.new_from_archive_time("20211216T113507")
+    # # archive_empty = arch.Archive(archive_path, "")
+    # # archive_empty.open_archive_file("20211216T113507")
+    # # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
+    # # analysis.draw_dst(archive, time_properties_reconstruction)
 
-    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
-    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_signal.csv", archive, fit_matched_filter = True)
+    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
+    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_signal.csv", archive, fit_matched_filter = True)
     # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_no_signal.csv", archive)
-    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_static_zero.csv", archive)
-    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
+    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_static_zero.csv", archive)
+    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
     
 
     # # === ===                 === ===
@@ -284,6 +284,17 @@ if __name__ == "__main__":
     #   # "20220202T135356" # Simulation 3
     #   "20220202T184548" # Simulation 4
     # )
+
+    # ramsey_results.time = ramsey_results.time[0:-1:2]
+    # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
+    # empty_results.time = empty_results.time[0:-1:2]
+    # empty_results.amplitude = empty_results.amplitude[0:-1:2]
+
+    # # print(ramsey_results.time)
+    # # print(empty_results.time)
+    # # print(ramsey_results.amplitude)
+    # # print(empty_results.amplitude)
+
     # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
     # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
     # ramsey_results.write_to_archive(archive)

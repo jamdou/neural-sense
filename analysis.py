@@ -763,7 +763,7 @@ def mode_filter(experiment_results:arch.ExperimentResults, frequency_mode = 4e3)
   frequency_filter[frequency < frequency_mode] = (frequency[frequency < frequency_mode]/np.max(frequency[frequency < frequency_mode]))**2
   frequency_filter[frequency >= frequency_mode] = (1 + (frequency[frequency >= frequency_mode] - np.max(frequency[frequency < frequency_mode]))/(np.max(frequency[frequency < frequency_mode]) - np.max(frequency)))**2
   # frequency_filter /= np.mean(frequency_filter**2)
-  frequency_amplitude *= frequency_filter*2#math.sqrt(2)
+  frequency_amplitude *= frequency_filter#*2#math.sqrt(2)
 
   return arch.ExperimentResults(
     frequency = experiment_results.frequency.copy(),
