@@ -747,6 +747,41 @@ def analyse_overall_noise(experiment_results:arch.ExperimentResults, experiment_
 
   return experiment_results_modified
 
+def analyse_readout_noise(experiment_results:arch.ExperimentResults, experiment_results_empty:arch.ExperimentResults, archive:arch.Archive = None):
+  readout_noise = experiment_results_empty.frequency_amplitude
+  readout_offset = np.mean(readout_noise)
+  readout_error = np.sqrt(np.mean((readout_offset - readout_noise)**2))
+
+  frequency_amplitude = experiment_results.frequency_amplitude.copy()
+  frequency = experiment_results.frequency
+  frequency_amplitude_modified = frequency_amplitude - readout_offset
+
+  experiment_results_modified = arch.ExperimentResults(frequency = frequency, frequency_amplitude = frequency_amplitude_modified, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, lab readout noise offset removed")
+
+  plt.figure()
+  plt.plot(readout_noise, "xy", label = "Readout noise")
+  plt.plot([0, readout_noise.size - 1], [readout_offset, readout_offset], "-y", label = "Offset")
+  plt.plot([0, readout_noise.size - 1], [readout_offset + readout_error, readout_offset + readout_error], "--y", label = "Error")
+  plt.plot([0, readout_noise.size - 1], [readout_offset - readout_error, readout_offset - readout_error], "--y")
+  plt.xlabel("Shot number")
+  plt.ylabel("Frequency amplitude (Hz)")
+  plt.legend()
+  if archive:
+    archive.write_plot("Lab readout data", "lab_noise_readout_data")
+  plt.draw()
+
+  plt.figure()
+  plt.plot(frequency, frequency_amplitude, "rx", label = "Lab data")
+  plt.plot(frequency, frequency_amplitude_modified, "bx", label = "Lab data modified")
+  plt.xlabel("Frequency (Hz)")
+  plt.ylabel("Frequency amplitude (Hz)")
+  if archive:
+    archive.write_plot("Lab readout modification", "lab_noise_readout_modification")
+  plt.draw()
+
+  return experiment_results_modified
+
+
 def reverse_polarity(experiment_results:arch.ExperimentResults):
   return arch.ExperimentResults(
     frequency = experiment_results.frequency.copy(),

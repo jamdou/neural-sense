@@ -332,7 +332,7 @@ class Reconstruction():
     self.backtrack_scale = backtrack_scale
 
     # tolerable_error = 2*expected_error_measurement
-    tolerable_error = expected_error_measurement
+    tolerable_error = expected_error_measurement*np.sqrt(self.frequency_amplitude.size)
     gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
     # gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
     self.reconstruction_step = 1/gradient_lipschitz
@@ -357,8 +357,8 @@ class Reconstruction():
     # # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     # # self.iteration_max = int(math.ceil(2*np.sqrt((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     
-    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
-    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
+    # self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+    self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
 
 
     self.shrink_size_max = 1e2
@@ -790,7 +790,7 @@ class Reconstruction():
     evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
     self.amplitude = np.linalg.lstsq(fourier_transform, self.frequency_amplitude, rcond = None)[0]
-    self.amplitude *= (self.time_properties.time_coarse.size/self.frequency.size)#*0.7
+    # self.amplitude *= (self.time_properties.time_coarse.size/self.frequency.size)#*0.7
 
     self.reconstruction_type = "least squares"
     C.finished("reconstruction (least squares)")
@@ -1217,36 +1217,50 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   errors_method_2 = []
   errors_method_sup = []
   errors_method_snr = []
+  errors_method_mf = []
+  errors_method_mfd = []
+  expected_signal_power = np.mean(expected_signal.amplitude**2)
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     errors_0 = []
     errors_1 = []
     errors_2 = []
     errors_sup = []
     errors_snr = []
+    errors_mf = []
+    errors_mfd = []
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
       error_0 = 0
       error_1 = 0
       error_2 = 0
       error_sup = 0
       error_snr = 0
+      error_mf = 0
+      error_mfd = 0
       for random_index, random_seed in enumerate(random_seeds):
         amplitude = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index]
         error_0 += np.mean((amplitude == 0)*(expected_signal.amplitude != 0) + (amplitude != 0)*(expected_signal.amplitude == 0))
         error_1 += np.mean(np.abs(amplitude - expected_signal.amplitude))
         error_2 += math.sqrt(np.mean((amplitude - expected_signal.amplitude)**2))
         error_sup += np.max(np.abs(amplitude - expected_signal.amplitude))
-        error_snr += np.mean((amplitude - expected_signal.amplitude)**2)/np.mean((expected_signal.amplitude)**2)
+        error_snr += expected_signal_power/np.mean((amplitude - expected_signal.amplitude)**2)
+        error_mf_current = np.mean(amplitude*expected_signal.amplitude)
+        error_mf += error_mf_current
+        error_mfd += error_mf_current >= expected_signal_power/2
       errors_0.append(error_0/random_seeds.size)
       errors_1.append(error_1/random_seeds.size)
       errors_2.append(error_2/random_seeds.size)
       errors_sup.append(error_sup/random_seeds.size)
       errors_snr.append(10*np.log10(error_snr/random_seeds.size))
+      errors_mf.append(error_mf/random_seeds.size)
+      errors_mfd.append(error_mfd/random_seeds.size)
     
     errors_method_0.append(np.array(errors_0))
     errors_method_1.append(np.array(errors_1))
     errors_method_2.append(np.array(errors_2))
     errors_method_sup.append(np.array(errors_sup))
     errors_method_snr.append(np.array(errors_snr))
+    errors_method_mf.append(np.array(errors_mf))
+    errors_method_mfd.append(np.array(errors_mfd))
   C.finished("error analysis")   
 
   if archive:
@@ -1260,6 +1274,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       evaluation_group["error_2"] = errors_method_2[evaluation_method_index]
       evaluation_group["error_sup"] = errors_method_sup[evaluation_method_index]
       evaluation_group["error_snr"] = errors_method_snr[evaluation_method_index]
+      evaluation_group["error_mf"] = errors_method_mf[evaluation_method_index]
+      evaluation_group["error_mfd"] = errors_method_mfd[evaluation_method_index]
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
@@ -1366,10 +1382,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   
   plt.figure()
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_0[evaluation_method_index], evaluation_method_legend[evaluation_method])
+    plt.plot(numbers_of_samples, errors_method_0[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
   plt.ylim(bottom = 0)
   plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel("Proportion of points incorrectly classified")
+  plt.ylabel("Proportion of points incorrectly classified (%)")
   plt.legend(legend)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(Determing the support)", "number_of_samples_error_0")
@@ -1419,6 +1435,26 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   plt.legend(legend)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(Signal to noise ratio)", "number_of_samples_error_snr")
+  plt.draw()
+
+  plt.figure()
+  plt.subplot(2, 1, 2)
+  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    plt.plot(numbers_of_samples, errors_method_mfd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+  plt.xlabel("Number of samples used in the reconstruction")
+  plt.ylabel(f"Proportion of correct\ndetections (%)")
+  plt.ylim(bottom = 0)
+  plt.legend(legend)
+  plt.subplot(2, 1, 1)
+  plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [expected_signal_power/2]*2, "y--")
+  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
+  # plt.xlabel("Number of samples used in the reconstruction")
+  plt.ylabel(f"Average detection\nenergy ({units}$^2$)")
+  plt.ylim(bottom = 0)
+  plt.legend(["Threshold"] + legend)
+  if archive:
+    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf")
   plt.draw()
 
   # plt.figure()
