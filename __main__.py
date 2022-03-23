@@ -89,7 +89,8 @@ if __name__ == "__main__":
       # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
       scaled.get_neural_pulses(),
 
-      [],
+      # [],
+      [test_signal.SinusoidalNoise.new_detuning_noise(100)],
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
       # line_noise_model.generate_sinusoidal_noise(),
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
@@ -148,7 +149,7 @@ if __name__ == "__main__":
 
     # === Experiment results ===
     experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-    experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, 1e4, 3)
+    # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, 1e4, 3)
     # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
     experiment_results.write_to_archive(archive)
     experiment_results.plot(archive, signal_reconstruction, units = "nT")
@@ -178,6 +179,8 @@ if __name__ == "__main__":
     # # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507")), archive = archive)
     # # experiment_results.write_to_archive(archive)
     # # experiment_results.plot(archive, signal_reconstruction)
+
+    # experiment_results = analysis.remove_dc_detuning(experiment_results, scaled, archive)
     recon.run_reconstruction_subsample_sweep(
       expected_signal = signal_reconstruction,
       # experiment_results = experiment_results,
@@ -205,7 +208,7 @@ if __name__ == "__main__":
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
       expected_error_measurement = 1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-      norm_scale_factor_modifier = 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      norm_scale_factor_modifier = 1/16,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,
       frequency_cutoff_high = scaled.sweep[1],
@@ -261,11 +264,13 @@ if __name__ == "__main__":
     # # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
     # # analysis.draw_dst(archive, time_properties_reconstruction)
 
-    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
-    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_signal.csv", archive, fit_matched_filter = True)
-    # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_no_signal.csv", archive)
-    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_static_zero.csv", archive)
-    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
+    # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
+    # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_signal.csv", archive, fit_matched_filter = True)
+    # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_no_signal.csv", archive)
+    # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_static_zero.csv", archive)
+    # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
+
+    # analysis.remove_dc_detuning(experiment_results, scaled, archive)
     
 
     # # === ===                 === ===

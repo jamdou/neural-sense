@@ -440,6 +440,53 @@ def remove_line_noise_from_evaluation(experiment_results:arch.ExperimentResults,
 
   return modified_experiment_results
 
+def remove_dc_detuning(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters = None, archive:arch.Archive = None):
+  C.starting("Removing dc detuning")
+  frequency = experiment_results.frequency.copy()
+  frequency_amplitude = experiment_results.frequency_amplitude.copy()
+  template_full = -(2/math.tau)/frequency
+  template_full[1::2] = 0
+  template = (frequency > 5e3)*template_full
+  detuning_normalised = np.mean(template*frequency_amplitude)/(np.mean(template**2))
+  if scaled is not None:
+    detuning = detuning_normalised*scaled.time_end
+    C.print(f"Detuning: {detuning} Hz")
+  else:
+    C.print(f"Detuning (normalised): {detuning} Hz")
+
+  detuning_error = detuning_normalised*template_full
+  detuning_direction = np.ones_like(detuning_error)
+  if scaled is not None:
+    detuning_direction = np.cos((math.tau*scaled.time_end)*detuning_error)
+    detuning_error = (1/(math.tau*scaled.time_end))*np.sin((math.tau*scaled.time_end)*detuning_error)
+  frequency_amplitude_modified = (frequency_amplitude - detuning_error)*detuning_direction
+
+  group = archive.archive_file.require_group("removed_dc_detuning")
+  group["frequency"] = frequency
+  group["frequency_amplitude_unmodified"] = frequency_amplitude
+  group["frequency_amplitude_modified"] = frequency_amplitude_modified
+  group["detuning_error"] = detuning_error
+  group.attrs["detuning_normalised"] = detuning_normalised
+  if scaled is not None:
+    group.attrs["detuning"] = detuning
+  if experiment_results.archive_time is not None:
+    group.attrs["previous_archive_time"] = experiment_results.archive_time
+
+  experiment_results_modified = arch.ExperimentResults(frequency = frequency, frequency_amplitude = frequency_amplitude_modified, archive_time = experiment_results.archive_time, experiment_type = f"{experiment_results.experiment_type}, removed dc detuning")
+
+  plt.figure()
+  plt.plot(frequency, frequency_amplitude, "rx", label = "Unmodified")
+  plt.plot(frequency, frequency_amplitude_modified, "bx", label = "Modified")
+  plt.plot(frequency, detuning_error, "yx", label = "Removed")
+  plt.xlabel("Frequency (Hz)")
+  plt.ylabel("Frequency amplitude (Hz)")
+  if archive:
+    archive.write_plot("Removed dc detuning", "removed_dc_detuning")
+  plt.legend()
+
+  C.finished("Removing dc detuning")
+  return experiment_results_modified
+
 def sweep_sensing_coherence(archive:arch.Archive, time_properties:test_signal.TimeProperties, sweep_parameters = [30, None, 10]):
   sweep_parameters[1] = sweep_parameters[1] or (time_properties.time_coarse.size)
   sampleses = np.arange(sweep_parameters[1], sweep_parameters[0] - 1, -sweep_parameters[2])
