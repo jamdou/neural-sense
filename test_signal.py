@@ -517,17 +517,19 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
         split = line.strip().split(sep = ",")
         time.append(float(split[0]))
         amplitude.append(float(split[1]))
+  data.close()
+
   time = np.array(time)
   amplitude = np.array(amplitude)
   time_step = time[1] - time[0]
   time_duration = time[-1] - time[0]
 
   if "20220208" in path:
-    amplitude /= 10
-    amplitude /= 100
+    amplitude /= 10 # Fake amps to volts
+    amplitude /= 100 # Amplification before sensing
   # 1.9kHz / A
   # amplitude *= 1.9e3
-  amplitude *= 3.08409e+06
+  amplitude *= 3.08409e+06 #
 
   oscilloscope_group = archive.archive_file.require_group("oscilloscope")
   oscilloscope_group.attrs["Units"] = "Hz"
@@ -685,3 +687,99 @@ def read_from_oscilloscope(path:str, archive = None, fit_matched_filter = False)
   if archive:
     archive.write_plot("Oscilloscope readout power spectrum (filtered)", "oscilloscope_readout_fft_coarse")
   plt.draw()
+
+  return time, amplitude
+
+class AcquiredSignal():
+  def __init__(self, time:np.ndarray, amplitude:np.ndarray, signal_tap = "", to_hz = 1):
+    self.time = time.copy()
+    self.amplitude = amplitude.copy()
+    self.time_step = time[1] - time[0]
+    self.time_duration = self.time_step*time.size
+    self.signal_tap = signal_tap
+    self.to_hz = to_hz
+
+  @staticmethod
+  def new_from_oscilloscope(path):
+    data = open(path, "r")
+    started = False
+    time = []
+    amplitude = []
+    for line in data:
+      if not started:
+        if "TIME" in line:
+          started = True
+      else:
+        if line.strip() != "":
+          split = line.strip().split(sep = ",")
+          time.append(float(split[0]))
+          amplitude.append(float(split[1]))
+    data.close()
+    
+    time = np.array(time)
+    amplitude = np.array(amplitude)
+    to_hz = ((1/100)/10)*3.08409e6
+
+    return AcquiredSignal(time, amplitude, "oscilloscope csv <- stupid current units (x10 A/V) <- preamp (x100 V/V) <- magneato monitor voltage (V)", to_hz)
+
+  @staticmethod
+  def new_from_archive_time(archive, archive_time):
+    from archive import Archive
+    archive_previous = Archive(archive.archive_path[:-25], "")
+    archive_previous.open_archive_file(archive_time)
+    group = archive_previous.archive_file.require_group("acquired_signal")
+
+    time = np.asarray(group["time"])
+    amplitude = np.asarray(group["amplitude"])
+    signal_tap = group.attrs["signal_tap"]
+    to_hz = group.attrs["to_hz"]
+
+    return AcquiredSignal(time, amplitude, signal_tap, to_hz)
+
+  
+  def write_to_file(self, archive):
+    group = archive.archive_file.require_group("acquired_signal")
+    group.attrs["time_step"] = self.time_step
+    group.attrs["time_duration"] = self.time_duration
+    group.attrs["signal_tap"] = self.signal_tap
+    group.attrs["to_hz"] = self.to_hz
+    group["time"] = self.time
+    group["amplitude"] = self.amplitude
+
+  def subsample(self, time_step_new, archive = None, units = "Hz"):
+    if "Hz" in units:
+      unit_factor = 1
+    elif "T" in units:
+      unit_factor = 1/7e9
+    if "n" in units:
+      unit_factor *= 1e9
+    elif "μ" in units:
+      unit_factor *= 1e6
+    elif "m" in units:
+      unit_factor *= 1e3
+
+    number_of_time_samples = np.floor(self.time_duration/time_step_new)
+    time_new = self.time[0] + time_step_new*np.arange(number_of_time_samples)
+    amplitude_new = np.zeros_like(time_new)
+    frequency_step = 1/self.time_duration
+    frequency = frequency_step*np.arange(number_of_time_samples/2)
+    for frequency_sample in frequency:
+      frequency_in_phase = np.sum(np.cos(math.tau*frequency_sample*self.time)*self.amplitude)*self.time_step*(2/self.time_duration)
+      frequency_quadrature = np.sum(np.sin(math.tau*frequency_sample*self.time)*self.amplitude)*self.time_step*(2/self.time_duration)
+      if frequency_sample == 0:
+        amplitude_new += frequency_in_phase/2
+      else:
+        amplitude_new += frequency_in_phase*np.cos(math.tau*frequency_sample*time_new)
+        amplitude_new += frequency_quadrature*np.sin(math.tau*frequency_sample*time_new)
+    
+    plt.figure()
+    plt.plot(self.time/1e-3, self.amplitude*self.to_hz*unit_factor, "r", label = "Acquired monitor signal")
+    plt.plot(time_new/1e-3, amplitude_new*self.to_hz*unit_factor, "bx--", label = "Subsampled")
+    plt.xlabel("Time (ms)")
+    plt.ylabel(f"Amplitude ({units})")
+    plt.legend()
+    if archive:
+      archive.write_plot("Subsampled monitor signal", "acquired_signal_subsampled")
+    plt.draw()
+
+    return time_new, amplitude_new*self.to_hz
