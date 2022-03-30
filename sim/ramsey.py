@@ -2,6 +2,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import spinsim
+from sim.manager import generate_interpolation_sampler
 
 import util
 from util import PrettyTritty as C
@@ -9,7 +10,7 @@ import archive as arch
 import test_signal
 import analysis
 
-def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, line_noise_model:test_signal.LineNoiseModel = None):
+def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, line_noise_model:test_signal.LineNoiseModel = None, lab_harmonics = None, signal = None):
   bias = 600e3
   duration_sensing = 60e-6
   amplitude_pulse = 20e3
@@ -26,6 +27,16 @@ def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, l
     line_noise_amplitudes = np.empty(0)
     line_noise_phases = np.empty(0)
 
+  lab_harmonic_amplitudes = []
+  lab_harmonic_frequencies = []
+  if lab_harmonics is not None:
+    for lab_harmonic in lab_harmonics:
+      lab_harmonic_amplitudes.append(lab_harmonic.amplitude[2])
+      lab_harmonic_frequencies.append(lab_harmonic.frequency[2])
+  lab_harmonic_amplitudes = np.array(lab_harmonic_amplitudes)
+  lab_harmonic_frequencies= np.array(lab_harmonic_frequencies)
+
+  interpolation_sampler = generate_interpolation_sampler(amplitude = signal.signal_trace_amplitude, time = signal.signal_trace_time)
   def ramsey_hamiltonian(time_sample, parameters, field_strength):
     time_sensing = parameters[0]
     if (time_sensing - duration_sensing/2 - duration_pulse <= time_sample) and (time_sample < time_sensing - duration_sensing/2):
@@ -38,12 +49,17 @@ def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, l
     field_strength[2] = math.tau*bias
     # field_strength[2] += math.tau*amplitude_line*math.sin(math.tau*50*time_sample)\
 
-    for time_neural_instance in time_neural:
-      if time_neural_instance <= time_sample and time_sample < time_neural_instance + 1/frequency_neural:
-        field_strength[2] += math.tau*amplitude_neural*math.sin(math.tau*frequency_neural*(time_sample - time_neural_instance))
+    # for time_neural_instance in time_neural:
+    #   if time_neural_instance <= time_sample and time_sample < time_neural_instance + 1/frequency_neural:
+    #     field_strength[2] += math.tau*amplitude_neural*math.sin(math.tau*frequency_neural*(time_sample - time_neural_instance))
+    interpolation_sampler(time_sample, parameters, field_strength)
     for line_noise_index, (line_noise_amplitude, line_noise_phase) in enumerate(zip(line_noise_amplitudes, line_noise_phases)):
       if line_noise_amplitude > 0:
         field_strength[2] += math.tau*line_noise_amplitude*math.cos(math.tau*50*(line_noise_index + 1)*time_sample + line_noise_phase)
+    
+    for lab_harmonic_amplitude, lab_harmonic_frequency in zip(lab_harmonic_amplitudes, lab_harmonic_frequencies):
+      field_strength[2] += math.tau*lab_harmonic_amplitude*math.sin(math.tau*lab_harmonic_frequency*time_sample)
+
     field_strength[3] = 0
 
 
@@ -53,11 +69,15 @@ def simulate_ramsey(scaled:util.ScaledParameters, archive:arch.Archive = None, l
   C.starting("Ramsey simulations")
   C.print(f"|{'Index':8}|{'Perc':8}|")
   for time_index, time_sensing in enumerate(time):
-    results = simulator.evaluate(0, scaled.time_end, scaled.time_step/100, scaled.time_step, spinsim.SpinQuantumNumber.ONE.plus_z, [time_sensing])
+    results = simulator.evaluate(-math.ceil((duration_sensing/2 + duration_pulse)/scaled.time_step)*scaled.time_step, scaled.time_end + math.ceil((duration_sensing/2 + duration_pulse)/scaled.time_step)*scaled.time_step, scaled.time_step/100, scaled.time_step, spinsim.SpinQuantumNumber.ONE.plus_z, [time_sensing])
     amplitude[time_index] = results.spin[-1, 2]/(duration_sensing*math.tau)
     C.print(f"|{time_index:8d}|{(time_index + 1)/time.size*100:7.2f}%|", end = "\r")
   C.print("\n")
   C.finished("Ramsey simulations")
+
+  # amplitude = amplitude[np.logical_and(0 <= time, time < scaled.time_end)]
+  # time = time[np.logical_and(0 <= time, time < scaled.time_end)]
+
   # if archive:
   #   ramsey_group = archive.archive_file.create_group("simulations_ramsey")
   #   ramsey_group["amplitude"] = amplitude
@@ -79,7 +99,7 @@ def remove_line_noise_bias(results:arch.RamseyResults, empty_results:arch.Ramsey
 
   return arch.RamseyResults(time = time, amplitude = amplitude, archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, line noise bias removed")
 
-def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSignal, archive:arch.Archive = None):
+def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSignal, archive:arch.Archive = None, units = "Hz"):
   time = []
   measured_amplitude = []
   original_amplitude = []
@@ -90,10 +110,50 @@ def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSi
         measured_amplitude.append(measured_amplitude_instance)
         original_amplitude.append(original_amplitude_instance)
   time = np.array(time)
-  measured_amplitude = np.array(measured_amplitude)
+  amplitude = np.array(measured_amplitude)
   original_amplitude = np.array(original_amplitude)
-  error_rms = np.sqrt(np.mean((measured_amplitude - original_amplitude)**2))
-  C.print(f"Ramsey error rms: {error_rms}")
+
+  expected_signal_power = np.mean(signal.amplitude**2)
+  mf_cutoff = expected_signal_power/2 # default
+
+  error_0 = np.mean((amplitude == 0)*(signal.amplitude != 0) + (amplitude != 0)*(signal.amplitude == 0))
+  error_1 = np.mean(np.abs(amplitude - signal.amplitude))
+  error_2 = math.sqrt(np.mean((amplitude - signal.amplitude)**2))
+  error_sup = np.max(np.abs(amplitude - signal.amplitude))
+  error_snr = expected_signal_power/np.mean((amplitude - signal.amplitude)**2)
+  error_mf = np.mean(amplitude*signal.amplitude)
+  error_mfd = error_mf >= mf_cutoff
+
+  if archive is not None:
+    group = archive.archive_file.require_group("ramsey_comparison")
+    group.attrs["error_0"] = error_0
+    group.attrs["error_1"] = error_1
+    group.attrs["error_2"] = error_2
+    group.attrs["error_sup"] = error_sup
+    group.attrs["error_snr"] = error_snr
+    group.attrs["error_mf"] = error_mf
+    group.attrs["error_mfd"] = error_mfd
+
+  if "Hz" in units:
+    unit_factor = 1
+  elif "T" in units:
+    unit_factor = 1/7e9
+  if "n" in units:
+    unit_factor *= 1e9
+  elif "μ" in units:
+    unit_factor *= 1e6
+  elif "m" in units:
+    unit_factor *= 1e3
+
+  C.print(f"Support error: {error_0*100} %")
+  C.print(f"Average error: {error_1*unit_factor} {units}")
+  C.print(f"RMS error: {error_2*unit_factor} {units}")
+  C.print(f"Maximum error: {error_sup*unit_factor} {units}")
+  C.print(f"Signal to error ratio: {10*math.log10(error_snr)} dB")
+  C.print(f"Matched filter response: {error_mf*unit_factor**2} {units}^2")
+  C.print(f"Matched filter threshold: {mf_cutoff*unit_factor**2} {units}^2")
+  C.print(f"Detected: {error_mfd}")
+
   plt.figure()
   plt.plot(time, original_amplitude, "k-", label = "Original")
   plt.plot(time, measured_amplitude, "r-", label = "Measured")

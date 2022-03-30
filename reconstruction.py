@@ -1220,6 +1220,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   errors_method_mf = []
   errors_method_mfd = []
   expected_signal_power = np.mean(expected_signal.amplitude**2)
+  mf_cutoff = expected_signal_power/2 # default
+  # mf_cutoff = expected_signal_power/4
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     errors_0 = []
     errors_1 = []
@@ -1245,7 +1247,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         error_snr += expected_signal_power/np.mean((amplitude - expected_signal.amplitude)**2)
         error_mf_current = np.mean(amplitude*expected_signal.amplitude)
         error_mf += error_mf_current
-        error_mfd += error_mf_current >= expected_signal_power/2
+        error_mfd += error_mf_current >= mf_cutoff
       errors_0.append(error_0/random_seeds.size)
       errors_1.append(error_1/random_seeds.size)
       errors_2.append(error_2/random_seeds.size)
@@ -1446,7 +1448,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   plt.ylim(bottom = 0)
   plt.legend(legend)
   plt.subplot(2, 1, 1)
-  plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [expected_signal_power/2]*2, "y--")
+  plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mf_cutoff]*2, "y--")
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
   # plt.xlabel("Number of samples used in the reconstruction")

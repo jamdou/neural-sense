@@ -382,6 +382,9 @@ def add_shot_noise(experiment_results:arch.ExperimentResults, scaled:util.Scaled
 
   return modified_experiment_results
 
+def add_shot_noise_ramsey(ramsey_results:arch.RamseyResults, sscaled:util.ScaledParameters, archive:arch.Archive = None, atom_count = 1e6, noise_modifier = 1):
+  pass
+
 def remove_line_noise_from_model(experiment_results:arch.ExperimentResults, scaled:util.ScaledParameters, line_noise_model:test_signal.LineNoiseModel, archive:arch.Archive = None):
   rabi = experiment_results.frequency
 

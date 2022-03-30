@@ -199,6 +199,20 @@ class SinusoidalNoise:
       A parametrisation of the line noise.
     """
     return SinusoidalNoise(amplitude, [50.0, 50.0, 50.0], phase, "line_noise")
+  
+  @staticmethod
+  def new_lab_harmonics_from_experiment_time(archive_time):
+    if archive_time in ["20220203T123716"]:
+      return [
+        SinusoidalNoise([0, 0, 10**(-40.9962/10)], [0, 0, 124e3], type = "lab harmonic"),
+        # SinusoidalNoise([0, 0, 10**(-29.0269/10)], [0, 0, 605e3], type = "lab harmonic"),
+        SinusoidalNoise([0, 0, 10**(-27.1536/10)], [0, 0, 206.5e3], type = "lab harmonic"),
+        SinusoidalNoise([0, 0, 10**(-27.1029/10)], [0, 0, 30e3], type = "lab harmonic"),
+        SinusoidalNoise([0, 0, 10**(-24.9550/10)], [0, 0, 289.25e3], type = "lab harmonic"),
+        SinusoidalNoise([0, 0, 10**(-21.9038/10)], [0, 0, 372e3], type = "lab harmonic"),
+        SinusoidalNoise([0, 0, 10**(-21.1901/10)], [0, 0, 41.25e3], type = "lab harmonic"),
+        SinusoidalNoise([0, 0, 10**(-21.1055/10)], [0, 0, 165.25e3], type = "lab harmonic")
+      ]
 
   def write_to_file(self, archive):
     """
@@ -331,7 +345,7 @@ class TestSignal:
   frequency_amplitude : :class:`numpy.ndarray` of :class:`numpy.double` (frequency_index)
     The sine Fourier transform of the pulse sequence. In units of Hz. Only evaluated when :func:`get_frequency_amplitude()` is called. See :math:`s(f)` above.
   """
-  def __init__(self, neural_pulses = [NeuralPulse()], sinusoidal_noises = [], time_properties:TimeProperties = TimeProperties(), do_evaluate = True):
+  def __init__(self, neural_pulses = [NeuralPulse()], sinusoidal_noises = [], time_properties:TimeProperties = TimeProperties(), do_evaluate = True, signal_trace_time = None, signal_trace_amplitude = None):
     """
     Parameters
     ----------
@@ -347,11 +361,15 @@ class TestSignal:
     self.time_properties = time_properties
     self.neural_pulses = neural_pulses
     self.sinusoidal_noises = sinusoidal_noises
-    self.amplitude = np.empty_like(time_properties.time_coarse, dtype = np.double)
+    self.amplitude = np.zeros_like(time_properties.time_coarse, dtype = np.double)
     self.frequency = np.empty_like(time_properties.time_coarse, dtype = np.double)
     self.frequency_amplitude = np.empty_like(self.frequency)   # The sine Fourier transform of the pulse sequence (Hz) [frequency index]
+    self.signal_trace_time = signal_trace_time
+    self.signal_trace_amplitude = signal_trace_amplitude
     if do_evaluate:
       self.get_amplitude()
+      if self.signal_trace_time is not None:
+        self.amplitude[:self.signal_trace_amplitude[self.signal_trace_time >= self.time_properties.time_end_points[0]].size] = self.signal_trace_amplitude[self.signal_trace_time >= self.time_properties.time_end_points[0]]
       self.get_frequency_amplitude()
 
   def get_amplitude(self):
@@ -767,7 +785,7 @@ class AcquiredSignal():
       frequency_in_phase = np.sum(np.cos(math.tau*frequency_sample*self.time)*self.amplitude)*self.time_step*(2/self.time_duration)
       frequency_quadrature = np.sum(np.sin(math.tau*frequency_sample*self.time)*self.amplitude)*self.time_step*(2/self.time_duration)
       if frequency_sample == 0:
-        amplitude_new += frequency_in_phase/2
+        amplitude_new += 0*frequency_in_phase/2
       else:
         amplitude_new += frequency_in_phase*np.cos(math.tau*frequency_sample*time_new)
         amplitude_new += frequency_quadrature*np.sin(math.tau*frequency_sample*time_new)

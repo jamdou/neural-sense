@@ -245,13 +245,17 @@ class SourceProperties:
     # Construct the signal from the dressing information and pulse description.
     if signal:
       self.add_dressing(signal, bias_amplitude, signal_reconstruction = signal_reconstruction)
-      for neural_pulse in signal.neural_pulses:
-        self.add_neural_pulse(neural_pulse)
-        # self.add_neural_pulse(neural_pulse.time_start, neural_pulse.amplitude, neural_pulse.frequency)
+      if signal.signal_trace_time is None:
+        for neural_pulse in signal.neural_pulses:
+          self.add_neural_pulse(neural_pulse)
+          # self.add_neural_pulse(neural_pulse.time_start, neural_pulse.amplitude, neural_pulse.frequency)
+      else:
+        self.signal_trace_time = signal.signal_trace_time
+        self.signal_trace_amplitude = signal.signal_trace_amplitude
       for sinusoidal_noise in signal.sinusoidal_noises:
         self.add_sinusoidal_noise(sinusoidal_noise)
 
-    self.evaluate_dressing = dressing_evaluator_factory(self.source_index_max, self.source_amplitude, self.source_frequency, self.source_phase, self.source_time_end_points, self.source_quadratic_shift, measurement_method)
+    self.evaluate_dressing = dressing_evaluator_factory(self.source_index_max, self.source_amplitude, self.source_frequency, self.source_phase, self.source_time_end_points, self.source_quadratic_shift, measurement_method, self.signal_trace_time, self.signal_trace_amplitude)
 
     # timeSource_index_max = int((signal.time_properties.time_end_points[1] - signal.time_properties.time_end_points[0])/signal.time_properties.time_step_source)
     # self.source = cuda.device_array((timeSource_index_max, 4), dtype = np.float64)
@@ -277,6 +281,9 @@ class SourceProperties:
     archive_group["source_type"] = np.asarray(self.source_type, dtype='|S32')
     archive_group["source_index_max"] = np.asarray([self.source_index_max])
     archive_group["source_quadratic_shift"] = np.asarray([self.source_quadratic_shift])
+    if self.signal_trace_time is not None:
+      archive_group["signal_trace_time"] = self.signal_trace_time
+      archive_group["signal_trace_amplitude"] = self.signal_trace_amplitude
 
   def add_dressing(self, signal:TestSignal, bias_amplitude = 460e3, signal_reconstruction:TestSignal = None):
     """
@@ -1122,7 +1129,7 @@ def get_frequency_amplitude_from_demodulation(time:np.ndarray, spin:np.ndarray, 
 #           )
 #       source[time_source_index, 3] = source_quadratic_shift
 
-def dressing_evaluator_factory(source_index_max, source_amplitude, source_frequency, source_phase, source_time_end_points, source_quadratic_shift = 0.0, measurement_method = MeasurementMethod.FARADAY_DEMODULATION):
+def dressing_evaluator_factory(source_index_max, source_amplitude, source_frequency, source_phase, source_time_end_points, source_quadratic_shift = 0.0, measurement_method = MeasurementMethod.FARADAY_DEMODULATION, signal_trace_time = None, signal_trace_amplitude = None):
   """
   Makes a field :obj:`callable` for :mod:`spinsim` of block pulses and false neural pulses. `field_modifier` sweeps the Rabi frequency.
 
@@ -1223,15 +1230,18 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
   elif measurement_method == MeasurementMethod.HARD_PULSE or measurement_method == MeasurementMethod.CORPSE:
     # time_interpolation = np.sqrt(np.linspace(0.001**2, 0.004**2))
     # time_interpolation = np.linspace(0.001, 0.004)
-    time_interpolation = np.arange(1e-3, 2e-3, 2e-6)
-    time_interpolation += 1e-6*np.sin(1e9*time_interpolation)
-    amplitude_interpolation = 1e3*math.tau*np.sin(math.tau*5e3*(time_interpolation - 1.5e-3))
-    amplitude_interpolation[time_interpolation < 1.5e-3] = 0
-    amplitude_interpolation[time_interpolation > 1.7e-3] = 0
+    # time_interpolation = np.arange(1e-3, 2e-3, 2e-6)
+    # time_interpolation += 1e-6*np.sin(1e9*time_interpolation)
+    # amplitude_interpolation = 1e3*math.tau*np.sin(math.tau*5e3*(time_interpolation - 1.5e-3))
+    # amplitude_interpolation[time_interpolation < 1.5e-3] = 0
+    # amplitude_interpolation[time_interpolation > 1.7e-3] = 0
     # plt.figure()
     # plt.plot(time_interpolation, amplitude_interpolation)
     # plt.show()
-    # interpolation_sampler = generate_interpolation_sampler(amplitude_interpolation, time_interpolation, order = 0)
+    run_sampler = False
+    if signal_trace_time is not None:
+      run_sampler = True
+      interpolation_sampler = generate_interpolation_sampler(signal_trace_amplitude, signal_trace_time, order = 3)
     def evaluate_dressing(time_sample, rabi_frequency, field_sample):
       field_sample[0] = 0
       field_sample[1] = 0
@@ -1247,7 +1257,8 @@ def dressing_evaluator_factory(source_index_max, source_amplitude, source_freque
             field_sample[spacial_index] += math.tau*amplitude*math.sin(math.tau*frequency*(time_sample - source_time_end_points[source_index, 0]) + source_phase[source_index, spacial_index])
       if field_sample.size > 2:
         field_sample[3] = math.tau*source_quadratic_shift
-      # interpolation_sampler(time_sample, rabi_frequency, field_sample)
+      if run_sampler:
+        interpolation_sampler(time_sample, rabi_frequency, field_sample)
   elif measurement_method == MeasurementMethod.HARD_PULSE_DETUNING_TEST:
     def evaluate_dressing(time_sample, detuning, field_sample):
       field_sample[0] = 0
