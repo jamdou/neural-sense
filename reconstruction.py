@@ -6,6 +6,8 @@ from numba import cuda
 import numba as nb
 import time as tm
 import scipy.optimize
+import scipy.signal
+import scipy.linalg
 
 import util
 from util import PrettyTritty as C
@@ -331,12 +333,22 @@ class Reconstruction():
     self.expected_error_measurement = expected_error_measurement
     self.backtrack_scale = backtrack_scale
 
-    # tolerable_error = 2*expected_error_measurement
+    # # tolerable_error = 2*expected_error_measurement
+    # tolerable_error = expected_error_measurement*np.sqrt(self.frequency_amplitude.size)
+    # gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+    # # gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
+    # self.reconstruction_step = 1/gradient_lipschitz
+    # self.fourier_scale = gradient_lipschitz
+    # expected_sparsity = 1/(expected_frequency*self.time_properties.time_step_coarse)
+    # expected_signal_energy = 0.5*(expected_amplitude**2)*expected_sparsity
+
+    self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+    fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
+    evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
+    gradient_lipschitz = 2*np.max(np.abs(scipy.linalg.svdvals(fourier_transform.copy_to_host()))**2)
+
     tolerable_error = expected_error_measurement*np.sqrt(self.frequency_amplitude.size)
-    gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
-    # gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
     self.reconstruction_step = 1/gradient_lipschitz
-    self.fourier_scale = gradient_lipschitz
     expected_sparsity = 1/(expected_frequency*self.time_properties.time_step_coarse)
     expected_signal_energy = 0.5*(expected_amplitude**2)*expected_sparsity
 
@@ -344,7 +356,6 @@ class Reconstruction():
     if is_fast:
       iteration_max_rate = 2*np.sqrt(iteration_max_rate)
     self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
-    
 
     # # self.fourier_scale = self.time_properties.time_step_coarse/(2*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0]))
     # # self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
@@ -357,16 +368,13 @@ class Reconstruction():
     # # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     # # self.iteration_max = int(math.ceil(2*np.sqrt((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     
-    # self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
-    self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
+    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
+    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
 
 
     self.shrink_size_max = 1e2
 
     C.print(f"reconstruction_step: {self.reconstruction_step}\niteration_max: {self.iteration_max}\nnorm_scale_factor: {self.norm_scale_factor}")
-    
-    fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
-    evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
     self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
     # # self.amplitude = 150*(1 - 2*np.fmod(self.time_properties.time_coarse/self.time_properties.time_coarse[1], 2))
@@ -1219,8 +1227,11 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   errors_method_snr = []
   errors_method_mf = []
   errors_method_mfd = []
+  errors_method_mfp = []
+  errors_method_mfpd = []
   expected_signal_power = np.mean(expected_signal.amplitude**2)
   mf_cutoff = expected_signal_power/2 # default
+  mfp_cutoff = mf_cutoff
   # mf_cutoff = expected_signal_power/4
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     errors_0 = []
@@ -1230,6 +1241,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     errors_snr = []
     errors_mf = []
     errors_mfd = []
+    errors_mfp = []
+    errors_mfpd = []
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
       error_0 = 0
       error_1 = 0
@@ -1238,6 +1251,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       error_snr = 0
       error_mf = 0
       error_mfd = 0
+      error_mfp = 0
+      error_mfpd = 0
       for random_index, random_seed in enumerate(random_seeds):
         amplitude = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index]
         error_0 += np.mean((amplitude == 0)*(expected_signal.amplitude != 0) + (amplitude != 0)*(expected_signal.amplitude == 0))
@@ -1245,9 +1260,15 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         error_2 += math.sqrt(np.mean((amplitude - expected_signal.amplitude)**2))
         error_sup += np.max(np.abs(amplitude - expected_signal.amplitude))
         error_snr += expected_signal_power/np.mean((amplitude - expected_signal.amplitude)**2)
+
         error_mf_current = np.mean(amplitude*expected_signal.amplitude)
         error_mf += error_mf_current
         error_mfd += error_mf_current >= mf_cutoff
+
+        error_mfp_current = np.max(np.abs(scipy.signal.correlate((amplitude - (error_mf_current/expected_signal_power)*expected_signal.amplitude), expected_signal.amplitude)))/expected_signal.amplitude.size
+        error_mfp += error_mfp_current
+        error_mfpd += error_mfp_current >= mfp_cutoff
+
       errors_0.append(error_0/random_seeds.size)
       errors_1.append(error_1/random_seeds.size)
       errors_2.append(error_2/random_seeds.size)
@@ -1255,6 +1276,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       errors_snr.append(10*np.log10(error_snr/random_seeds.size))
       errors_mf.append(error_mf/random_seeds.size)
       errors_mfd.append(error_mfd/random_seeds.size)
+      errors_mfp.append(error_mfp/random_seeds.size)
+      errors_mfpd.append(error_mfpd/random_seeds.size)
     
     errors_method_0.append(np.array(errors_0))
     errors_method_1.append(np.array(errors_1))
@@ -1263,6 +1286,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     errors_method_snr.append(np.array(errors_snr))
     errors_method_mf.append(np.array(errors_mf))
     errors_method_mfd.append(np.array(errors_mfd))
+    errors_method_mfp.append(np.array(errors_mfp))
+    errors_method_mfpd.append(np.array(errors_mfpd))
   C.finished("error analysis")   
 
   if archive:
@@ -1278,6 +1303,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       evaluation_group["error_snr"] = errors_method_snr[evaluation_method_index]
       evaluation_group["error_mf"] = errors_method_mf[evaluation_method_index]
       evaluation_group["error_mfd"] = errors_method_mfd[evaluation_method_index]
+      evaluation_group["error_mfp"] = errors_method_mfp[evaluation_method_index]
+      evaluation_group["error_mfpd"] = errors_method_mfpd[evaluation_method_index]
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
@@ -1444,19 +1471,37 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     plt.plot(numbers_of_samples, errors_method_mfd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
   plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Proportion of correct\ndetections (%)")
+  plt.ylabel(f"Proportion of reconstructions\n with correct detections (%)")
   plt.ylim(bottom = 0)
   plt.legend(legend)
   plt.subplot(2, 1, 1)
   plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mf_cutoff]*2, "y--")
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
-  # plt.xlabel("Number of samples used in the reconstruction")
   plt.ylabel(f"Average detection\nenergy ({units}$^2$)")
   plt.ylim(bottom = 0)
   plt.legend(["Threshold"] + legend)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf")
+  plt.draw()
+
+  plt.figure()
+  plt.subplot(2, 1, 2)
+  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    plt.plot(numbers_of_samples, errors_method_mfpd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+  plt.xlabel("Number of samples used in the reconstruction")
+  plt.ylabel(f"Proportion of reconstructions\nwith false positives (%)")
+  plt.ylim(bottom = 0)
+  plt.legend(legend)
+  plt.subplot(2, 1, 1)
+  plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mfp_cutoff]*2, "y--")
+  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    plt.plot(numbers_of_samples, errors_method_mfp[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
+  plt.ylabel(f"Average false positive\nenergy ({units}$^2$)")
+  plt.ylim(bottom = 0)
+  plt.legend(["Threshold"] + legend)
+  if archive:
+    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter false positives)", "number_of_samples_error_mfp")
   plt.draw()
 
   # plt.figure()

@@ -58,8 +58,8 @@ if __name__ == "__main__":
     scaled = util.ScaledParameters.new_from_experiment_time(experiment_time)
     # scaled = util.ScaledParameters(
     #   scaled_frequency = 5000,
-    #   scaled_density = 1/25,
-    #   scaled_samples = 10,
+    #   scaled_density = 1/1e5,
+    #   scaled_samples = 4,
     #   scaled_amplitude = 6000,#995.5/2,
     #   scaled_sweep = [5000/5, 25001],
     #   scaled_pulse_time_fraction = [0.2333333],
@@ -95,11 +95,11 @@ if __name__ == "__main__":
       # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
       scaled.get_neural_pulses(),
 
-      # [],
+      [],
       # [test_signal.SinusoidalNoise.new_detuning_noise(100)],
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
       # line_noise_model.generate_sinusoidal_noise(),
-      lab_harmonics,
+      # lab_harmonics,
       # line_noise_model.generate_sinusoidal_noise() + [test_signal.SinusoidalNoise.new_detuning_noise(191.79021534986123)] + lab_harmonics,
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
       # [
@@ -134,128 +134,128 @@ if __name__ == "__main__":
       signal_trace_amplitude = acquired_amplitude
     )
 
-    # # === Make state ===
-    # # [0.5, 1/np.sqrt(2), 0.5]
-    # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
-    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE, state_init = spinsim.SpinQuantumNumber.ONE.minus_z)
-    # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
+    # === Make state ===
+    # [0.5, 1/np.sqrt(2), 0.5]
+    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+    state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE, state_init = spinsim.SpinQuantumNumber.ONE.minus_z)
+    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
-    # cuda.profile_start()
-    # # === Run simulations ===
-    # # frequency = np.arange(70, 3071, 30)
-    # # frequency = np.arange(250, 2251, 3)
-    # # frequency = np.arange(250, 2000, 10.0)
-    # # frequency = np.arange(250, 2251, 50)
-    # # frequency = np.arange(250, 2251, 460e3/1e5)
-    # # frequency = np.arange(990, 1010, 0.02)
-    # # frequency = np.arange(253, 3251, 30)
-    # # frequency = np.arange(1000, 1003, 1)
-    # # frequency = np.arange(1000, 1001, 1)
-    # # frequency = np.arange(0, 1000000, 1)
-    # # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-    # frequency = scaled.sample_frequencies
-    # # frequency += 100#*(np.sin(frequency)**2)
+    cuda.profile_start()
+    # === Run simulations ===
+    # frequency = np.arange(70, 3071, 30)
+    # frequency = np.arange(250, 2251, 3)
+    # frequency = np.arange(250, 2000, 10.0)
+    # frequency = np.arange(250, 2251, 50)
+    # frequency = np.arange(250, 2251, 460e3/1e5)
+    # frequency = np.arange(990, 1010, 0.02)
+    # frequency = np.arange(253, 3251, 30)
+    # frequency = np.arange(1000, 1003, 1)
+    # frequency = np.arange(1000, 1001, 1)
+    # frequency = np.arange(0, 1000000, 1)
+    # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
+    frequency = scaled.sample_frequencies
+    # frequency += 100#*(np.sin(frequency)**2)
 
-    # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-    # simulation_manager.evaluate(False, False)
+    simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+    simulation_manager.evaluate(False, False)
 
-    # # === Experiment results ===
-    # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-    # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, 1e3, 3)
-    # # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
-    # experiment_results.write_to_archive(archive)
-    # experiment_results.plot(archive, signal_reconstruction, units = "nT")
+    # === Experiment results ===
+    experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+    # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, 1e3, 3)
+    # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
+    experiment_results.write_to_archive(archive)
+    experiment_results.plot(archive, signal_reconstruction, units = "nT")
 
     # # # === Make reconstructions ===
     # # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
     # # # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
     # # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
 
-    # # === ===                       === ===
-    # # === === Sweep reconstructions === ===
-    # # === ===                       === ===
+    # === ===                       === ===
+    # === === Sweep reconstructions === ===
+    # === ===                       === ===
 
-    # # # experiment_results.frequency -= 100
-    # # experiment_results = analysis.reverse_polarity(experiment_results)
-    # # # experiment_results = analysis.arcsin_filter(experiment_results)
-    # # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
-    # # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
-    # # # experiment_results = analysis.mode_filter(experiment_results)
-    # # # experiment_results = analysis.whitening_filter(experiment_results)
-    # # # experiment_results = analysis.mode_filter(experiment_results)
+    # # experiment_results.frequency -= 100
+    # experiment_results = analysis.reverse_polarity(experiment_results)
+    # # experiment_results = analysis.arcsin_filter(experiment_results)
+    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
+    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
+    # # experiment_results = analysis.mode_filter(experiment_results)
+    # # experiment_results = analysis.whitening_filter(experiment_results)
+    # # experiment_results = analysis.mode_filter(experiment_results)
+    # archive_empty = arch.Archive(archive_path, "")
+    # archive_empty.open_archive_file("20220208T171729")
+    # experiment_results = analysis.analyse_readout_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20220208T171729")), archive = archive)
     # # archive_empty = arch.Archive(archive_path, "")
-    # # archive_empty.open_archive_file("20220208T171729")
-    # # experiment_results = analysis.analyse_readout_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20220208T171729")), archive = archive)
-    # # # archive_empty = arch.Archive(archive_path, "")
-    # # # archive_empty.open_archive_file("20211216T113507")
-    # # # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507")), archive = archive)
-    # # # experiment_results.write_to_archive(archive)
-    # # # experiment_results.plot(archive, signal_reconstruction)
+    # # archive_empty.open_archive_file("20211216T113507")
+    # # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507")), archive = archive)
+    # # experiment_results.write_to_archive(archive)
+    # # experiment_results.plot(archive, signal_reconstruction)
 
-    # # experiment_results = analysis.remove_dc_detuning(experiment_results, scaled, archive)
-    # recon.run_reconstruction_subsample_sweep(
+    # experiment_results = analysis.remove_dc_detuning(experiment_results, scaled, archive)
+    recon.run_reconstruction_subsample_sweep(
+      expected_signal = signal_reconstruction,
+      # experiment_results = experiment_results,
+      experiment_results = arch.ExperimentResults(
+        frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
+        frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
+      ),
+      sweep_parameters = (0, 10000, 10),
+      archive = archive,
+      random_seeds = np.arange(10)*util.Seeds.metroid,
+      evaluation_methods = [
+        "least_squares",
+
+        "fista_backtracking",
+        # "fista_adaptive",
+        # "fista_informed_least_squares",
+        # "fadaptive_informed_least_squares",
+
+        # "ista_backtracking",
+        # "ista_adaptive",
+        # "ista_informed_least_squares",
+        # "adaptive_informed_least_squares",
+        # "adaptive_frequency_fit"
+      ],
+      expected_amplitude = scaled.amplitude,
+      expected_frequency = scaled.frequency,
+      expected_error_measurement = 0.05, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      frequency_line_noise = 50,
+      rabi_frequency_readout = 2e3,
+      frequency_cutoff_high = scaled.sweep[1],
+      # units = "nT"
+      units = "Hz"
+    )
+    # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
+    # recon.run_reconstruction_norm_scale_factor_sweep(
     #   expected_signal = signal_reconstruction,
-    #   # experiment_results = experiment_results,
-    #   experiment_results = arch.ExperimentResults(
-    #     frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
-    #     frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
-    #   ),
-    #   sweep_parameters = (0, 10000, 10),
+    #   experiment_results = experiment_results,
+    #   sweep_parameters = (0.001, 0.2, 25), #(0.01, 2, 50), #(1, 75, 100),
     #   archive = archive,
-    #   random_seeds = np.arange(10)*util.Seeds.metroid,
+    #   random_seeds = np.arange(1)*util.Seeds.metroid,
     #   evaluation_methods = [
-    #     "least_squares",
-
-    #     "fista_backtracking",
-    #     # "fista_adaptive",
+    #     # "fista_backtracking",
     #     # "fista_informed_least_squares",
-    #     # "fadaptive_informed_least_squares",
-
-    #     # "ista_backtracking",
-    #     # "ista_adaptive",
-    #     # "ista_informed_least_squares",
-    #     # "adaptive_informed_least_squares",
+    #     "fadaptive_informed_least_squares",
+    #     # "fista_adaptive"
     #     # "adaptive_frequency_fit"
     #   ],
     #   expected_amplitude = scaled.amplitude,
     #   expected_frequency = scaled.frequency,
-    #   expected_error_measurement = 5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-    #   norm_scale_factor_modifier = 1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+    #   expected_error_measurement = 5, #0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
     #   frequency_line_noise = 50,
-    #   rabi_frequency_readout = 2e3,
-    #   frequency_cutoff_high = scaled.sweep[1],
-    #   # units = "nT"
-    #   units = "Hz"
+    #   rabi_frequency_readout = 20e3,
+    #   number_of_samples = 10000,
+    #   frequency_cutoff_low = 0,
+    #   # frequency_cutoff_low = 20e3,
+    #   frequency_cutoff_high = 25e3 - 1,
+    #   # frequency_cutoff_high = 12.5e3 - 1,
+    #   # frequency_cutoff_high = 10e3 - 1,
+    #   frequency_fit_step_size = 1e-1,
+    #   # number_of_samples = 50
+    #   units = "nT"
     # )
-    # # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
-    # # recon.run_reconstruction_norm_scale_factor_sweep(
-    # #   expected_signal = signal_reconstruction,
-    # #   experiment_results = experiment_results,
-    # #   sweep_parameters = (0.001, 0.2, 25), #(0.01, 2, 50), #(1, 75, 100),
-    # #   archive = archive,
-    # #   random_seeds = np.arange(1)*util.Seeds.metroid,
-    # #   evaluation_methods = [
-    # #     # "fista_backtracking",
-    # #     # "fista_informed_least_squares",
-    # #     "fadaptive_informed_least_squares",
-    # #     # "fista_adaptive"
-    # #     # "adaptive_frequency_fit"
-    # #   ],
-    # #   expected_amplitude = scaled.amplitude,
-    # #   expected_frequency = scaled.frequency,
-    # #   expected_error_measurement = 5, #0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
-    # #   frequency_line_noise = 50,
-    # #   rabi_frequency_readout = 20e3,
-    # #   number_of_samples = 10000,
-    # #   frequency_cutoff_low = 0,
-    # #   # frequency_cutoff_low = 20e3,
-    # #   frequency_cutoff_high = 25e3 - 1,
-    # #   # frequency_cutoff_high = 12.5e3 - 1,
-    # #   # frequency_cutoff_high = 10e3 - 1,
-    # #   frequency_fit_step_size = 1e-1,
-    # #   # number_of_samples = 50
-    # #   units = "nT"
-    # # )
 
     # # === ===          === ===
     # # === === Analysis === ===
@@ -289,45 +289,45 @@ if __name__ == "__main__":
     # analysis.remove_dc_detuning(experiment_results, scaled, archive)
     
 
-    # === ===                 === ===
-    # === === Non compressive === ===
-    # === ===                 === ===
-    ramsey_results = sim.ramsey.simulate_ramsey(
-      scaled,
-      archive,
-      # lab_harmonics = lab_harmonics
-      # line_noise_model,
-      signal = signal
-    )
+    # # === ===                 === ===
+    # # === === Non compressive === ===
+    # # === ===                 === ===
+    # ramsey_results = sim.ramsey.simulate_ramsey(
+    #   scaled,
+    #   archive,
+    #   # lab_harmonics = lab_harmonics
+    #   # line_noise_model,
+    #   signal = signal
+    # )
+    # # ramsey_results.write_to_archive(archive)
+    # # ramsey_results.plot(archive)
+    # # ramsey_results = arch.RamseyResults.new_from_archive_time(
+    # #   archive,
+    # #   "20211202T124902" # Lab
+    # # )
+    # # empty_results = arch.RamseyResults.new_from_archive_time(
+    # #   archive,
+    # #   # "20220113T201129" # Simulation 1
+    # #   # "20220201T132717" # Simulation 2
+    # #   # "20220202T135356" # Simulation 3
+    # #   "20220202T184548" # Simulation 4
+    # # )
+
+    # # ramsey_results.time = ramsey_results.time[0:-1:2]
+    # # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
+    # # # empty_results.time = empty_results.time[0:-1:2]
+    # # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
+
+    # # print(ramsey_results.time)
+    # # print(empty_results.time)
+    # # print(ramsey_results.amplitude)
+    # # print(empty_results.amplitude)
+
+    # # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
+    # # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
     # ramsey_results.write_to_archive(archive)
     # ramsey_results.plot(archive)
-    # ramsey_results = arch.RamseyResults.new_from_archive_time(
-    #   archive,
-    #   "20211202T124902" # Lab
-    # )
-    # empty_results = arch.RamseyResults.new_from_archive_time(
-    #   archive,
-    #   # "20220113T201129" # Simulation 1
-    #   # "20220201T132717" # Simulation 2
-    #   # "20220202T135356" # Simulation 3
-    #   "20220202T184548" # Simulation 4
-    # )
-
-    # ramsey_results.time = ramsey_results.time[0:-1:2]
-    # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
-    # # empty_results.time = empty_results.time[0:-1:2]
-    # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
-
-    # print(ramsey_results.time)
-    # print(empty_results.time)
-    # print(ramsey_results.amplitude)
-    # print(empty_results.amplitude)
-
-    # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
-    # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
-    ramsey_results.write_to_archive(archive)
-    ramsey_results.plot(archive)
-    sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
+    # sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
 
     # === ===                      === ===
     # === === Benchmarks and tests === ===
