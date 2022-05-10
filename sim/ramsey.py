@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.signal
 import spinsim
 from sim.manager import generate_interpolation_sampler
 
@@ -99,6 +100,34 @@ def remove_line_noise_bias(results:arch.RamseyResults, empty_results:arch.Ramsey
 
   return arch.RamseyResults(time = time, amplitude = amplitude, archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, line noise bias removed")
 
+class RamseyComparisonResults():
+  def __init__(self, error_0, error_1, error_2, error_sup, error_snr, error_mf, error_mfd, error_mfp, error_mfpd, error_sensitivity, error_specificity):
+    self.error_0 = error_0
+    self.error_1 = error_1
+    self.error_2 = error_2
+    self.error_sup = error_sup
+    self.error_snr = error_snr
+    self.error_mf = error_mf
+    self.error_mfd = error_mfd
+    self.error_mfp = error_mfp
+    self.error_mfpd = error_mfpd
+    self.error_sensitivity = error_sensitivity
+    self.error_specificity = error_specificity
+
+  def write_to_file(self, archive:arch.Archive):
+    group = archive.archive_file.require_group("ramsey_comparison")
+    group.attrs["error_0"] = self.error_0
+    group.attrs["error_1"] = self.error_1
+    group.attrs["error_2"] = self.error_2
+    group.attrs["error_sup"] = self.error_sup
+    group.attrs["error_snr"] = self.error_snr
+    group.attrs["error_mf"] = self.error_mf
+    group.attrs["error_mfd"] = self.error_mfd
+    group.attrs["error_mfp"] = self.error_mfp
+    group.attrs["error_mfpd"] = self.error_mfpd
+    group.attrs["error_sensitivity"] = self.error_sensitivity
+    group.attrs["error_specificity"] = self.error_specificity
+
 def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSignal, archive:arch.Archive = None, units = "Hz"):
   time = []
   measured_amplitude = []
@@ -115,24 +144,52 @@ def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSi
 
   expected_signal_power = np.mean(signal.amplitude**2)
   mf_cutoff = expected_signal_power/2 # default
+  mfp_cutoff = mf_cutoff
 
   error_0 = np.mean((amplitude == 0)*(signal.amplitude != 0) + (amplitude != 0)*(signal.amplitude == 0))
   error_1 = np.mean(np.abs(amplitude - signal.amplitude))
   error_2 = math.sqrt(np.mean((amplitude - signal.amplitude)**2))
   error_sup = np.max(np.abs(amplitude - signal.amplitude))
   error_snr = expected_signal_power/np.mean((amplitude - signal.amplitude)**2)
+
   error_mf = np.mean(amplitude*signal.amplitude)
   error_mfd = error_mf >= mf_cutoff
 
+  error_mfp = np.max(np.abs(scipy.signal.correlate((amplitude - (error_mf/expected_signal_power)*signal.amplitude), signal.amplitude)))/signal.amplitude.size
+  error_mfpd = error_mfp >= mfp_cutoff
+
+  expected_frequency = 5e3
+  expected_amplitude = 1e3
+  template_time = np.arange(0, 1/expected_frequency, signal.time_properties.time_step_coarse)
+  template_amplitude = expected_amplitude*np.sin(math.tau*expected_frequency*template_time)
+  matched_cutoff = np.sum(template_amplitude**2)/2
+  matched_ground_truth = np.abs(scipy.signal.correlate(signal.amplitude, template_amplitude)) >= matched_cutoff
+  matched_decision = np.abs(scipy.signal.correlate(amplitude, template_amplitude)) >= matched_cutoff
+  if np.sum(matched_ground_truth) > 0:
+    error_sensitivity = np.sum(np.logical_and(matched_ground_truth, matched_decision))/np.sum(matched_ground_truth)
+  else:
+    error_sensitivity = 1
+  if np.sum(np.logical_not(matched_ground_truth)) > 0:
+    error_specificity = np.sum(np.logical_and(np.logical_not(matched_ground_truth), np.logical_not(matched_decision)))/np.sum(np.logical_not(matched_ground_truth))
+  else:
+    error_specificity = 1
+
+  ramsey_comparison_results = RamseyComparisonResults(error_0, error_1, error_2, error_sup, error_snr, error_mf, error_mfd, error_mfp, error_mfpd, error_sensitivity, error_specificity)
   if archive is not None:
-    group = archive.archive_file.require_group("ramsey_comparison")
-    group.attrs["error_0"] = error_0
-    group.attrs["error_1"] = error_1
-    group.attrs["error_2"] = error_2
-    group.attrs["error_sup"] = error_sup
-    group.attrs["error_snr"] = error_snr
-    group.attrs["error_mf"] = error_mf
-    group.attrs["error_mfd"] = error_mfd
+    ramsey_comparison_results.write_to_file(archive)
+
+  
+  # if archive is not None:
+  #   group = archive.archive_file.require_group("ramsey_comparison")
+  #   group.attrs["error_0"] = error_0
+  #   group.attrs["error_1"] = error_1
+  #   group.attrs["error_2"] = error_2
+  #   group.attrs["error_sup"] = error_sup
+  #   group.attrs["error_snr"] = error_snr
+  #   group.attrs["error_mf"] = error_mf
+  #   group.attrs["error_mfd"] = error_mfd
+  #   group.attrs["error_mfp"] = error_mfp
+  #   group.attrs["error_mfpd"] = error_mfpd
 
   if "Hz" in units:
     unit_factor = 1
@@ -149,10 +206,16 @@ def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSi
   C.print(f"Average error: {error_1*unit_factor} {units}")
   C.print(f"RMS error: {error_2*unit_factor} {units}")
   C.print(f"Maximum error: {error_sup*unit_factor} {units}")
-  C.print(f"Signal to error ratio: {10*math.log10(error_snr)} dB")
+  if error_snr > 0:
+    C.print(f"Signal to error ratio: {10*math.log10(error_snr)} dB")
   C.print(f"Matched filter response: {error_mf*unit_factor**2} {units}^2")
   C.print(f"Matched filter threshold: {mf_cutoff*unit_factor**2} {units}^2")
   C.print(f"Detected: {error_mfd}")
+  C.print(f"Matched filter false positive response: {error_mfp*unit_factor**2} {units}^2")
+  C.print(f"Matched filter false positive threshold: {mfp_cutoff*unit_factor**2} {units}^2")
+  C.print(f"Detected: {error_mfpd}")
+  C.print(f"Sensitivity: {error_sensitivity*100} %")
+  C.print(f"Specificity: {error_specificity*100} %")
 
   plt.figure()
   plt.plot(time, original_amplitude, "k-", label = "Original")
@@ -163,6 +226,8 @@ def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSi
   if archive:
     archive.write_plot("Ramsey comparison", "ramsey_comparison")
   plt.draw()
+
+  return ramsey_comparison_results
 
 def mode_filter(results:arch.RamseyResults):
   amplitude = results.amplitude.copy()
