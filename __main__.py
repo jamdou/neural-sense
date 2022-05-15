@@ -69,7 +69,7 @@ if __name__ == "__main__":
     scaled.write_to_file(archive)
 
     line_noise_model = test_signal.LineNoiseModel.new_from_experiment_time(experiment_time[0:15])
-    lab_harmonics = test_signal.SinusoidalNoise.new_lab_harmonics_from_experiment_time(experiment_time[0:15])
+    # lab_harmonics = test_signal.SinusoidalNoise.new_lab_harmonics_from_experiment_time(experiment_time[0:15])
     # print(line_noise_model.a)
     # print(line_noise_model.p)
 
@@ -86,8 +86,8 @@ if __name__ == "__main__":
     # time_properties_reconstruction = test_signal.TimeProperties(scaled.time_step, scaled.time_step/np.ceil(scaled.time_step/1e-7), 1e-8, [scaled.time_step, scaled.time_step*10])
     acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
     acquired_time, acquired_amplitude = acquired_signal.subsample(scaled.time_step, archive, "Hz")
-    # scaled.amplitude *= 0.06
-    # acquired_amplitude *= 0.06
+    scaled.amplitude *= 10
+    acquired_amplitude *= 10
 
     signal = test_signal.TestSignal(
       # [],
@@ -95,10 +95,10 @@ if __name__ == "__main__":
       # [test_signal.NeuralPulse(0.02333333, 70.0, 1000)],
       scaled.get_neural_pulses(),
 
-      [],
+      # [],
       # [test_signal.SinusoidalNoise.new_detuning_noise(100)],
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500])],
-      # line_noise_model.generate_sinusoidal_noise(),
+      line_noise_model.generate_sinusoidal_noise(),
       # lab_harmonics,
       # line_noise_model.generate_sinusoidal_noise() + [test_signal.SinusoidalNoise.new_detuning_noise(191.79021534986123)] + lab_harmonics,
       # [test_signal.SinusoidalNoise.new_line_noise([0.0, 0.0, 500], phase = [0.0, 0.0, -math.pi/4])],
@@ -138,35 +138,35 @@ if __name__ == "__main__":
       # signal_trace_amplitude = acquired_amplitude[1:]
     )
 
-    # # === Make state ===
-    # # [0.5, 1/np.sqrt(2), 0.5]
-    # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
-    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE, state_init = spinsim.SpinQuantumNumber.ONE.minus_z)
-    # # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
+    # === Make state ===
+    # [0.5, 1/np.sqrt(2), 0.5]
+    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE)
+    state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.ONE, state_init = spinsim.SpinQuantumNumber.ONE.minus_z)
+    # state_properties = sim.manager.StateProperties(spinsim.SpinQuantumNumber.HALF)
 
-    # cuda.profile_start()
-    # # === Run simulations ===
-    # # frequency = np.arange(70, 3071, 30)
-    # # frequency = np.arange(250, 2251, 3)
-    # # frequency = np.arange(250, 2000, 10.0)
-    # # frequency = np.arange(250, 2251, 50)
-    # # frequency = np.arange(250, 2251, 460e3/1e5)
-    # # frequency = np.arange(990, 1010, 0.02)
-    # # frequency = np.arange(253, 3251, 30)
-    # # frequency = np.arange(1000, 1003, 1)
-    # # frequency = np.arange(1000, 1001, 1)
-    # # frequency = np.arange(0, 1000000, 1)
-    # # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
-    # frequency = scaled.sample_frequencies
-    # # frequency += 100#*(np.sin(frequency)**2)
+    cuda.profile_start()
+    # === Run simulations ===
+    # frequency = np.arange(70, 3071, 30)
+    # frequency = np.arange(250, 2251, 3)
+    # frequency = np.arange(250, 2000, 10.0)
+    # frequency = np.arange(250, 2251, 50)
+    # frequency = np.arange(250, 2251, 460e3/1e5)
+    # frequency = np.arange(990, 1010, 0.02)
+    # frequency = np.arange(253, 3251, 30)
+    # frequency = np.arange(1000, 1003, 1)
+    # frequency = np.arange(1000, 1001, 1)
+    # frequency = np.arange(0, 1000000, 1)
+    # frequency = np.arange(scaled.sweep[0], min(max(scaled.sweep[1], 0), scaled.samples*scaled.frequency/2), scaled.frequency_step) # ---- Scaled
+    frequency = scaled.sample_frequencies
+    # frequency += 100#*(np.sin(frequency)**2)
 
-    # simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
-    # simulation_manager.evaluate(False, False)
+    simulation_manager = sim.manager.SimulationManager(signal, frequency, archive, state_properties = state_properties, measurement_method = sim.manager.MeasurementMethod.HARD_PULSE, signal_reconstruction = signal_reconstruction)
+    simulation_manager.evaluate(False, False)
 
     # === Experiment results ===
-    # experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
-    # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, 1e3, 3)
-    experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
+    experiment_results = arch.ExperimentResults.new_from_simulation_manager(simulation_manager)
+    experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, 1e3, 3)
+    # experiment_results = arch.ExperimentResults.new_from_archive_time(archive, experiment_time[0:15])
     experiment_results.write_to_archive(archive)
     experiment_results.plot(archive, signal_reconstruction, units = "nT")
 
@@ -179,19 +179,19 @@ if __name__ == "__main__":
     # === ===                 === ===
     # === === Non compressive === ===
     # === ===                 === ===
-    # ramsey_results = sim.ramsey.simulate_ramsey(
-    #   scaled,
-    #   archive,
-    #   # lab_harmonics = lab_harmonics
-    #   # line_noise_model,
-    #   signal = signal
-    # )
+    ramsey_results = sim.ramsey.simulate_ramsey(
+      scaled,
+      archive,
+      # lab_harmonics = lab_harmonics
+      line_noise_model,
+      signal = signal
+    )
     # ramsey_results.write_to_archive(archive)
     # ramsey_results.plot(archive)
-    ramsey_results = arch.RamseyResults.new_from_archive_time(
-      archive,
-      "20211202T124902" # Lab
-    )
+    # ramsey_results = arch.RamseyResults.new_from_archive_time(
+    #   archive,
+    #   "20211202T124902" # Lab
+    # )
     # empty_results = arch.RamseyResults.new_from_archive_time(
     #   archive,
     #   # "20220113T201129" # Simulation 1
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # === ===                       === ===
 
     # # experiment_results.frequency -= 100
-    experiment_results = analysis.reverse_polarity(experiment_results)
+    # experiment_results = analysis.reverse_polarity(experiment_results)
     # # experiment_results = analysis.arcsin_filter(experiment_results)
     # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
     # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
@@ -265,7 +265,7 @@ if __name__ == "__main__":
       ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
-      expected_error_measurement = 0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      expected_error_measurement = 0.1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
       norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,

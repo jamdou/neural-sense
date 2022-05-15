@@ -1566,11 +1566,11 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     plt.plot(numbers_of_samples, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
   plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Sensitivity (%)")
+  plt.ylabel(f"Recall (%)")
   plt.legend(legend)
   plt.ylim(bottom = -5, top = 105)
   if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Sensitivity)", "number_of_samples_error_sensitivity")
+    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Recall)", "number_of_samples_error_sensitivity")
   plt.draw()
 
   plt.figure()
@@ -1585,6 +1585,21 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   plt.ylim(bottom = -5, top = 105)
   if archive:
     archive.write_plot("Sweeping the number of samples used in reconstruction\n(Specificity)", "number_of_samples_error_specificity")
+  plt.draw()
+
+  plt.figure()
+  plt.subplot()
+  if ramsey_comparison_results is not None:
+    plt.plot([(ramsey_comparison_results.error_specificity - 1)*100], [ramsey_comparison_results.error_specificity*100], "mo")
+  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    plt.plot((1 - errors_method_specificity[evaluation_method_index])*100, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+  plt.ylabel("Recall (%)")
+  plt.xlabel("Fall out (%)")
+  plt.legend(legend)
+  plt.ylim(bottom = -5, top = 105)
+  plt.xlim(left = -5, right = 105)
+  if archive:
+    archive.write_plot("ROC parametrised by\nnumber of samples", "number_of_samples_error_roc_sweep")
   plt.draw()
 
   # plt.figure()
