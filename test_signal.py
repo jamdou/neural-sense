@@ -754,6 +754,20 @@ class AcquiredSignal():
 
     return AcquiredSignal(time, amplitude, signal_tap, to_hz)
 
+  @staticmethod
+  def new_from_experiment_time(archive, archive_time):
+    from archive import Archive
+    archive_previous = Archive(archive.archive_path[:-25], "")
+    archive_previous.open_archive_file(archive_time)
+    group = archive_previous.archive_file.require_group("lab_monitor_trace")
+
+    time = np.asarray(group["time"])
+    amplitude = np.asarray(group["amplitude"])
+    amplification = group["amplitude"].attrs["amplification"]
+    signal_tap = f"analogue in (V) <- preamp (x{amplification} V/V) <- By_aux (V)"
+    to_hz = 1/group["amplitude"].attrs["conversion"]
+
+    return AcquiredSignal(time, amplitude, signal_tap, to_hz)
   
   def write_to_file(self, archive):
     group = archive.archive_file.require_group("acquired_signal")
