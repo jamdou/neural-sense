@@ -765,7 +765,7 @@ class AcquiredSignal():
     amplitude = np.asarray(group["amplitude"])
     amplification = group["amplitude"].attrs["amplification"]
     signal_tap = f"analogue in (V) <- preamp (x{amplification} V/V) <- By_aux (V)"
-    to_hz = 1/group["amplitude"].attrs["conversion"]
+    to_hz = group["amplitude"].attrs["conversion"]
 
     return AcquiredSignal(time, amplitude, signal_tap, to_hz)
   

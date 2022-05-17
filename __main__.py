@@ -43,8 +43,9 @@ if __name__ == "__main__":
     archive.new_archive_file()
 
     # === Scaled protocol ===
+    experiment_time = "20220517T111439" # One signal, By_aux
     # experiment_time = "20220516T171054" # One signal, 250 Hz
-    experiment_time = "20220516T142033" # One signal, 100 shots, quantised waveform
+    # experiment_time = "20220516T142033" # One signal, 100 shots, quantised waveform
     # experiment_time = "20220203T123716q" # One signal, DDS, frequency corrected
     # experiment_time = "20220127T131147q" # Two signals, DDS, frequency corrected
     # experiment_time = "20220118T131910q" # One signal, all shots, DDS
@@ -89,8 +90,8 @@ if __name__ == "__main__":
     # acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
     acquired_signal = test_signal.AcquiredSignal.new_from_experiment_time(archive, experiment_time[0:15])
     acquired_time, acquired_amplitude = acquired_signal.subsample(scaled.time_step, archive, "Hz")
-    # scaled.amplitude *= 10
-    # acquired_amplitude *= 10
+    # scaled.amplitude   *= 0.25
+    # acquired_amplitude *= 0.25
 
     signal = test_signal.TestSignal(
       # [],
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     # === ===                       === ===
 
     # # experiment_results.frequency -= 100
-    experiment_results = analysis.reverse_polarity(experiment_results)
+    # experiment_results = analysis.reverse_polarity(experiment_results)
     # # experiment_results = analysis.arcsin_filter(experiment_results)
     # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
     # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
@@ -268,7 +269,7 @@ if __name__ == "__main__":
       ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
-      expected_error_measurement = 0.1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      expected_error_measurement = 1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
       norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,

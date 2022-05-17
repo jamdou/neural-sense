@@ -279,7 +279,17 @@ class ScaledParameters():
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.2333333]
       )
+    elif archive_time in ["20220517T111439"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 10000],
+        scaled_pulse_time_fraction = [0.732]
+      )
     return scaled
+    
 
   def print(self):
     print(f"{'freq_n':>10s} {'period_n':>10s} {'time_n':>10s} {'sig_dense':>10s} {'samp_num':>10s} {'freq_d_s':>10s} {'freq_d_e':>10s} {'dfreq_d':>10s} {'time_e':>10s}")
