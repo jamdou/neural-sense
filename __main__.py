@@ -281,7 +281,8 @@ if __name__ == "__main__":
       ],
       metrics = [
         "rmse",
-        "confusion_fixed"
+        "confusion_fixed",
+        "roc"
       ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,

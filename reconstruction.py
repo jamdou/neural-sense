@@ -1228,6 +1228,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   C.starting("error analysis")
   expected_signal_power = np.mean(expected_signal.amplitude**2)
 
+  template_time = np.arange(0, 1/expected_frequency, expected_signal.time_properties.time_step_coarse)
+  template_amplitude = expected_amplitude*np.sin(math.tau*expected_frequency*template_time)
+  matched_cutoff = np.sum(template_amplitude**2)/2
+  
   if "rmse" in metrics:
     errors_method_2 = []
     stdevs_method_2 = []
@@ -1261,11 +1265,20 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     errors_method_specificity = []
     stdevs_method_sensitivity = []
     stdevs_method_specificity = []
+    method_matched_decisions = []
 
-  template_time = np.arange(0, 1/expected_frequency, expected_signal.time_properties.time_step_coarse)
-  template_amplitude = expected_amplitude*np.sin(math.tau*expected_frequency*template_time)
-  matched_cutoff = np.sum(template_amplitude**2)/2
-  matched_ground_truth = np.abs(scipy.signal.correlate(expected_signal.amplitude, template_amplitude)) >= matched_cutoff
+    matched_ground_truth = scipy.signal.correlate(expected_signal.amplitude, template_amplitude) >= matched_cutoff
+
+  if "roc" in metrics:
+    errors_method_roc_auc = []
+    errors_method_roc_sensitivity = []
+    errors_method_roc_specificity = []
+    stdevs_method_roc_auc = []
+    stdevs_method_roc_sensitivity = []
+    stdevs_method_roc_specificity = []
+
+    roc_cutoff_max = np.sum(template_amplitude**2)*2
+    roc_ground_truth = scipy.signal.correlate(expected_signal.amplitude, template_amplitude) >= matched_cutoff
 
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
     if "rmse" in metrics:
@@ -1294,6 +1307,14 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       errors_specificity = []
       stdevs_sensitivity = []
       stdevs_specificity = []
+      matched_decisions = []
+    if "roc" in metrics:
+      errors_roc_sensitivity = []
+      errors_roc_specificity = []
+      errors_roc_auc = []
+      stdevs_roc_sensitivity = []
+      stdevs_roc_specificity = []
+      stdevs_roc_auc = []
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
       if "rmse" in metrics:
         error_2 = []
@@ -1310,6 +1331,11 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       if "confusion_fixed" in metrics:
         error_sensitivity = []
         error_specificity = []
+        matched_decision = []
+      if "roc" in metrics:
+        roc_sensitivities = []
+        roc_specificities = []
+        error_roc_auc = []
       for random_index, random_seed in enumerate(random_seeds):
         amplitude = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index]
         if "rmse" in metrics:
@@ -1329,15 +1355,43 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
           error_mfpd.append(error_mfp_current >= mfp_cutoff)
 
         if "confusion_fixed" in metrics:
-          matched_decision = np.abs(scipy.signal.correlate(amplitude, template_amplitude)) >= matched_cutoff
+          matched_decision.append(scipy.signal.correlate(amplitude, template_amplitude) >= matched_cutoff)
           if np.sum(matched_ground_truth) > 0:
-            error_sensitivity.append(np.sum(np.logical_and(matched_ground_truth, matched_decision))/np.sum(matched_ground_truth))
+            error_sensitivity.append(np.sum(np.logical_and(matched_ground_truth, matched_decision[-1]))/np.sum(matched_ground_truth))
           else:
             error_sensitivity.append(1)
           if np.sum(np.logical_not(matched_ground_truth)) > 0:
-            error_specificity.append(np.sum(np.logical_and(np.logical_not(matched_ground_truth), np.logical_not(matched_decision)))/np.sum(np.logical_not(matched_ground_truth)))
+            error_specificity.append(np.sum(np.logical_and(np.logical_not(matched_ground_truth), np.logical_not(matched_decision[-1])))/np.sum(np.logical_not(matched_ground_truth)))
           else:
             error_specificity.append(1)
+
+        if "roc" in metrics:
+          roc_sensitivity = [1]
+          roc_specificity = [0]
+          for roc_cutoff in np.linspace(0, roc_cutoff_max, 20):
+            roc_decision = scipy.signal.correlate(amplitude, template_amplitude) >= roc_cutoff
+            if np.sum(roc_ground_truth) > 0:
+              roc_sensitivity.append(np.sum(np.logical_and(roc_ground_truth, roc_decision))/np.sum(roc_ground_truth))
+            else:
+              roc_sensitivity.append(1)
+            if np.sum(np.logical_not(roc_ground_truth)) > 0:
+              roc_specificity.append(np.sum(np.logical_and(np.logical_not(roc_ground_truth), np.logical_not(roc_decision)))/np.sum(np.logical_not(roc_ground_truth)))
+            else:
+              roc_specificity.append(1)
+          roc_sensitivity.append(0)
+          roc_specificity.append(1)
+          roc_sensitivity.append(0)
+          roc_specificity.append(0)
+
+          roc_auc = 0
+          for roc_index in range(len(roc_sensitivity) - 2):
+            roc_auc += roc_sensitivity[roc_index + 1]*roc_specificity[roc_index] - roc_sensitivity[roc_index]*roc_specificity[roc_index + 1]
+          roc_auc /= 2
+
+          roc_sensitivities.append(np.array(roc_sensitivity))
+          roc_specificities.append(np.array(roc_specificity))
+          error_roc_auc.append(roc_auc)
+
       if "rmse" in metrics:
         errors_2.append(np.mean(error_2))
         stdevs_2.append(np.std(error_2))
@@ -1364,6 +1418,14 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         errors_specificity.append(np.mean(error_specificity))
         stdevs_sensitivity.append(np.std(error_sensitivity))
         stdevs_specificity.append(np.std(error_specificity))
+        matched_decisions.append(np.mean(matched_decision, axis = 0))
+      if "roc" in metrics:
+        errors_roc_auc.append(np.mean(error_roc_auc))
+        errors_roc_sensitivity.append(np.mean(roc_sensitivities, axis = 0))
+        errors_roc_specificity.append(np.mean(roc_specificities, axis = 0))
+        stdevs_roc_auc.append(np.std(error_roc_auc))
+        stdevs_roc_sensitivity.append(np.std(roc_sensitivities, axis = 0))
+        stdevs_roc_specificity.append(np.std(roc_specificities, axis = 0))
     
     if "rmse" in metrics:
       errors_method_2.append(np.array(errors_2))
@@ -1391,6 +1453,14 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       errors_method_specificity.append(np.array(errors_specificity))
       stdevs_method_sensitivity.append(np.array(stdevs_sensitivity))
       stdevs_method_specificity.append(np.array(stdevs_specificity))
+      method_matched_decisions.append(np.array(matched_decisions))
+    if "roc" in metrics:
+      errors_method_roc_auc.append        (np.array(errors_roc_auc))
+      errors_method_roc_sensitivity.append(np.array(errors_roc_sensitivity))
+      errors_method_roc_specificity.append(np.array(errors_roc_specificity))
+      stdevs_method_roc_auc.append        (np.array(stdevs_roc_auc))
+      stdevs_method_roc_sensitivity.append(np.array(stdevs_roc_sensitivity))
+      stdevs_method_roc_specificity.append(np.array(stdevs_roc_specificity))
   C.finished("error analysis")   
 
   if archive:
@@ -1425,6 +1495,13 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         evaluation_group["error_specificity"] = errors_method_specificity[evaluation_method_index]
         evaluation_group["stdev_sensitivity"] = stdevs_method_sensitivity[evaluation_method_index]
         evaluation_group["stdev_specificity"] = stdevs_method_specificity[evaluation_method_index]
+      if "roc" in metrics:
+        evaluation_group["error_roc_auc"] =         errors_roc_auc[evaluation_method_index]
+        evaluation_group["error_roc_sensitivity"] = errors_roc_sensitivity[evaluation_method_index]
+        evaluation_group["error_roc_specificity"] = errors_roc_specificity[evaluation_method_index]
+        evaluation_group["stdev_roc_auc"] =         stdevs_roc_auc[evaluation_method_index]
+        evaluation_group["stdev_roc_sensitivity"] = stdevs_roc_sensitivity[evaluation_method_index]
+        evaluation_group["stdev_roc_specificity"] = stdevs_roc_specificity[evaluation_method_index]
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
@@ -1691,7 +1768,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     plt.figure()
     plt.subplot()
     if ramsey_comparison_results is not None:
-      plt.plot([(ramsey_comparison_results.error_specificity - 1)*100], [ramsey_comparison_results.error_specificity*100], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+      plt.plot([(ramsey_comparison_results.error_specificity - 1)*100], [ramsey_comparison_results.error_sensitivity*100], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
       plt.plot((1 - errors_method_specificity[evaluation_method_index])*100, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
     plt.ylabel("Recall (%)")
@@ -1702,6 +1779,44 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     if archive:
       archive.write_plot("ROC parametrised by\nnumber of samples", "number_of_samples_error_roc_sweep")
     plt.draw()
+
+    time_mesh -= 0.5/expected_frequency
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      for reconstruction_index, number_of_samples in enumerate(sweep_samples):
+          amplitude_mesh[reconstruction_index, :] = method_matched_decisions[evaluation_method_index][reconstruction_index, 0:99]
+      
+      plt.figure()
+      plt.subplot(2, 1, 2)
+      neural_pulse = expected_signal.neural_pulses[0]
+      plt.pcolormesh(time_mesh*1e3, samples_mesh, amplitude_mesh, cmap = "Reds", vmin = 0, vmax = 1)
+      plt.xlabel("Time (ms)")
+      plt.ylabel("Number of samples")
+      plt.xlim([(neural_pulse.time_start - 0.5/neural_pulse.frequency)*1e3, (neural_pulse.time_start + 1.5/neural_pulse.frequency)*1e3])
+      colour_bar = plt.colorbar()
+      colour_bar.set_label(f"Negative - Positive")
+
+      plt.subplot(2, 1, 1)
+      plt.pcolormesh(time_mesh*1e3, samples_mesh, amplitude_mesh, cmap = "Reds", vmin = 0, vmax = 1)
+      plt.ylabel("Number of samples")
+
+      if archive:
+        archive.write_plot(f"Sweeping the number of samples used in reconstruction\nPulse detection, {evaluation_method_labels[evaluation_method]}", f"number_of_samples_error_confusion_fixed_{evaluation_method}")
+      plt.draw()
+    time_mesh += 0.5/expected_frequency
+
+  if "roc" in metrics:
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.figure()
+      # plt.plot((1 - errors_method_roc_specificity[evaluation_method_index][0])*100, errors_method_roc_sensitivity[evaluation_method_index][0]*100, evaluation_method_legend[evaluation_method])
+      for samples_index in range(numbers_of_samples.size):
+        plt.fill((1 - errors_method_roc_specificity[evaluation_method_index][samples_index])*100, errors_method_roc_sensitivity[evaluation_method_index][samples_index]*100, color = evaluation_method_legend[evaluation_method][0], alpha = 1/numbers_of_samples.size)
+      plt.ylabel("Recall (%)")
+      plt.xlabel("Fall out (%)")
+      plt.ylim(bottom = -5, top = 105)
+      plt.xlim(left = -5, right = 105)
+      if archive:
+        archive.write_plot(f"ROC, {evaluation_method}", f"number_of_samples_error_roc_{evaluation_method}")
+      plt.draw()
 
   # plt.figure()
   # plt.subplot()
