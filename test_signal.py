@@ -766,6 +766,8 @@ class AcquiredSignal():
     amplification = group["amplitude"].attrs["amplification"]
     signal_tap = f"analogue in (V) <- preamp (x{amplification} V/V) <- By_aux (V)"
     to_hz = group["amplitude"].attrs["conversion"]
+    if archive_time < "20220531T000000":
+      to_hz /= 2.5707876186376266
 
     return AcquiredSignal(time, amplitude, signal_tap, to_hz)
   

@@ -288,17 +288,17 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 1000,
+        scaled_amplitude = 389, #1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [-5]
       )
     # One pulse
-    elif archive_time in ["20220517T111439", "20220520T143240"]:
+    elif archive_time in ["20220517T111439", "20220520T143240", "20220520T160357"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 1000,
+        scaled_amplitude = 389, #1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.732]
       )
@@ -308,7 +308,7 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 1000,
+        scaled_amplitude = 389, #1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.254, 0.666]
       )

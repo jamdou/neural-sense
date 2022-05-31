@@ -834,6 +834,43 @@ def analyse_readout_noise(experiment_results:arch.ExperimentResults, experiment_
 
   return experiment_results_modified
 
+def get_ground_truth_amplitude_from_ramsey(ramsey_results:arch.RamseyResults, signal:test_signal.TestSignal, archive:arch.Archive = None):
+  C.starting("ground truth from Ramsey analysis")
+
+  time = []
+  amplitude_measured = []
+  amplitude_ramsey = []
+
+  for time_instance, amplitude_instance in zip(ramsey_results.time, ramsey_results.amplitude):
+    for time_instance_measured, amplitude_instance_measured in zip(signal.time_properties.time_coarse, signal.amplitude):
+      if np.isclose(time_instance_measured, time_instance):
+        time.append(time_instance)
+        amplitude_measured.append(amplitude_instance_measured)
+        amplitude_ramsey.append(amplitude_instance)
+  
+  time = np.array(time)
+  amplitude_measured = np.array(amplitude_measured)
+  amplitude_ramsey = np.array(amplitude_ramsey)
+
+  scale_error = np.sum(amplitude_measured*amplitude_measured)/np.sum(amplitude_measured*amplitude_ramsey)
+  C.print(f"scale_error: {scale_error}")
+
+  if archive is not None:
+    group = archive.archive_file.require_group("ground_truth_from_ramsey")
+    group.attrs["scale_error"] = scale_error
+
+  plt.figure()
+  plt.plot(time/1e-3, amplitude_ramsey, "r-", label = "Ramsey")
+  plt.plot(time/1e-3, amplitude_measured/scale_error, "b-", label = "Ground truth (monitor voltage), rescaled")
+  plt.legend()
+  plt.xlabel("Time (ms)")
+  plt.ylabel("Signal amplitude (Hz)")
+  plt.draw()
+
+  if archive is not None:
+    archive.write_plot(f"Finding ground truth amplitude\nScale error: {scale_error}", "ground_truth_from_ramsey")
+
+  C.finished("ground truth from Ramsey analysis")
 
 def reverse_polarity(experiment_results:arch.ExperimentResults):
   return arch.ExperimentResults(

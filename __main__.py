@@ -47,6 +47,8 @@ if __name__ == "__main__":
     experiment_time = "20220517T111439" # One signal, By_aux, Compressive
     # experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
 
+    # experiment_time = "20220520T160357" # Repeated Ramsey for calibration
+
     # experiment_time = "20220516T171054" # One signal, 250 Hz
     # experiment_time = "20220516T142033" # One signal, 100 shots, quantised waveform
     # experiment_time = "20220203T123716q" # One signal, DDS, frequency corrected
@@ -93,8 +95,8 @@ if __name__ == "__main__":
     # acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
     acquired_signal = test_signal.AcquiredSignal.new_from_experiment_time(archive, experiment_time[0:15])
     acquired_time, acquired_amplitude = acquired_signal.subsample(scaled.time_step, archive, "Hz")
-    scaled.amplitude   *= 0.4
-    acquired_amplitude *= 0.4
+    # scaled.amplitude   *= 0.4
+    # acquired_amplitude *= 0.4
 
     signal = test_signal.TestSignal(
       # [],
@@ -202,6 +204,8 @@ if __name__ == "__main__":
       # "20220523T124716" # No signals, By_aux, Ramsey
       "20220520T143240" # One signal, By_aux, Ramsey
       # "20220523T141012" # Two signals, By_aux, Ramsey
+
+      # "20220520T160357" # Repeated Ramsey calibration
     )
     # empty_results = arch.RamseyResults.new_from_archive_time(
     #   archive,
@@ -275,6 +279,10 @@ if __name__ == "__main__":
         # "adaptive_informed_least_squares",
         # "adaptive_frequency_fit"
       ],
+      metrics = [
+        "rmse",
+        "confusion_fixed"
+      ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
       expected_error_measurement = 1.8, #1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
@@ -330,9 +338,9 @@ if __name__ == "__main__":
     # # analysis.find_neural_signal_size(analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive), scaled, archive)
     # # analysis.sweep_sensing_coherence(archive = archive, time_properties = time_properties_reconstruction, sweep_parameters = [2, None, 1])
     # # experiment_results_empty = arch.ExperimentResults.new_from_archive_time("20211216T113507")
-    # archive_empty = arch.Archive(archive_path, "")
-    # archive_empty.open_archive_file("20220520T124644")
-    # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20220520T124644"), archive = archive)
+    # # archive_empty = arch.Archive(archive_path, "")
+    # # archive_empty.open_archive_file("20220520T124644")
+    # # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20220520T124644"), archive = archive)
     # # analysis.draw_dst(archive, time_properties_reconstruction)
 
     # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
@@ -344,6 +352,8 @@ if __name__ == "__main__":
     # # acquired_signal.write_to_file(archive)
     # # acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
     # # acquired_signal.subsample(scaled.time_step, archive, "Hz")
+
+    # analysis.get_ground_truth_amplitude_from_ramsey(ramsey_results, signal_reconstruction, archive)
 
     # # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 

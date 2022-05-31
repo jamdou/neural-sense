@@ -1146,7 +1146,7 @@ def subtract_constant(amplitude, constant):
   if time_index < amplitude.size:
     amplitude[time_index] -= constant
 
-def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None, frequency_fit_step_size = 1, units = "Hz",ramsey_comparison_results:RamseyComparisonResults = None):
+def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None, frequency_fit_step_size = 1, units = "Hz",ramsey_comparison_results:RamseyComparisonResults = None, metrics = ["rmse"]):
   reconstruction = Reconstruction(expected_signal.time_properties)
 
   random_seeds = np.array(random_seeds)
@@ -1226,21 +1226,41 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   C.finished("number of samples sweep")
 
   C.starting("error analysis")
-  errors_method_0 = []
-  errors_method_1 = []
-  errors_method_2 = []
-  errors_method_sup = []
-  errors_method_snr = []
-  errors_method_mf = []
-  errors_method_mfd = []
-  errors_method_mfp = []
-  errors_method_mfpd = []
-  errors_method_sensitivity = []
-  errors_method_specificity = []
   expected_signal_power = np.mean(expected_signal.amplitude**2)
-  mf_cutoff = expected_signal_power/2 # default
-  mfp_cutoff = mf_cutoff
-  # mf_cutoff = expected_signal_power/4
+
+  if "rmse" in metrics:
+    errors_method_2 = []
+    stdevs_method_2 = []
+
+  if "norms" in metrics:
+    errors_method_0 = []
+    errors_method_1 = []
+    errors_method_sup = []
+    errors_method_snr = []
+    stdevs_method_0 = []
+    stdevs_method_1 = []
+    stdevs_method_sup = []
+    stdevs_method_snr = []
+
+  if "mf" in metrics:
+    errors_method_mf = []
+    errors_method_mfd = []
+    errors_method_mfp = []
+    errors_method_mfpd = []
+    stdevs_method_mf = []
+    stdevs_method_mfd = []
+    stdevs_method_mfp = []
+    stdevs_method_mfpd = []
+
+    mf_cutoff = expected_signal_power/2 # default
+    mfp_cutoff = mf_cutoff
+    # mf_cutoff = expected_signal_power/4
+
+  if "confusion_fixed" in metrics:
+    errors_method_sensitivity = []
+    errors_method_specificity = []
+    stdevs_method_sensitivity = []
+    stdevs_method_specificity = []
 
   template_time = np.arange(0, 1/expected_frequency, expected_signal.time_properties.time_step_coarse)
   template_amplitude = expected_amplitude*np.sin(math.tau*expected_frequency*template_time)
@@ -1248,83 +1268,129 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
   matched_ground_truth = np.abs(scipy.signal.correlate(expected_signal.amplitude, template_amplitude)) >= matched_cutoff
 
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    errors_0 = []
-    errors_1 = []
-    errors_2 = []
-    errors_sup = []
-    errors_snr = []
-    errors_mf = []
-    errors_mfd = []
-    errors_mfp = []
-    errors_mfpd = []
-    errors_sensitivity = []
-    errors_specificity = []
+    if "rmse" in metrics:
+      errors_2 = []
+      stdevs_2 = []
+    if "norms" in metrics:
+      errors_0 = []
+      errors_1 = []
+      errors_sup = []
+      errors_snr = []
+      stdevs_0 = []
+      stdevs_1 = []
+      stdevs_sup = []
+      stdevs_snr = []
+    if "mf" in metrics:
+      errors_mf = []
+      errors_mfd = []
+      errors_mfp = []
+      errors_mfpd = []
+      stdevs_mf = []
+      stdevs_mfd = []
+      stdevs_mfp = []
+      stdevs_mfpd = []
+    if "confusion_fixed" in metrics:
+      errors_sensitivity = []
+      errors_specificity = []
+      stdevs_sensitivity = []
+      stdevs_specificity = []
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
-      error_0 = 0
-      error_1 = 0
-      error_2 = 0
-      error_sup = 0
-      error_snr = 0
-      error_mf = 0
-      error_mfd = 0
-      error_mfp = 0
-      error_mfpd = 0
-      error_sensitivity = 0
-      error_specificity = 0
+      if "rmse" in metrics:
+        error_2 = []
+      if "norms" in metrics:
+        error_0   = []
+        error_1   = []
+        error_sup = []
+        error_snr = []
+      if "mf" in metrics:
+        error_mf    = []
+        error_mfd   = []
+        error_mfp   = []
+        error_mfpd  = []
+      if "confusion_fixed" in metrics:
+        error_sensitivity = []
+        error_specificity = []
       for random_index, random_seed in enumerate(random_seeds):
         amplitude = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index]
-        error_0 += np.mean((amplitude == 0)*(expected_signal.amplitude != 0) + (amplitude != 0)*(expected_signal.amplitude == 0))
-        error_1 += np.mean(np.abs(amplitude - expected_signal.amplitude))
-        error_2 += math.sqrt(np.mean((amplitude - expected_signal.amplitude)**2))
-        error_sup += np.max(np.abs(amplitude - expected_signal.amplitude))
-        error_snr += expected_signal_power/np.mean((amplitude - expected_signal.amplitude)**2)
+        if "rmse" in metrics:
+          error_2.append(math.sqrt(np.mean((amplitude - expected_signal.amplitude)**2)))
+        if "norms" in metrics:
+          error_0.append(np.mean((amplitude == 0)*(expected_signal.amplitude != 0) + (amplitude != 0)*(expected_signal.amplitude == 0)))
+          error_1.append(np.mean(np.abs(amplitude - expected_signal.amplitude)))
+          error_sup.append(np.max(np.abs(amplitude - expected_signal.amplitude)))
+          error_snr.append(expected_signal_power/np.mean((amplitude - expected_signal.amplitude)**2))
+        if "mf" in metrics:
+          error_mf_current = np.mean(amplitude*expected_signal.amplitude)
+          error_mf.append(np.mean(amplitude*expected_signal.amplitude))
+          error_mfd.append(error_mf_current >= mf_cutoff)
 
-        error_mf_current = np.mean(amplitude*expected_signal.amplitude)
-        error_mf += error_mf_current
-        error_mfd += error_mf_current >= mf_cutoff
+          error_mfp_current = np.max(np.abs(scipy.signal.correlate((amplitude - (error_mf_current/expected_signal_power)*expected_signal.amplitude), expected_signal.amplitude)))/expected_signal.amplitude.size
+          error_mfp.append(error_mfp_current)
+          error_mfpd.append(error_mfp_current >= mfp_cutoff)
 
-        error_mfp_current = np.max(np.abs(scipy.signal.correlate((amplitude - (error_mf_current/expected_signal_power)*expected_signal.amplitude), expected_signal.amplitude)))/expected_signal.amplitude.size
-        error_mfp += error_mfp_current
-        error_mfpd += error_mfp_current >= mfp_cutoff
-
-        matched_decision = np.abs(scipy.signal.correlate(amplitude, template_amplitude)) >= matched_cutoff
-        if np.sum(matched_ground_truth) > 0:
-          error_sensitivity += np.sum(np.logical_and(matched_ground_truth, matched_decision))/np.sum(matched_ground_truth)
-        else:
-          error_sensitivity += 1
-        if np.sum(np.logical_not(matched_ground_truth)) > 0:
-          error_specificity += np.sum(np.logical_and(np.logical_not(matched_ground_truth), np.logical_not(matched_decision)))/np.sum(np.logical_not(matched_ground_truth))
-        else:
-          error_specificity += 1
-        # if not plotted:
-        #   plt.figure()
-        #   plt.plot(error_sensitivity)
-        #   plt.draw()
-        #   plotted = True
-
-      errors_0.append(error_0/random_seeds.size)
-      errors_1.append(error_1/random_seeds.size)
-      errors_2.append(error_2/random_seeds.size)
-      errors_sup.append(error_sup/random_seeds.size)
-      errors_snr.append(10*np.log10(error_snr/random_seeds.size))
-      errors_mf.append(error_mf/random_seeds.size)
-      errors_mfd.append(error_mfd/random_seeds.size)
-      errors_mfp.append(error_mfp/random_seeds.size)
-      errors_mfpd.append(error_mfpd/random_seeds.size)
-      errors_sensitivity.append(error_sensitivity/random_seeds.size)
-      errors_specificity.append(error_specificity/random_seeds.size)
+        if "confusion_fixed" in metrics:
+          matched_decision = np.abs(scipy.signal.correlate(amplitude, template_amplitude)) >= matched_cutoff
+          if np.sum(matched_ground_truth) > 0:
+            error_sensitivity.append(np.sum(np.logical_and(matched_ground_truth, matched_decision))/np.sum(matched_ground_truth))
+          else:
+            error_sensitivity.append(1)
+          if np.sum(np.logical_not(matched_ground_truth)) > 0:
+            error_specificity.append(np.sum(np.logical_and(np.logical_not(matched_ground_truth), np.logical_not(matched_decision)))/np.sum(np.logical_not(matched_ground_truth)))
+          else:
+            error_specificity.append(1)
+      if "rmse" in metrics:
+        errors_2.append(np.mean(error_2))
+        stdevs_2.append(np.std(error_2))
+      if "norms" in metrics:
+        errors_0.append   (np.mean(error_0))
+        errors_1.append   (np.mean(error_1))
+        errors_sup.append (np.mean(error_sup))
+        errors_snr.append (10*np.log10(np.mean(error_snr)))
+        stdevs_0.append   (np.std(error_0))
+        stdevs_1.append   (np.std(error_1))
+        stdevs_sup.append (np.std(error_sup))
+        stdevs_snr.append (10*np.log10(np.std(error_snr)))
+      if "mf" in metrics:
+        errors_mf.append  (np.mean(error_mf))
+        errors_mfd.append (np.mean(error_mfd))
+        errors_mfp.append (np.mean(error_mfp))
+        errors_mfpd.append(np.mean(error_mfpd))
+        stdevs_mf.append  (np.std(error_mf))
+        stdevs_mfd.append (np.std(error_mfd))
+        stdevs_mfp.append (np.std(error_mfp))
+        stdevs_mfpd.append(np.std(error_mfpd))
+      if "confusion_fixed" in metrics:
+        errors_sensitivity.append(np.mean(error_sensitivity))
+        errors_specificity.append(np.mean(error_specificity))
+        stdevs_sensitivity.append(np.std(error_sensitivity))
+        stdevs_specificity.append(np.std(error_specificity))
     
-    errors_method_0.append(np.array(errors_0))
-    errors_method_1.append(np.array(errors_1))
-    errors_method_2.append(np.array(errors_2))
-    errors_method_sup.append(np.array(errors_sup))
-    errors_method_snr.append(np.array(errors_snr))
-    errors_method_mf.append(np.array(errors_mf))
-    errors_method_mfd.append(np.array(errors_mfd))
-    errors_method_mfp.append(np.array(errors_mfp))
-    errors_method_mfpd.append(np.array(errors_mfpd))
-    errors_method_sensitivity.append(np.array(errors_sensitivity))
-    errors_method_specificity.append(np.array(errors_specificity))
+    if "rmse" in metrics:
+      errors_method_2.append(np.array(errors_2))
+      stdevs_method_2.append(np.array(stdevs_2))
+    if "norms" in metrics:
+      errors_method_0.append  (np.array(errors_0))
+      errors_method_1.append  (np.array(errors_1))
+      errors_method_sup.append(np.array(errors_sup))
+      errors_method_snr.append(np.array(errors_snr))
+      stdevs_method_0.append  (np.array(stdevs_0))
+      stdevs_method_1.append  (np.array(stdevs_1))
+      stdevs_method_sup.append(np.array(stdevs_sup))
+      stdevs_method_snr.append(np.array(stdevs_snr))
+    if "mf" in metrics:
+      errors_method_mf.append   (np.array(errors_mf))
+      errors_method_mfd.append  (np.array(errors_mfd))
+      errors_method_mfp.append  (np.array(errors_mfp))
+      errors_method_mfpd.append (np.array(errors_mfpd))
+      stdevs_method_mf.append   (np.array(stdevs_mf))
+      stdevs_method_mfd.append  (np.array(stdevs_mfd))
+      stdevs_method_mfp.append  (np.array(stdevs_mfp))
+      stdevs_method_mfpd.append (np.array(stdevs_mfpd))
+    if "confusion_fixed" in metrics:
+      errors_method_sensitivity.append(np.array(errors_sensitivity))
+      errors_method_specificity.append(np.array(errors_specificity))
+      stdevs_method_sensitivity.append(np.array(stdevs_sensitivity))
+      stdevs_method_specificity.append(np.array(stdevs_specificity))
   C.finished("error analysis")   
 
   if archive:
@@ -1333,20 +1399,36 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     # sweep_group["coherence_coefficient"] = [coherence_coefficient]
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
       evaluation_group = sweep_group.require_group(evaluation_method)
-      evaluation_group["error_0"] = errors_method_0[evaluation_method_index]
-      evaluation_group["error_1"] = errors_method_1[evaluation_method_index]
-      evaluation_group["error_2"] = errors_method_2[evaluation_method_index]
-      evaluation_group["error_sup"] = errors_method_sup[evaluation_method_index]
-      evaluation_group["error_snr"] = errors_method_snr[evaluation_method_index]
-      evaluation_group["error_mf"] = errors_method_mf[evaluation_method_index]
-      evaluation_group["error_mfd"] = errors_method_mfd[evaluation_method_index]
-      evaluation_group["error_mfp"] = errors_method_mfp[evaluation_method_index]
-      evaluation_group["error_mfpd"] = errors_method_mfpd[evaluation_method_index]
-      evaluation_group["error_sensitivity"] = errors_method_sensitivity[evaluation_method_index]
-      evaluation_group["error_specificity"] = errors_method_specificity[evaluation_method_index]
+      if "rmse" in metrics:
+        evaluation_group["error_2"] = errors_method_2[evaluation_method_index]
+        evaluation_group["stdev_2"] = stdevs_method_2[evaluation_method_index]
+      if "norms" in metrics:
+        evaluation_group["error_0"]   = errors_method_0[evaluation_method_index]
+        evaluation_group["error_1"]   = errors_method_1[evaluation_method_index]
+        evaluation_group["error_sup"] = errors_method_sup[evaluation_method_index]
+        evaluation_group["error_snr"] = errors_method_snr[evaluation_method_index]
+        evaluation_group["stdev_0"]   = stdevs_method_0[evaluation_method_index]
+        evaluation_group["stdev_1"]   = stdevs_method_1[evaluation_method_index]
+        evaluation_group["stdev_sup"] = stdevs_method_sup[evaluation_method_index]
+        evaluation_group["stdev_snr"] = stdevs_method_snr[evaluation_method_index]
+      if "mf" in metrics:
+        evaluation_group["error_mf"]    = errors_method_mf[evaluation_method_index]
+        evaluation_group["error_mfd"]   = errors_method_mfd[evaluation_method_index]
+        evaluation_group["error_mfp"]   = errors_method_mfp[evaluation_method_index]
+        evaluation_group["error_mfpd"]  = errors_method_mfpd[evaluation_method_index]
+        evaluation_group["stdev_mf"]    = stdevs_method_mf[evaluation_method_index]
+        evaluation_group["stdev_mfd"]   = stdevs_method_mfd[evaluation_method_index]
+        evaluation_group["stdev_mfp"]   = stdevs_method_mfp[evaluation_method_index]
+        evaluation_group["stdev_mfpd"]  = stdevs_method_mfpd[evaluation_method_index]
+      if "confusion_fixed" in metrics:
+        evaluation_group["error_sensitivity"] = errors_method_sensitivity[evaluation_method_index]
+        evaluation_group["error_specificity"] = errors_method_specificity[evaluation_method_index]
+        evaluation_group["stdev_sensitivity"] = stdevs_method_sensitivity[evaluation_method_index]
+        evaluation_group["stdev_specificity"] = stdevs_method_specificity[evaluation_method_index]
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
+    "ramsey" : "Ramsey",
 
     "fista_ayanzadeh" : "FISTA (Ayanzadeh)",
     "fista_adaptive" : "FISTA (Adaptive)",
@@ -1366,16 +1448,17 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     "adaptive_informed_least_squares" : "Sandwich",
     "adaptive_frequency_fit" : "Sandwich frequency fit"
   }
-  legend = []
-  for evaluation_method in evaluation_methods:
-    legend.append(evaluation_method_labels[evaluation_method])
-  if ramsey_comparison_results is not None:
-    legend = ["Ramsey"] + legend
+  # legend = []
+  # for evaluation_method in evaluation_methods:
+  #   legend.append(evaluation_method_labels[evaluation_method])
+  # if ramsey_comparison_results is not None:
+  #   legend = ["Ramsey"] + legend
 
   evaluation_method_legend = {
-    "least_squares" : "b-",
+    "least_squares" : "g-",
+    "ramsey" : "mo",
 
-    "fista_backtracking" : "c-x",
+    "fista_backtracking" : "r-",
     "fista_fit" : "r-x",
     "fista_ayanzadeh" : "y-x",
     "fista_adaptive" : "g-x",
@@ -1407,6 +1490,9 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
   expected_amplitude *= unit_factor
 
+  uncertainty_alpha = 0.25
+
+  # === Plot heat maps ===
   time_mesh, samples_mesh = np.meshgrid(reconstruction.time_properties.time_coarse, sweep_samples)
   amplitude_mesh = np.empty((len(sweep_samples), amplitudes[0].size))
   residual_mesh = np.empty_like(amplitude_mesh)
@@ -1451,161 +1537,171 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       archive.write_plot(f"Sweeping the number of samples used in reconstruction\n{evaluation_method_labels[evaluation_method]}, Residual", f"number_of_samples_{evaluation_method}_residual")
     plt.draw()
   
-  plt.figure()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_0], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_0[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-  plt.ylim(bottom = 0)
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel("Proportion of points incorrectly classified (%)")
-  plt.legend(legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Determing the support)", "number_of_samples_error_0")
-  plt.draw()
+  # === Plot metrics ===
+  if "rmse" in metrics:
+    plt.figure()
+    plt.subplot()
+    plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [math.sqrt(expected_signal_power)]*2, "b--", label = "Ground truth RMS amplitude")
+    if ramsey_comparison_results is not None:
+      if hasattr(ramsey_comparison_results, "error_2"):
+        plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_2], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.fill_between(numbers_of_samples, (errors_method_2[evaluation_method_index] + stdevs_method_2[evaluation_method_index])*unit_factor, (errors_method_2[evaluation_method_index] - stdevs_method_2[evaluation_method_index])*unit_factor, facecolor = evaluation_method_legend[evaluation_method][0], alpha = uncertainty_alpha)
+      plt.plot(numbers_of_samples, errors_method_2[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"RMS error compared to expected signal ({units})")
+    plt.legend()
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(2-norm)", "number_of_samples_error_2")
+    plt.draw()
 
-  plt.figure()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_1], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_1[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
-  plt.ylim(bottom = 0)
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Average error compared to expected signal ({units})")
-  plt.legend(legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(1-norm)", "number_of_samples_error_1")
-  plt.draw()
+  if "norms" in metrics:
+    plt.figure()
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_0], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_0[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel("Proportion of points incorrectly classified (%)")
+    plt.legend(legend)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Determing the support)", "number_of_samples_error_0")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_2], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_2[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
-  plt.ylim(bottom = 0)
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"RMS error compared to expected signal ({units})")
-  plt.legend(legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(2-norm)", "number_of_samples_error_2")
-  plt.draw()
+    plt.figure()
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_1], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_1[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Average error compared to expected signal ({units})")
+    plt.legend(legend)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(1-norm)", "number_of_samples_error_1")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_sup], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_sup[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
-  plt.ylim(bottom = 0)
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Largest error compared to expected signal ({units})")
-  plt.legend(legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
-  plt.draw()
+    plt.figure()
+    plt.subplot()
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_sup], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_sup[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method])
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Largest error compared to expected signal ({units})")
+    plt.legend(legend)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(sup-norm)", "number_of_samples_error_sup")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_snr], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_snr[evaluation_method_index], evaluation_method_legend[evaluation_method])
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Signal to noise ratio (dB)")
-  plt.legend(legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Signal to noise ratio)", "number_of_samples_error_snr")
-  plt.draw()
+    plt.figure()
+    plt.subplot()
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_snr], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_snr[evaluation_method_index], evaluation_method_legend[evaluation_method])
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Signal to noise ratio (dB)")
+    plt.legend(legend)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Signal to noise ratio)", "number_of_samples_error_snr")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot(2, 1, 2)
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfd], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_mfd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Proportion of reconstructions\n with correct detections (%)")
-  plt.ylim(bottom = 0)
-  plt.legend(legend)
-  plt.subplot(2, 1, 1)
-  plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mf_cutoff]*2, "y--")
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mf], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
-  plt.ylabel(f"Average detection\nenergy ({units}$^2$)")
-  plt.ylim(bottom = 0)
-  plt.legend(["Threshold"] + legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf")
-  plt.draw()
+  if "mf" in metrics:
+    plt.figure()
+    plt.subplot(2, 1, 2)
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfd], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_mfd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Proportion of reconstructions\n with correct detections (%)")
+    plt.ylim(bottom = 0)
+    plt.legend(legend)
+    plt.subplot(2, 1, 1)
+    plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mf_cutoff]*2, "y--")
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mf], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
+    plt.ylabel(f"Average detection\nenergy ({units}$^2$)")
+    plt.ylim(bottom = 0)
+    plt.legend(["Threshold"] + legend)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot(2, 1, 2)
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfpd*100], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_mfpd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Proportion of reconstructions\nwith false positives (%)")
-  plt.ylim(bottom = 0)
-  plt.legend(legend)
-  plt.subplot(2, 1, 1)
-  plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mfp_cutoff]*2, "y--")
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfp], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_mfp[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
-  plt.ylabel(f"Average false positive\nenergy ({units}$^2$)")
-  plt.ylim(bottom = 0)
-  plt.legend(["Threshold"] + legend)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter false positives)", "number_of_samples_error_mfp")
-  plt.draw()
+    plt.figure()
+    plt.subplot(2, 1, 2)
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfpd*100], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_mfpd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Proportion of reconstructions\nwith false positives (%)")
+    plt.ylim(bottom = 0)
+    plt.legend(legend)
+    plt.subplot(2, 1, 1)
+    plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mfp_cutoff]*2, "y--")
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfp], "mo")
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot(numbers_of_samples, errors_method_mfp[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
+    plt.ylabel(f"Average false positive\nenergy ({units}$^2$)")
+    plt.ylim(bottom = 0)
+    plt.legend(["Threshold"] + legend)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter false positives)", "number_of_samples_error_mfp")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_sensitivity*100], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Recall (%)")
-  plt.legend(legend)
-  plt.ylim(bottom = -5, top = 105)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Recall)", "number_of_samples_error_sensitivity")
-  plt.draw()
+  if "confusion_fixed" in metrics:
+    plt.figure()
+    plt.subplot()
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_sensitivity*100], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.fill_between(numbers_of_samples, (errors_method_sensitivity[evaluation_method_index] + stdevs_method_sensitivity[evaluation_method_index])*100, (errors_method_sensitivity[evaluation_method_index] - stdevs_method_sensitivity[evaluation_method_index])*100, facecolor = evaluation_method_legend[evaluation_method][0], alpha = uncertainty_alpha)
+      plt.plot(numbers_of_samples, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Recall (%)")
+    plt.legend()
+    plt.ylim(bottom = -5, top = 105)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Recall)", "number_of_samples_error_sensitivity")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot()
-  if ramsey_comparison_results is not None:
-    plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_specificity*100], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot(numbers_of_samples, errors_method_specificity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-  plt.xlabel("Number of samples used in the reconstruction")
-  plt.ylabel(f"Specificity (%)")
-  plt.legend(legend)
-  plt.ylim(bottom = -5, top = 105)
-  if archive:
-    archive.write_plot("Sweeping the number of samples used in reconstruction\n(Specificity)", "number_of_samples_error_specificity")
-  plt.draw()
+    plt.figure()
+    plt.subplot()
+    if ramsey_comparison_results is not None:
+      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_specificity*100], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.fill_between(numbers_of_samples, (errors_method_specificity[evaluation_method_index] + stdevs_method_specificity[evaluation_method_index])*100, (errors_method_specificity[evaluation_method_index] - stdevs_method_specificity[evaluation_method_index])*100, facecolor = evaluation_method_legend[evaluation_method][0], alpha = uncertainty_alpha)
+      plt.plot(numbers_of_samples, errors_method_specificity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Specificity (%)")
+    plt.legend()
+    plt.ylim(bottom = -5, top = 105)
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Specificity)", "number_of_samples_error_specificity")
+    plt.draw()
 
-  plt.figure()
-  plt.subplot()
-  if ramsey_comparison_results is not None:
-    plt.plot([(ramsey_comparison_results.error_specificity - 1)*100], [ramsey_comparison_results.error_specificity*100], "mo")
-  for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-    plt.plot((1 - errors_method_specificity[evaluation_method_index])*100, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-  plt.ylabel("Recall (%)")
-  plt.xlabel("Fall out (%)")
-  plt.legend(legend)
-  plt.ylim(bottom = -5, top = 105)
-  plt.xlim(left = -5, right = 105)
-  if archive:
-    archive.write_plot("ROC parametrised by\nnumber of samples", "number_of_samples_error_roc_sweep")
-  plt.draw()
+    plt.figure()
+    plt.subplot()
+    if ramsey_comparison_results is not None:
+      plt.plot([(ramsey_comparison_results.error_specificity - 1)*100], [ramsey_comparison_results.error_specificity*100], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.plot((1 - errors_method_specificity[evaluation_method_index])*100, errors_method_sensitivity[evaluation_method_index]*100, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
+    plt.ylabel("Recall (%)")
+    plt.xlabel("Fall out (%)")
+    plt.legend()
+    plt.ylim(bottom = -5, top = 105)
+    plt.xlim(left = -5, right = 105)
+    if archive:
+      archive.write_plot("ROC parametrised by\nnumber of samples", "number_of_samples_error_roc_sweep")
+    plt.draw()
 
   # plt.figure()
   # plt.subplot()
