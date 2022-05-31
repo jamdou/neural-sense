@@ -43,7 +43,10 @@ if __name__ == "__main__":
     archive.new_archive_file()
 
     # === Scaled protocol ===
-    experiment_time = "20220517T111439" # One signal, By_aux
+    # experiment_time = "20220520T124644" # No signals, By_aux, Compressive
+    experiment_time = "20220517T111439" # One signal, By_aux, Compressive
+    # experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
+
     # experiment_time = "20220516T171054" # One signal, 250 Hz
     # experiment_time = "20220516T142033" # One signal, 100 shots, quantised waveform
     # experiment_time = "20220203T123716q" # One signal, DDS, frequency corrected
@@ -51,7 +54,7 @@ if __name__ == "__main__":
     # experiment_time = "20220118T131910q" # One signal, all shots, DDS
     # experiment_time = "20220118T124831" # Two signals, all shots, DDS
     # experiment_time = "20211216T113507" # No signal, all shots
-    # experiment_results = "20220208T171729" # No signal, readout only
+    # experiment_time = "20220208T171729" # No signal, readout only
     # experiment_time = "20211209T143732" # One signal, all shots
     # experiment_time = "20211216T161624" # Two signals, all shots
     # experiment_time = "20211117T155508" # One signal, up to 14kHz
@@ -90,8 +93,8 @@ if __name__ == "__main__":
     # acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
     acquired_signal = test_signal.AcquiredSignal.new_from_experiment_time(archive, experiment_time[0:15])
     acquired_time, acquired_amplitude = acquired_signal.subsample(scaled.time_step, archive, "Hz")
-    # scaled.amplitude   *= 0.25
-    # acquired_amplitude *= 0.25
+    scaled.amplitude   *= 0.4
+    acquired_amplitude *= 0.4
 
     signal = test_signal.TestSignal(
       # [],
@@ -180,9 +183,9 @@ if __name__ == "__main__":
     # # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
 
 
-    # # === ===                 === ===
-    # # === === Non compressive === ===
-    # # === ===                 === ===
+    # === ===                 === ===
+    # === === Non compressive === ===
+    # === ===                 === ===
     # ramsey_results = sim.ramsey.simulate_ramsey(
     #   scaled,
     #   archive,
@@ -190,35 +193,40 @@ if __name__ == "__main__":
     #   line_noise_model,
     #   signal = signal
     # )
-    # # ramsey_results.write_to_archive(archive)
-    # # ramsey_results.plot(archive)
-    # # ramsey_results = arch.RamseyResults.new_from_archive_time(
-    # #   archive,
-    # #   "20211202T124902" # Lab
-    # # )
-    # # empty_results = arch.RamseyResults.new_from_archive_time(
-    # #   archive,
-    # #   # "20220113T201129" # Simulation 1
-    # #   # "20220201T132717" # Simulation 2
-    # #   # "20220202T135356" # Simulation 3
-    # #   "20220202T184548" # Simulation 4
-    # # )
-
-    # # ramsey_results.time = ramsey_results.time[0:-1:2]
-    # # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
-    # # # empty_results.time = empty_results.time[0:-1:2]
-    # # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
-
-    # # print(ramsey_results.time)
-    # # print(empty_results.time)
-    # # print(ramsey_results.amplitude)
-    # # print(empty_results.amplitude)
-
-    # # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
-    # # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
     # ramsey_results.write_to_archive(archive)
     # ramsey_results.plot(archive)
-    # ramsey_comparison_results = sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
+    ramsey_results = arch.RamseyResults.new_from_archive_time(
+      archive,
+      # "20211202T124902" # Lab
+
+      # "20220523T124716" # No signals, By_aux, Ramsey
+      "20220520T143240" # One signal, By_aux, Ramsey
+      # "20220523T141012" # Two signals, By_aux, Ramsey
+    )
+    # empty_results = arch.RamseyResults.new_from_archive_time(
+    #   archive,
+    #   # "20220113T201129" # Simulation 1
+    #   # "20220201T132717" # Simulation 2
+    #   # "20220202T135356" # Simulation 3
+    #   "20220202T184548" # Simulation 4
+    # )
+
+    # ramsey_results.time = ramsey_results.time[0:-1:2]
+    # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
+    # # empty_results.time = empty_results.time[0:-1:2]
+    # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
+
+    # print(ramsey_results.time)
+    # print(empty_results.time)
+    # print(ramsey_results.amplitude)
+    # print(empty_results.amplitude)
+
+    # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
+    # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
+    ramsey_results = sim.ramsey.remove_dc(ramsey_results)
+    ramsey_results.write_to_archive(archive)
+    ramsey_results.plot(archive)
+    ramsey_comparison_results = sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
 
 
     # === ===                       === ===
@@ -269,14 +277,14 @@ if __name__ == "__main__":
       ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
-      expected_error_measurement = 1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-      norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      expected_error_measurement = 1.8, #1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      norm_scale_factor_modifier = 1.75, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,
       frequency_cutoff_high = scaled.sweep[1],
       # units = "nT"
       units = "Hz",
-      # ramsey_comparison_results = ramsey_comparison_results
+      ramsey_comparison_results = ramsey_comparison_results
     )
     # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
     # recon.run_reconstruction_norm_scale_factor_sweep(
@@ -322,9 +330,9 @@ if __name__ == "__main__":
     # # analysis.find_neural_signal_size(analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time)[0:15]), archive), scaled, archive)
     # # analysis.sweep_sensing_coherence(archive = archive, time_properties = time_properties_reconstruction, sweep_parameters = [2, None, 1])
     # # experiment_results_empty = arch.ExperimentResults.new_from_archive_time("20211216T113507")
-    # # archive_empty = arch.Archive(archive_path, "")
-    # # archive_empty.open_archive_file("20211216T113507")
-    # # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507"), archive = archive)
+    # archive_empty = arch.Archive(archive_path, "")
+    # archive_empty.open_archive_file("20220520T124644")
+    # analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = arch.ExperimentResults.new_from_archive_time(archive_empty, "20220520T124644"), archive = archive)
     # # analysis.draw_dst(archive, time_properties_reconstruction)
 
     # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv", archive, fit_matched_filter = True)
@@ -334,10 +342,10 @@ if __name__ == "__main__":
     # # # test_signal.read_from_oscilloscope("archive\\20220208\\DSO\\20220208_HPF_off.csv", archive)
     # # acquired_signal = test_signal.AcquiredSignal.new_from_oscilloscope("archive\\20220208\\DSO\\20220208_BPF_signal.csv")
     # # acquired_signal.write_to_file(archive)
-    # acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
-    # acquired_signal.subsample(scaled.time_step, archive, "Hz")
+    # # acquired_signal = test_signal.AcquiredSignal.new_from_archive_time(archive, "20220325T160348")
+    # # acquired_signal.subsample(scaled.time_step, archive, "Hz")
 
-    # analysis.remove_dc_detuning(experiment_results, scaled, archive)
+    # # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 
     # === ===                      === ===
     # === === Benchmarks and tests === ===

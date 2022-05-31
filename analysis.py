@@ -726,14 +726,17 @@ def analyse_overall_noise(experiment_results:arch.ExperimentResults, experiment_
   frequency_amplitude_offset = noise_model(frequency_empty, amplitude, decay, offset)
   frequency_amplitude_offset_residual = frequency_amplitude_empty - frequency_amplitude_offset
   error_rms = np.sqrt(np.mean(frequency_amplitude_offset_residual**2))
+  signal_rms = np.sqrt(np.mean(frequency_empty**2))
   C.print(f"RMS error: {error_rms}")
+  C.print(f"RMS signal: {signal_rms}")
 
   lab_noise_group = archive.archive_file.require_group("lab_noise")
   lab_noise_noise_group = lab_noise_group.require_group("noise")
   lab_noise_noise_group["frequency"] = frequency_empty
   lab_noise_noise_group["unmodified"] = frequency_amplitude_empty
   lab_noise_noise_group["residual"] = frequency_amplitude_offset_residual
-  lab_noise_noise_group.attrs["rms"] = error_rms
+  lab_noise_noise_group.attrs["fit_rms"] = error_rms
+  lab_noise_noise_group.attrs["rms"] = signal_rms
   lab_noise_noise_group.attrs["amplitude"] = amplitude
   lab_noise_noise_group.attrs["decay"] = decay
   lab_noise_noise_group.attrs["offset"] = offset

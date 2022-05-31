@@ -142,28 +142,28 @@ def compare_to_test_signal(results:arch.RamseyResults, signal:test_signal.TestSi
   amplitude = np.array(measured_amplitude)
   original_amplitude = np.array(original_amplitude)
 
-  expected_signal_power = np.mean(signal.amplitude**2)
+  expected_signal_power = np.mean(original_amplitude**2)
   mf_cutoff = expected_signal_power/2 # default
   mfp_cutoff = mf_cutoff
 
-  error_0 = np.mean((amplitude == 0)*(signal.amplitude != 0) + (amplitude != 0)*(signal.amplitude == 0))
-  error_1 = np.mean(np.abs(amplitude - signal.amplitude))
-  error_2 = math.sqrt(np.mean((amplitude - signal.amplitude)**2))
-  error_sup = np.max(np.abs(amplitude - signal.amplitude))
-  error_snr = expected_signal_power/np.mean((amplitude - signal.amplitude)**2)
+  error_0 = np.mean((amplitude == 0)*(original_amplitude != 0) + (amplitude != 0)*(original_amplitude == 0))
+  error_1 = np.mean(np.abs(amplitude - original_amplitude))
+  error_2 = math.sqrt(np.mean((amplitude - original_amplitude)**2))
+  error_sup = np.max(np.abs(amplitude - original_amplitude))
+  error_snr = expected_signal_power/np.mean((amplitude - original_amplitude)**2)
 
-  error_mf = np.mean(amplitude*signal.amplitude)
+  error_mf = np.mean(amplitude*original_amplitude)
   error_mfd = error_mf >= mf_cutoff
 
-  error_mfp = np.max(np.abs(scipy.signal.correlate((amplitude - (error_mf/expected_signal_power)*signal.amplitude), signal.amplitude)))/signal.amplitude.size
+  error_mfp = np.max(np.abs(scipy.signal.correlate((amplitude - (error_mf/expected_signal_power)*original_amplitude), original_amplitude)))/original_amplitude.size
   error_mfpd = error_mfp >= mfp_cutoff
 
   expected_frequency = 5e3
   expected_amplitude = 1e3
-  template_time = np.arange(0, 1/expected_frequency, signal.time_properties.time_step_coarse)
+  template_time = np.arange(0, 1/expected_frequency, time[1] - time[0])
   template_amplitude = expected_amplitude*np.sin(math.tau*expected_frequency*template_time)
   matched_cutoff = np.sum(template_amplitude**2)/2
-  matched_ground_truth = np.abs(scipy.signal.correlate(signal.amplitude, template_amplitude)) >= matched_cutoff
+  matched_ground_truth = np.abs(scipy.signal.correlate(original_amplitude, template_amplitude)) >= matched_cutoff
   matched_decision = np.abs(scipy.signal.correlate(amplitude, template_amplitude)) >= matched_cutoff
   if np.sum(matched_ground_truth) > 0:
     error_sensitivity = np.sum(np.logical_and(matched_ground_truth, matched_decision))/np.sum(matched_ground_truth)
@@ -248,4 +248,12 @@ def mode_filter(results:arch.RamseyResults):
   amplitude_modified = np.linalg.lstsq(fourier_transform, frequency_amplitude, rcond = None)[0]
 
   results_modified = arch.RamseyResults(time = time, amplitude = amplitude_modified, archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, mode filter")
+  return results_modified
+
+def remove_dc(results:arch.RamseyResults):
+  amplitude = results.amplitude.copy()
+  time = results.time.copy()
+  amplitude_modified = amplitude - np.mean(amplitude)
+
+  results_modified = arch.RamseyResults(time = time[1:], amplitude = amplitude_modified[1:], archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, removed dc")
   return results_modified

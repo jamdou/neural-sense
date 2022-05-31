@@ -270,6 +270,9 @@ class ScaledParameters():
         # scaled_pulse_time = [0.0021666, 0.0031749]
         scaled_pulse_time = [2.1666e-3, 3.1749e-3]
       )
+
+    # By_aux shots
+    # 250 Hz:
     elif archive_time in ["20220516T171054"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
@@ -279,7 +282,18 @@ class ScaledParameters():
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.2333333]
       )
-    elif archive_time in ["20220517T111439"]:
+    # No pulse
+    elif archive_time in ["20220520T124644", "20220523T124716"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 10000],
+        scaled_pulse_time_fraction = [-5]
+      )
+    # One pulse
+    elif archive_time in ["20220517T111439", "20220520T143240"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
@@ -287,6 +301,16 @@ class ScaledParameters():
         scaled_amplitude = 1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.732]
+      )
+    # Two pulses
+    elif archive_time in ["20220520T111524", "20220523T141012"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 1000,
+        scaled_sweep = [100, 10000],
+        scaled_pulse_time_fraction = [0.254, 0.666]
       )
     return scaled
     
