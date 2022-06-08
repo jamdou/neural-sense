@@ -128,21 +128,21 @@ class Reconstruction():
     if hasattr(self, "shrink_size_max"):
       archive_group_reconstruction["shrink_size_max"] = self.shrink_size_max
 
-  def plot(self, archive:Archive, test_signal:TestSignal):
+  def plot(self, archive:Archive, test_signal:TestSignal = None):
     """
     Plot the reconstruction signal, possibly against a template test signal
     """
     plt.figure()
-    if test_signal:
+    if test_signal is not None:
       plt.plot(test_signal.time_properties.time_coarse, test_signal.amplitude[0:test_signal.amplitude.size - self.end_buffer], "-k")
     plt.plot(self.time_properties.time_coarse, self.amplitude, "-r")
-    if test_signal:
+    if test_signal is not None:
       plt.legend(["Original", "Reconstruction"])
       plt.xlim(test_signal.time_properties.time_end_points)
     plt.xlabel("Time (s)")
     plt.ylabel("Amplitude (Hz)")
     plt.grid()
-    if archive:
+    if archive is not None:
       archive.write_plot("Reconstruction", "reconstruction")
     plt.draw()
 
@@ -382,9 +382,9 @@ class Reconstruction():
 
     C.print(f"reconstruction_step: {self.reconstruction_step}\niteration_max: {self.iteration_max}\nnorm_scale_factor: {self.norm_scale_factor}")
 
-    # self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+    self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
     # # self.amplitude = 150*(1 - 2*np.fmod(self.time_properties.time_coarse/self.time_properties.time_coarse[1], 2))
-    self.amplitude = 0*self.time_properties.time_coarse
+    # self.amplitude = 0*self.time_properties.time_coarse
     # self.amplitude[0] = 1
     amplitude = cuda.to_device(self.amplitude)
     amplitude_previous = cuda.to_device(1*self.amplitude)

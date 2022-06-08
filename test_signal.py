@@ -766,7 +766,7 @@ class AcquiredSignal():
     amplification = group["amplitude"].attrs["amplification"]
     signal_tap = f"analogue in (V) <- preamp (x{amplification} V/V) <- By_aux (V)"
     to_hz = group["amplitude"].attrs["conversion"]
-    if archive_time < "20220531T000000":
+    if archive_time < "20220608T000000":
       to_hz /= 2.5707876186376266
 
     return AcquiredSignal(time, amplitude, signal_tap, to_hz)
@@ -780,7 +780,7 @@ class AcquiredSignal():
     group["time"] = self.time
     group["amplitude"] = self.amplitude
 
-  def subsample(self, time_step_new, archive = None, units = "Hz"):
+  def subsample(self, time_step_new, archive = None, units = "Hz", do_plot = False):
     if "Hz" in units:
       unit_factor = 1
     elif "T" in units:
@@ -806,14 +806,15 @@ class AcquiredSignal():
         amplitude_new += frequency_in_phase*np.cos(math.tau*frequency_sample*time_new)
         amplitude_new += frequency_quadrature*np.sin(math.tau*frequency_sample*time_new)
     
-    plt.figure()
-    plt.plot(self.time/1e-3, self.amplitude*self.to_hz*unit_factor, "r", label = "Acquired monitor signal")
-    plt.plot(time_new/1e-3, amplitude_new*self.to_hz*unit_factor, "bx--", label = "Subsampled")
-    plt.xlabel("Time (ms)")
-    plt.ylabel(f"Amplitude ({units})")
-    plt.legend()
-    if archive:
-      archive.write_plot("Subsampled monitor signal", "acquired_signal_subsampled")
-    plt.draw()
+    if do_plot:
+      plt.figure()
+      plt.plot(self.time/1e-3, self.amplitude*self.to_hz*unit_factor, "r", label = "Acquired monitor signal")
+      plt.plot(time_new/1e-3, amplitude_new*self.to_hz*unit_factor, "bx--", label = "Subsampled")
+      plt.xlabel("Time (ms)")
+      plt.ylabel(f"Amplitude ({units})")
+      plt.legend()
+      if archive:
+        archive.write_plot("Subsampled monitor signal", "acquired_signal_subsampled")
+      plt.draw()
 
     return time_new, amplitude_new*self.to_hz

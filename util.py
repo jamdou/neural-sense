@@ -283,7 +283,7 @@ class ScaledParameters():
         scaled_pulse_time_fraction = [0.2333333]
       )
     # No pulse
-    elif archive_time in ["20220520T124644", "20220523T124716"]:
+    elif archive_time in ["20220520T124644", "20220607T154609", "20220523T124716"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
@@ -304,6 +304,16 @@ class ScaledParameters():
       )
     # Two pulses
     elif archive_time in ["20220520T111524", "20220523T141012"]:
+      scaled = ScaledParameters(
+        scaled_frequency = 5000,
+        scaled_density = 1/25,
+        scaled_samples = 4,
+        scaled_amplitude = 389, #1000,
+        scaled_sweep = [100, 10000],
+        scaled_pulse_time_fraction = [0.254, 0.666]
+      )
+    # Unknown pulse locations, 60 shots
+    elif archive_time in ["20220607T134852", "20220607T144242"]:
       scaled = ScaledParameters(
         scaled_frequency = 5000,
         scaled_density = 1/25,
