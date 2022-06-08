@@ -352,9 +352,9 @@ class Reconstruction():
     tolerable_error = expected_error_measurement*np.sqrt(self.frequency_amplitude.size)
     self.reconstruction_step = 1/gradient_lipschitz
     expected_sparsity = 1/(expected_frequency*self.time_properties.time_step_coarse)
-    expected_signal_energy = 0.5*(expected_amplitude**2)*expected_sparsity
+    expected_signal_energy = (0.5*(expected_amplitude**2)*expected_sparsity)
 
-    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy
+    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy*expected_frequency
     if is_fast:
       iteration_max_rate = 2*np.sqrt(iteration_max_rate)
     self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
@@ -382,9 +382,9 @@ class Reconstruction():
 
     C.print(f"reconstruction_step: {self.reconstruction_step}\niteration_max: {self.iteration_max}\nnorm_scale_factor: {self.norm_scale_factor}")
 
-    self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+    # self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
     # # self.amplitude = 150*(1 - 2*np.fmod(self.time_properties.time_coarse/self.time_properties.time_coarse[1], 2))
-    # self.amplitude = 0*self.time_properties.time_coarse
+    self.amplitude = 0*self.time_properties.time_coarse
     # self.amplitude[0] = 1
     amplitude = cuda.to_device(self.amplitude)
     amplitude_previous = cuda.to_device(1*self.amplitude)
@@ -471,36 +471,53 @@ class Reconstruction():
     self.expected_error_measurement = expected_error_measurement
     self.backtrack_scale = backtrack_scale
 
-    tolerable_error = 2*expected_error_measurement
-    gradient_lipschitz = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
-    # (self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])
-    self.reconstruction_step = 1/gradient_lipschitz
-    self.fourier_scale = gradient_lipschitz
-    expected_signal_energy = 0.5*(expected_amplitude**2)/(expected_frequency*self.time_properties.time_step_coarse)
+    self.fourier_scale = self.time_properties.time_step_coarse/(self.time_properties.time_step_coarse*(self.time_properties.time_coarse.size + 1))
+    fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
+    evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
+    gradient_lipschitz = 2*np.max(np.abs(scipy.linalg.svdvals(fourier_transform.copy_to_host()))**2)
 
-    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy
+    tolerable_error = expected_error_measurement*np.sqrt(self.frequency_amplitude.size)
+    self.reconstruction_step = 1/gradient_lipschitz
+    expected_sparsity = 1/(expected_frequency*self.time_properties.time_step_coarse)
+    expected_signal_energy = (0.5*(expected_amplitude**2)*expected_sparsity)
+
+    iteration_max_rate = 0.5*gradient_lipschitz*expected_signal_energy*expected_frequency
     if is_fast:
       iteration_max_rate = 2*np.sqrt(iteration_max_rate)
     self.iteration_max = int(np.ceil(iteration_max_rate/tolerable_error))
-
-    self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
-    # self.norm_scale_factor = norm_scale_factor_modifier*math.sqrt(8*expected_error_measurement*math.log(self.time_properties.time_coarse.size - expected_sparsity)) # Eldar and Kutyniok 2012
+    
+    self.norm_scale_factor = norm_scale_factor_modifier*4*expected_error_measurement*math.sqrt(gradient_lipschitz)*scipy.special.erfcinv(5/(4*self.frequency.size + 1)) # Chichignoud et al 2016, probability max
 
 
     self.shrink_size_max = 1e2
 
     C.print(f"reconstruction_step: {self.reconstruction_step}\niteration_max: {self.iteration_max}\nnorm_scale_factor: {self.norm_scale_factor}")
-    
-    fourier_transform = cuda.device_array((self.frequency.size, self.time_properties.time_coarse.size), np.float64)
-    evaluate_fourier_transform[blocks_per_grid_time, threads_per_block](cuda.to_device(self.frequency), cuda.to_device(self.time_properties.time_coarse), fourier_transform, self.fourier_scale)
 
-    self.amplitude = np.linalg.lstsq(fourier_transform.copy_to_host(), self.frequency_amplitude, rcond = None)[0]
+    self.amplitude = 0*self.time_properties.time_coarse
+    amplitude = cuda.to_device(self.amplitude)
+    amplitude_previous = cuda.to_device(1*self.amplitude)
+
+    frequency_amplitude = cuda.to_device(self.frequency_amplitude)
+
+    frequency_amplitude_prediction = np.zeros(self.frequency_amplitude.size, np.float64)
+    frequency_amplitude_prediction = cuda.to_device(frequency_amplitude_prediction)
+
+    norm = 0
+    norm_previous = np.infty
+    reconstruction_step_backtrack = self.reconstruction_step
+    moving_away_strike_max = 0
+    moving_away_strike = moving_away_strike_max
+
+    fast_step_size = 1
+    fast_step_size_previous = 1
+    fast_step_size_previous_previous = 1
 
     refinement_level = 1
-    weight_maximum = 10000 #10000
+    weight_maximum = 2 #10000
     for refinement_index in range(refinement_level):
       weights = np.abs(self.amplitude)
       weights = (weights/np.max(weights) + 1/weight_maximum)
+      # weights = (weights + 1/weight_maximum)
       weights = weights**(-1)
       weights = cuda.to_device(weights)
 
@@ -1230,7 +1247,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
   template_time = np.arange(0, 1/expected_frequency, expected_signal.time_properties.time_step_coarse)
   template_amplitude = expected_amplitude*np.sin(math.tau*expected_frequency*template_time)
-  matched_cutoff = np.sum(template_amplitude**2)/2
+  template_energy = np.sum(template_amplitude**2)
+  matched_cutoff = template_energy/2
   
   if "rmse" in metrics:
     errors_method_2 = []
@@ -1257,8 +1275,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     stdevs_method_mfpd = []
 
     mf_cutoff = expected_signal_power/2 # default
-    mfp_cutoff = mf_cutoff
     # mf_cutoff = expected_signal_power/4
+    mfp_cutoff = mf_cutoff
 
   if "confusion_fixed" in metrics:
     errors_method_sensitivity = []
@@ -1273,11 +1291,15 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     errors_method_roc_auc = []
     errors_method_roc_sensitivity = []
     errors_method_roc_specificity = []
+    errors_method_roc_amplitude = []
     stdevs_method_roc_auc = []
     stdevs_method_roc_sensitivity = []
     stdevs_method_roc_specificity = []
+    stdevs_method_roc_amplitude = []
 
-    roc_cutoff_max = np.sum(template_amplitude**2)*2
+    roc_cutoff_max = np.sum(template_amplitude**2)*8
+    roc_cutoff_min = np.sum(template_amplitude**2)*1e-4
+    roc_resolution = 100
     roc_ground_truth = scipy.signal.correlate(expected_signal.amplitude, template_amplitude) >= matched_cutoff
 
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
@@ -1312,9 +1334,11 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       errors_roc_sensitivity = []
       errors_roc_specificity = []
       errors_roc_auc = []
+      errors_roc_amplitude = []
       stdevs_roc_sensitivity = []
       stdevs_roc_specificity = []
       stdevs_roc_auc = []
+      stdevs_roc_amplitude = []
     for reconstruction_index, number_of_samples in enumerate(sweep_samples):
       if "rmse" in metrics:
         error_2 = []
@@ -1336,6 +1360,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         roc_sensitivities = []
         roc_specificities = []
         error_roc_auc = []
+        error_roc_amplitude = []
       for random_index, random_seed in enumerate(random_seeds):
         amplitude = amplitudes[(numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index]
         if "rmse" in metrics:
@@ -1368,8 +1393,9 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         if "roc" in metrics:
           roc_sensitivity = [1]
           roc_specificity = [0]
-          for roc_cutoff in np.linspace(0, roc_cutoff_max, 20):
-            roc_decision = scipy.signal.correlate(amplitude, template_amplitude) >= roc_cutoff
+          roc_matched_filter_output = scipy.signal.correlate(amplitude, template_amplitude)
+          for roc_cutoff in np.geomspace(roc_cutoff_min, roc_cutoff_max, roc_resolution):
+            roc_decision = roc_matched_filter_output >= roc_cutoff
             if np.sum(roc_ground_truth) > 0:
               roc_sensitivity.append(np.sum(np.logical_and(roc_ground_truth, roc_decision))/np.sum(roc_ground_truth))
             else:
@@ -1379,18 +1405,21 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
             else:
               roc_specificity.append(1)
           roc_sensitivity.append(0)
-          roc_specificity.append(1)
+          roc_specificity.append(roc_specificity[-1])
+          roc_sensitivity[0] = roc_sensitivity[1]
           roc_sensitivity.append(0)
           roc_specificity.append(0)
 
           roc_auc = 0
           for roc_index in range(len(roc_sensitivity) - 2):
-            roc_auc += roc_sensitivity[roc_index + 1]*roc_specificity[roc_index] - roc_sensitivity[roc_index]*roc_specificity[roc_index + 1]
+            roc_auc -= roc_sensitivity[roc_index + 1]*roc_specificity[roc_index] - roc_sensitivity[roc_index]*roc_specificity[roc_index + 1]
           roc_auc /= 2
 
           roc_sensitivities.append(np.array(roc_sensitivity))
           roc_specificities.append(np.array(roc_specificity))
           error_roc_auc.append(roc_auc)
+
+          error_roc_amplitude.append(np.max(roc_matched_filter_output*roc_ground_truth)/math.sqrt(template_energy))
 
       if "rmse" in metrics:
         errors_2.append(np.mean(error_2))
@@ -1423,9 +1452,11 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         errors_roc_auc.append(np.mean(error_roc_auc))
         errors_roc_sensitivity.append(np.mean(roc_sensitivities, axis = 0))
         errors_roc_specificity.append(np.mean(roc_specificities, axis = 0))
+        errors_roc_amplitude.append(np.mean(error_roc_amplitude))
         stdevs_roc_auc.append(np.std(error_roc_auc))
         stdevs_roc_sensitivity.append(np.std(roc_sensitivities, axis = 0))
         stdevs_roc_specificity.append(np.std(roc_specificities, axis = 0))
+        stdevs_roc_amplitude.append(np.std(error_roc_amplitude))
     
     if "rmse" in metrics:
       errors_method_2.append(np.array(errors_2))
@@ -1458,9 +1489,11 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       errors_method_roc_auc.append        (np.array(errors_roc_auc))
       errors_method_roc_sensitivity.append(np.array(errors_roc_sensitivity))
       errors_method_roc_specificity.append(np.array(errors_roc_specificity))
+      errors_method_roc_amplitude.append  (np.array(errors_roc_amplitude))
       stdevs_method_roc_auc.append        (np.array(stdevs_roc_auc))
       stdevs_method_roc_sensitivity.append(np.array(stdevs_roc_sensitivity))
       stdevs_method_roc_specificity.append(np.array(stdevs_roc_specificity))
+      stdevs_method_roc_amplitude.append  (np.array(stdevs_roc_amplitude))
   C.finished("error analysis")   
 
   if archive:
@@ -1496,12 +1529,14 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         evaluation_group["stdev_sensitivity"] = stdevs_method_sensitivity[evaluation_method_index]
         evaluation_group["stdev_specificity"] = stdevs_method_specificity[evaluation_method_index]
       if "roc" in metrics:
-        evaluation_group["error_roc_auc"] =         errors_roc_auc[evaluation_method_index]
-        evaluation_group["error_roc_sensitivity"] = errors_roc_sensitivity[evaluation_method_index]
-        evaluation_group["error_roc_specificity"] = errors_roc_specificity[evaluation_method_index]
-        evaluation_group["stdev_roc_auc"] =         stdevs_roc_auc[evaluation_method_index]
-        evaluation_group["stdev_roc_sensitivity"] = stdevs_roc_sensitivity[evaluation_method_index]
-        evaluation_group["stdev_roc_specificity"] = stdevs_roc_specificity[evaluation_method_index]
+        evaluation_group["error_roc_auc"] =         errors_method_roc_auc[evaluation_method_index]
+        evaluation_group["error_roc_sensitivity"] = errors_method_roc_sensitivity[evaluation_method_index]
+        evaluation_group["error_roc_specificity"] = errors_method_roc_specificity[evaluation_method_index]
+        evaluation_group["error_roc_amplitude"] =   errors_method_roc_amplitude[evaluation_method_index]
+        evaluation_group["stdev_roc_auc"] =         stdevs_method_roc_auc[evaluation_method_index]
+        evaluation_group["stdev_roc_sensitivity"] = stdevs_method_roc_sensitivity[evaluation_method_index]
+        evaluation_group["stdev_roc_specificity"] = stdevs_method_roc_specificity[evaluation_method_index]
+        evaluation_group["stdev_roc_amplitude"] =   stdevs_method_roc_amplitude[evaluation_method_index]
 
   evaluation_method_labels = {
     "least_squares" : "Least squares",
@@ -1538,7 +1573,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     "fista_backtracking" : "r-",
     "fista_fit" : "r-x",
     "fista_ayanzadeh" : "y-x",
-    "fista_adaptive" : "g-x",
+    "fista_adaptive" : "y-",
     "fista" : "c--x",
     "fista_informed_least_squares" : "g--x",
     "fadaptive_informed_least_squares" : "g-.x",
@@ -1691,48 +1726,63 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     plt.figure()
     plt.subplot(2, 1, 2)
     if ramsey_comparison_results is not None:
-      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfd], "mo")
+      if hasattr(ramsey_comparison_results, "error_mf"):
+        plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mf], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
     for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-      plt.plot(numbers_of_samples, errors_method_mfd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+      plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
     plt.xlabel("Number of samples used in the reconstruction")
-    plt.ylabel(f"Proportion of reconstructions\n with correct detections (%)")
+    plt.ylabel(f"Detected signal amplitude ({units})")
     plt.ylim(bottom = 0)
-    plt.legend(legend)
-    plt.subplot(2, 1, 1)
-    plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mf_cutoff]*2, "y--")
-    if ramsey_comparison_results is not None:
-      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mf], "mo")
-    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-      plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
-    plt.ylabel(f"Average detection\nenergy ({units}$^2$)")
-    plt.ylim(bottom = 0)
-    plt.legend(["Threshold"] + legend)
+    plt.legend()
     if archive:
-      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf")
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf_amplitude")
     plt.draw()
 
-    plt.figure()
-    plt.subplot(2, 1, 2)
-    if ramsey_comparison_results is not None:
-      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfpd*100], "mo")
-    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-      plt.plot(numbers_of_samples, errors_method_mfpd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
-    plt.xlabel("Number of samples used in the reconstruction")
-    plt.ylabel(f"Proportion of reconstructions\nwith false positives (%)")
-    plt.ylim(bottom = 0)
-    plt.legend(legend)
-    plt.subplot(2, 1, 1)
-    plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mfp_cutoff]*2, "y--")
-    if ramsey_comparison_results is not None:
-      plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfp], "mo")
-    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
-      plt.plot(numbers_of_samples, errors_method_mfp[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
-    plt.ylabel(f"Average false positive\nenergy ({units}$^2$)")
-    plt.ylim(bottom = 0)
-    plt.legend(["Threshold"] + legend)
-    if archive:
-      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter false positives)", "number_of_samples_error_mfp")
-    plt.draw()
+    # plt.figure()
+    # plt.subplot(2, 1, 2)
+    # if ramsey_comparison_results is not None:
+    #   plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfd], "mo")
+    # for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    #   plt.plot(numbers_of_samples, errors_method_mfd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+    # plt.xlabel("Number of samples used in the reconstruction")
+    # plt.ylabel(f"Proportion of reconstructions\n with correct detections (%)")
+    # plt.ylim(bottom = 0)
+    # plt.legend(legend)
+    # plt.subplot(2, 1, 1)
+    # plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mf_cutoff]*2, "y--")
+    # if ramsey_comparison_results is not None:
+    #   plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mf], "mo")
+    # for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    #   plt.plot(numbers_of_samples, errors_method_mf[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
+    # plt.ylabel(f"Average detection\nenergy ({units}$^2$)")
+    # plt.ylim(bottom = 0)
+    # plt.legend(["Threshold"] + legend)
+    # if archive:
+    #   archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter detection)", "number_of_samples_error_mf")
+    # plt.draw()
+
+    # plt.figure()
+    # plt.subplot(2, 1, 2)
+    # if ramsey_comparison_results is not None:
+    #   plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfpd*100], "mo")
+    # for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    #   plt.plot(numbers_of_samples, errors_method_mfpd[evaluation_method_index]*100, evaluation_method_legend[evaluation_method])
+    # plt.xlabel("Number of samples used in the reconstruction")
+    # plt.ylabel(f"Proportion of reconstructions\nwith false positives (%)")
+    # plt.ylim(bottom = 0)
+    # plt.legend(legend)
+    # plt.subplot(2, 1, 1)
+    # plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [mfp_cutoff]*2, "y--")
+    # if ramsey_comparison_results is not None:
+    #   plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_mfp], "mo")
+    # for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+    #   plt.plot(numbers_of_samples, errors_method_mfp[evaluation_method_index]*(unit_factor**2), evaluation_method_legend[evaluation_method])
+    # plt.ylabel(f"Average false positive\nenergy ({units}$^2$)")
+    # plt.ylim(bottom = 0)
+    # plt.legend(["Threshold"] + legend)
+    # if archive:
+    #   archive.write_plot("Sweeping the number of samples used in reconstruction\n(Matched filter false positives)", "number_of_samples_error_mfp")
+    # plt.draw()
 
   if "confusion_fixed" in metrics:
     plt.figure()
@@ -1809,14 +1859,45 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
       plt.figure()
       # plt.plot((1 - errors_method_roc_specificity[evaluation_method_index][0])*100, errors_method_roc_sensitivity[evaluation_method_index][0]*100, evaluation_method_legend[evaluation_method])
       for samples_index in range(numbers_of_samples.size):
-        plt.fill((1 - errors_method_roc_specificity[evaluation_method_index][samples_index])*100, errors_method_roc_sensitivity[evaluation_method_index][samples_index]*100, color = evaluation_method_legend[evaluation_method][0], alpha = 1/numbers_of_samples.size)
+        plt.fill((1 - errors_method_roc_specificity[evaluation_method_index][samples_index])*100, errors_method_roc_sensitivity[evaluation_method_index][samples_index]*100, color = "k", alpha = 1/numbers_of_samples.size)
       plt.ylabel("Recall (%)")
       plt.xlabel("Fall out (%)")
       plt.ylim(bottom = -5, top = 105)
       plt.xlim(left = -5, right = 105)
       if archive:
-        archive.write_plot(f"ROC, {evaluation_method}", f"number_of_samples_error_roc_{evaluation_method}")
+        archive.write_plot(f"ROC, {evaluation_method_labels[evaluation_method]}", f"number_of_samples_error_roc_{evaluation_method}")
       plt.draw()
+
+    plt.figure()
+    if ramsey_comparison_results is not None:
+      if hasattr(ramsey_comparison_results, "error_roc_auc"):
+        plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_roc_auc], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.fill_between(numbers_of_samples, (errors_method_roc_auc[evaluation_method_index] + stdevs_method_roc_auc[evaluation_method_index])*100, (errors_method_roc_auc[evaluation_method_index] - stdevs_method_roc_auc[evaluation_method_index])*100, facecolor = evaluation_method_legend[evaluation_method][0], alpha = uncertainty_alpha)
+      plt.plot(numbers_of_samples, errors_method_roc_auc[evaluation_method_index]*100, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
+    plt.ylim(bottom = -5, top = 105)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Area under receiver operating characteristic (%)")
+    plt.legend()
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(ROC AUC)", "number_of_samples_error_roc_auc")
+    plt.draw()
+
+    plt.figure()
+    plt.plot([numbers_of_samples[0], numbers_of_samples[-1]], [expected_amplitude]*2, "b--", label = "Ground truth amplitude")
+    if ramsey_comparison_results is not None:
+      if hasattr(ramsey_comparison_results, "error_roc_amplitude"):
+        plt.plot([numbers_of_samples[0]], [ramsey_comparison_results.error_roc_amplitude], evaluation_method_legend["ramsey"], label = evaluation_method_labels["ramsey"])
+    for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
+      plt.fill_between(numbers_of_samples, (errors_method_roc_amplitude[evaluation_method_index] + stdevs_method_roc_amplitude[evaluation_method_index])*unit_factor, (errors_method_roc_amplitude[evaluation_method_index] - stdevs_method_roc_amplitude[evaluation_method_index])*unit_factor, facecolor = evaluation_method_legend[evaluation_method][0], alpha = uncertainty_alpha)
+      plt.plot(numbers_of_samples, errors_method_roc_amplitude[evaluation_method_index]*unit_factor, evaluation_method_legend[evaluation_method], label = evaluation_method_labels[evaluation_method])
+    plt.ylim(bottom = 0)
+    plt.xlabel("Number of samples used in the reconstruction")
+    plt.ylabel(f"Estimate of signal amplitude ({units})")
+    plt.legend()
+    if archive:
+      archive.write_plot("Sweeping the number of samples used in reconstruction\n(Amplitude estimation)", "number_of_samples_error_roc_amplitude")
+    plt.draw()
 
   # plt.figure()
   # plt.subplot()

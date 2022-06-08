@@ -44,8 +44,8 @@ if __name__ == "__main__":
 
     # === Scaled protocol ===
     # experiment_time = "20220520T124644" # No signals, By_aux, Compressive
-    experiment_time = "20220517T111439" # One signal, By_aux, Compressive
-    # experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
+    # experiment_time = "20220517T111439" # One signal, By_aux, Compressive
+    experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
 
     # experiment_time = "20220520T160357" # Repeated Ramsey for calibration
 
@@ -202,8 +202,8 @@ if __name__ == "__main__":
       # "20211202T124902" # Lab
 
       # "20220523T124716" # No signals, By_aux, Ramsey
-      "20220520T143240" # One signal, By_aux, Ramsey
-      # "20220523T141012" # Two signals, By_aux, Ramsey
+      # "20220520T143240" # One signal, By_aux, Ramsey
+      "20220523T141012" # Two signals, By_aux, Ramsey
 
       # "20220520T160357" # Repeated Ramsey calibration
     )
@@ -262,7 +262,7 @@ if __name__ == "__main__":
         frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
         frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
       ),
-      sweep_parameters = (0, 10000, 10),
+      sweep_parameters = (2, 10000, 10),
       archive = archive,
       random_seeds = np.arange(10)*util.Seeds.metroid,
       evaluation_methods = [
@@ -281,7 +281,7 @@ if __name__ == "__main__":
       ],
       metrics = [
         "rmse",
-        "confusion_fixed",
+        # "confusion_fixed",
         "roc"
       ],
       expected_amplitude = scaled.amplitude,
