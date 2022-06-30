@@ -726,7 +726,7 @@ def analyse_overall_noise(experiment_results:arch.ExperimentResults, experiment_
   frequency_amplitude_offset = noise_model(frequency_empty, amplitude, decay, offset)
   frequency_amplitude_offset_residual = frequency_amplitude_empty - frequency_amplitude_offset
   error_rms = np.sqrt(np.mean(frequency_amplitude_offset_residual**2))
-  signal_rms = np.sqrt(np.mean(frequency_empty**2))
+  signal_rms = np.sqrt(np.mean(frequency_amplitude_empty**2))
   C.print(f"RMS error: {error_rms}")
   C.print(f"RMS signal: {signal_rms}")
 

@@ -370,8 +370,9 @@ class Reconstruction():
     # # self.iteration_max = int(math.ceil(2*np.sqrt(backtrack_scale*(expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     # # self.iteration_max = int(math.ceil(2*np.sqrt((expected_amplitude**2)/((4*(self.time_properties.time_end_points[1] - self.time_properties.time_end_points[0])*expected_frequency)*(2*expected_error_measurement)))))
     
-    self.norm_scale_factor = norm_scale_factor_modifier*4*expected_error_measurement*math.sqrt(gradient_lipschitz)*scipy.special.erfcinv(5/(4*self.frequency.size + 1)) # Chichignoud et al 2016, probability max
-    # self.norm_scale_factor = norm_scale_factor_modifier*4*tolerable_error*gradient_lipschitz # Chichignoud et al 2016, probability mean
+    # self.norm_scale_factor = norm_scale_factor_modifier*4*expected_error_measurement*math.sqrt(gradient_lipschitz)*scipy.special.erfcinv(2/(self.frequency.size + 1)) # Chichignoud et al 2016, probability max unmodified
+    # self.norm_scale_factor = norm_scale_factor_modifier*4*expected_error_measurement*math.sqrt(gradient_lipschitz)*scipy.special.erfcinv(5/(4*self.frequency.size + 1)) # Chichignoud et al 2016, probability max
+    self.norm_scale_factor = norm_scale_factor_modifier*4*tolerable_error*gradient_lipschitz # Chichignoud et al 2016, probability mean
     # self.norm_scale_factor = 4*norm_scale_factor_modifier*expected_signal_energy*np.max(np.sqrt(np.sum(fourier_transform.copy_to_host()**2, axis = 0))) # Chichignoud et al 2016, operator norm
     # self.norm_scale_factor = 4*np.min(np.abs(np.sqrt(np.sum((fourier_transform.copy_to_host()*expected_error_measurement)**2, axis = 0)))) # Chichignoud et al 2016, more advanced
     # self.norm_scale_factor = norm_scale_factor_modifier*4*self.frequency.size*expected_error_measurement*gradient_lipschitz # Chichignoud et al 2016
