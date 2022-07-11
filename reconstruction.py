@@ -1220,7 +1220,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
         elif evaluation_method == "adaptive_frequency_fit":
           reconstruction.evaluate_informed_least_squares(informed_type = "ista_frequency_fit", expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, frequency_fit_step_size = frequency_fit_step_size)
         elif evaluation_method == "fista_backtracking":
-          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+          # reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
+          reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True, norm_scale_factor = 1.1100824932577424)
         elif evaluation_method == "ista_backtracking":
           reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
         reconstruction.write_to_file(archive.archive_file, (numbers_of_samples.size*evaluation_method_index + reconstruction_index)*random_seeds.size + random_index)

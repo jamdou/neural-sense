@@ -156,25 +156,32 @@ class ResultsCompilation:
 
     C.finished("cross validation simulations")
 
-  def reconstruct(self, archive:arch.Archive = None, units = "Hz"):
-    number_of_samples = 50
-    number_of_folds = 5
-
+  def reconstruct(self, archive:arch.Archive = None, number_of_samples = 50):
     C.starting("cross validation reconstructions")
     reconstruction = recon.Reconstruction(self.time_properties)
 
-    number_of_experiments = self.frequency_amplitudes.shape[0]
-    error_array = []
-    for experiment_index in range(number_of_experiments):
+    self.number_of_experiments = self.frequency_amplitudes.shape[0]
+    self.norm_scale_factor = np.geomspace(0.1, 10, number_of_samples)
+
+    if archive is not None:
+      archive_group = archive.archive_file.require_group("cross_validation/reconstructions")
+      archive_group["norm_scale_factor"] = self.norm_scale_factor
+      archive_group.attrs["number_of_experiments"] = self.number_of_experiments
+    archive_group = archive.archive_file.require_group("cross_validation/reconstructions/error")
+    self.error_array = []
+    wall_time_start = time.time()
+    wall_time_current = 0
+    for experiment_index in range(self.number_of_experiments):
+      wall_time_previous = wall_time_current
+
       reconstruction.read_frequencies_directly(
         self.frequency,
         self.frequency_amplitudes[experiment_index, :],
-        99,
+        60,
         0, 20e3
       )
       error_experiment = []
-      norm_scale_factor = np.geomspace(0.1, 10, number_of_samples)
-      for norm_scale_factor_instance in norm_scale_factor:
+      for norm_scale_factor_instance in self.norm_scale_factor:
         reconstruction.evaluate_fista_backtracking(
           expected_amplitude = 360.0,
           expected_frequency = 5000,
@@ -185,11 +192,34 @@ class ResultsCompilation:
         )
         error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude - self.amplitudes[experiment_index, :])**2)))
       error_experiment = np.array(error_experiment)
-      error_array.append(error_experiment)
-    error_array = np.array(error_array)
+      self.error_array.append(error_experiment)
+      archive_group[f"{experiment_index}"] = error_experiment
+
+      wall_time_current = time.time() - wall_time_start
+      wall_time_step = wall_time_current - wall_time_previous
+      C.print(f"Time: {wall_time_current} s, Time step: {wall_time_step} s")
+
+    self.error_array = np.array(self.error_array)
     C.finished("cross validation reconstructions")
 
-    C.starting("cross validation error minimisation")
+  def read_reconstructions_from_archive_time(self, archive:arch.Archive, archive_time):
+    archive_previous = arch.Archive(archive.archive_path[:-25], "")
+    archive_previous.open_archive_file(archive_time)
+
+    archive_group = archive_previous.archive_file.require_group("cross_validation/reconstructions")
+    self.number_of_experiments = archive_group.attrs["number_of_experiments"]
+    self.norm_scale_factor = np.asarray(archive_group["norm_scale_factor"])
+
+    archive_group = archive_previous.archive_file.require_group("cross_validation/reconstructions/error")
+    experiment_index = 0
+    self.error_array = []
+    while f"{experiment_index}" in archive_group:
+      self.error_array.append(np.asarray(archive_group[f"{experiment_index}"]))
+      experiment_index += 1
+    self.error_array = np.array(self.error_array)
+
+  def cross_validate(self, archive:arch.Archive = None, units = "Hz", number_of_folds = 5):
+
     if "Hz" in units:
       unit_factor = 1
     elif "T" in units:
@@ -201,19 +231,21 @@ class ResultsCompilation:
     elif "m" in units:
       unit_factor *= 1e3
 
+    C.starting("cross validation error minimisation")
+
     fold = np.arange(number_of_folds)
-    indices = np.arange(number_of_experiments)
+    indices = np.arange(self.number_of_experiments)
     error = []
     error_min = []
     norm_scale_factor_min = []
     plt.figure()
     for fold_index in fold:
       mask = np.logical_or(indices*fold.size/indices.size < fold_index, indices*fold.size/indices.size >= fold_index + 1)
-      error.append(np.mean(error_array[mask, :], axis = 0))
+      error.append(np.mean(self.error_array[mask, :], axis = 0))
       error_min.append(np.min(error[-1]))
-      norm_scale_factor_min.append(norm_scale_factor[np.argmin(error[-1])])
+      norm_scale_factor_min.append(self.norm_scale_factor[np.argmin(error[-1])])
 
-      plt.loglog(norm_scale_factor*unit_factor, error[-1]*unit_factor, "g", alpha = 1/number_of_folds)
+      plt.loglog(self.norm_scale_factor*unit_factor, error[-1]*unit_factor, "g", alpha = 1/number_of_folds)
       plt.loglog([norm_scale_factor_min[-1]*unit_factor], [error_min[-1]*unit_factor], "co", alpha = 1/number_of_folds)
 
     error = np.array(error)
@@ -223,6 +255,14 @@ class ResultsCompilation:
     norm_scale_factor_min_mean = np.mean(norm_scale_factor_min)
     norm_scale_factor_min_std = np.std(norm_scale_factor_min)
 
+    if archive is not None:
+      archive_group = archive.archive_file.require_group("cross_validation/cross_validation")
+      archive_group["norm_scale_factor"] = self.norm_scale_factor
+      archive_group["error"] = error
+      archive_group["error_min"] = error_min
+      archive_group["norm_scale_factor_min"] = norm_scale_factor_min
+      archive_group["norm_scale_factor_min"].attrs["mean"] = norm_scale_factor_min_mean
+      archive_group["norm_scale_factor_min"].attrs["std"] = norm_scale_factor_min_std
     C.print(f"λ (trained): {norm_scale_factor_min_mean*unit_factor} +- {norm_scale_factor_min_std*unit_factor} {units}")
 
     plt.xlabel(f"Regularisation parameter ({units})")
@@ -237,10 +277,15 @@ class ResultsCompilation:
     error_validation = []
     for fold_index in fold:
       mask = np.logical_and(indices*fold.size/indices.size >= fold_index, indices*fold.size/indices.size < fold_index + 1)
-      error_validation.append(np.mean(error_array[mask, norm_scale_factor == norm_scale_factor_min[fold_index]]))
+      error_validation.append(np.mean(self.error_array[mask, self.norm_scale_factor == norm_scale_factor_min[fold_index]]))
     error_validation = np.array(error_validation)
     error_validation_mean = np.mean(error_validation)
     error_validation_std = np.std(error_validation)
+    if archive is not None:
+      archive_group = archive.archive_file.require_group("cross_validation/cross_validation")
+      archive_group["error_validation"] = error_validation
+      archive_group["error_validation"].attrs["mean"] = error_validation_mean
+      archive_group["error_validation"].attrs["std"] = error_validation_std
     C.print(f"Validation RMSE: {error_validation_mean*unit_factor} +- {error_validation_std*unit_factor} {units}")
 
     plt.figure()
