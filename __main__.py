@@ -469,8 +469,16 @@ if __name__ == "__main__":
     # # # # # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210507T165913", "20210507T170105", "20210507T170256", "20210507T170456", "20210507T170646", "20210507T170822", "20210504T175150"], reference_name = "SciPy", is_external = False)
     # # # # # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
-    results_compilation = sim.cross_validate.ResultsCompilation.generate_inputs()
-    results_compilation.simulate()
+    # results_compilation = sim.cross_validate.ResultsCompilation.generate_inputs(number_of_experiments = 10)
+    # results_compilation.write_to_file(archive)
+    # results_compilation.simulate(archive)
+    results_compilation = sim.cross_validate.ResultsCompilation.read_simulations_from_archive_time(
+      archive,
+      "20220707T144904"
+      # "20220707T142432"
+      # "20220701T144056"
+    )
+    results_compilation.reconstruct(archive)
     # === Clean up ===
     archive.close_archive_file()
     cuda.profile_stop()
