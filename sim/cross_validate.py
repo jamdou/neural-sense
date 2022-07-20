@@ -82,7 +82,7 @@ class ResultsCompilation:
 
     time_end = 5e-3
     readout_amplitude = 20e3
-    neural_amplitude = 360.0
+    neural_amplitude = 1000#360
     neural_frequency = 5e3
     bias = 600e3
 
@@ -156,7 +156,7 @@ class ResultsCompilation:
 
     C.finished("cross validation simulations")
 
-  def reconstruct(self, archive:arch.Archive = None, number_of_samples = 50):
+  def reconstruct(self, archive:arch.Archive = None, number_of_samples = 50, metric = "rms"):
     C.starting("cross validation reconstructions")
     reconstruction = recon.Reconstruction(self.time_properties)
 
@@ -173,24 +173,37 @@ class ResultsCompilation:
     wall_time_current = 0
     for experiment_index in range(self.number_of_experiments):
       wall_time_previous = wall_time_current
+      if metric == "scaled rms":
+        power = np.dot(self.amplitudes[experiment_index, :], self.amplitudes[experiment_index, :])
 
       reconstruction.read_frequencies_directly(
         self.frequency,
         self.frequency_amplitudes[experiment_index, :],
-        60,
+        # 60,
+        100,
         0, 20e3
       )
       error_experiment = []
       for norm_scale_factor_instance in self.norm_scale_factor:
         reconstruction.evaluate_fista_backtracking(
-          expected_amplitude = 360.0,
+          expected_amplitude = 1000,#360.0,
           expected_frequency = 5000,
           expected_error_measurement = 5,
           norm_scale_factor_modifier = 1,
           is_fast = True,
           norm_scale_factor = norm_scale_factor_instance
         )
-        error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude - self.amplitudes[experiment_index, :])**2)))
+        if metric == "rms":
+          error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude - self.amplitudes[experiment_index, :])**2)))
+        elif metric == "scaled rms":
+          if power > 0:
+            dot = np.dot(reconstruction.amplitude, self.amplitudes[experiment_index, :])
+            # if dot > 0.2:
+            error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude - (dot/power)*self.amplitudes[experiment_index, :])**2)) + (np.sqrt(power) - np.sqrt(dot)))
+            # else:
+            #   error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude - self.amplitudes[experiment_index, :])**2)))
+          else:
+            error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude)**2)))
       error_experiment = np.array(error_experiment)
       self.error_array.append(error_experiment)
       archive_group[f"{experiment_index}"] = error_experiment
@@ -218,7 +231,7 @@ class ResultsCompilation:
       experiment_index += 1
     self.error_array = np.array(self.error_array)
 
-  def cross_validate(self, archive:arch.Archive = None, units = "Hz", number_of_folds = 5):
+  def cross_validate(self, archive:arch.Archive = None, units = "Hz", number_of_folds = 5, metric = "rms"):
 
     if "Hz" in units:
       unit_factor = 1
@@ -266,7 +279,10 @@ class ResultsCompilation:
     C.print(f"λ (trained): {norm_scale_factor_min_mean*unit_factor} +- {norm_scale_factor_min_std*unit_factor} {units}")
 
     plt.xlabel(f"Regularisation parameter ({units})")
-    plt.ylabel(f"Average RMSE for training set ({units})")
+    if metric == "rms":
+      plt.ylabel(f"Average RMSE for training set ({units})")
+    elif metric == "scaled rms":
+      plt.ylabel(f"Average noise RMS for training set ({units})")
     plt.legend(["Error curve for training", "Regularisation parameter determined from training set"])
     if archive:
       archive.write_plot(f"Cross validation:\nMinimising regularisation parameter", f"cross_validation_min")
@@ -286,13 +302,16 @@ class ResultsCompilation:
       archive_group["error_validation"] = error_validation
       archive_group["error_validation"].attrs["mean"] = error_validation_mean
       archive_group["error_validation"].attrs["std"] = error_validation_std
-    C.print(f"Validation RMSE: {error_validation_mean*unit_factor} +- {error_validation_std*unit_factor} {units}")
+    C.print(f"Validation noise: {error_validation_mean*unit_factor} +- {error_validation_std*unit_factor} {units}")
 
     plt.figure()
     plt.plot(fold, error_validation*unit_factor, "yo", label = "Validation error")
     plt.plot(fold, error_min*unit_factor, "co", label = "Training error")
     plt.xlabel("Iteration")
-    plt.ylabel(f"Average validation RMSE ({units})")
+    if metric == "rms":
+      plt.ylabel(f"Average validation RMSE ({units})")
+    elif metric == "scaled rms":
+      plt.ylabel(f"Average validation noise RMS ({units})")
     plt.legend()
     if archive:
       archive.write_plot(f"Cross validation:\nValidation error", f"cross_validation_validation")
