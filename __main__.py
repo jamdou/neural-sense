@@ -44,11 +44,11 @@ if __name__ == "__main__":
 
     # === Scaled protocol ===
     # experiment_time = "20220607T154609" # No signals, By_aux, Compressive
-    # experiment_time = "20220517T111439" # One signal, By_aux, Compressive
+    experiment_time = "20220517T111439" # One signal, By_aux, Compressive
     # experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
 
     # experiment_time = "20220607T134852" # Single pulse, 60 shots
-    experiment_time = "20220607T144242" # Double pulse, 60 shots, u1 = 13, u2 = 223
+    # experiment_time = "20220607T144242" # Double pulse, 60 shots, u1 = 13, u2 = 223
 
     # experiment_time = "20220520T160357" # Repeated Ramsey for calibration
     # experiment_time = "20220520T124644" # No signals, By_aux, Compressive, not calibrated
