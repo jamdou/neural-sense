@@ -529,91 +529,91 @@ def fit_frequency(frequency_dressing, spin, time_coarse, do_plot = False):
 
   return shift, shift_predict
 
-def fft_cuda(signal):
-  power_of_2_shape = int(2**math.ceil(math.log2(signal.shape[1])))
-  number_of_iterations = int(math.ceil(math.log2(signal.shape[1])))
-  if signal.ndim == 2:
-    signal_reshape = np.zeros((signal.shape[0], power_of_2_shape))
-  else:
-    signal_reshape = np.zeros((1, power_of_2_shape))
-  signal_reshape[:, 0:signal.shape[1]] = signal
-  output = np.array(signal_reshape, np.cdouble)
-  # output = cuda.to_device(output)
+# def fft_cuda(signal):
+#   power_of_2_shape = int(2**math.ceil(math.log2(signal.shape[1])))
+#   number_of_iterations = int(math.ceil(math.log2(signal.shape[1])))
+#   if signal.ndim == 2:
+#     signal_reshape = np.zeros((signal.shape[0], power_of_2_shape))
+#   else:
+#     signal_reshape = np.zeros((1, power_of_2_shape))
+#   signal_reshape[:, 0:signal.shape[1]] = signal
+#   output = np.array(signal_reshape, np.cdouble)
+#   # output = cuda.to_device(output)
 
-  block_size = (int(max(128//signal_reshape.shape[0], 1)), int(signal_reshape.shape[0]))
-  number_of_blocks = (int(signal_reshape.shape[1] // block_size[0]), int(signal_reshape.shape[0] // block_size[1]))
-  print(block_size)
-  print(number_of_blocks)
-  for iteration_index in range(1, number_of_iterations):
-    stride = int(2**iteration_index)
-    # block_size = (int(max(128//signal_reshape.shape[0], 1)), int(signal_reshape.shape[0]))
-    # number_of_blocks = (int(max((signal_reshape.shape[1]/stride) // block_size[0], 1)), int(signal_reshape.shape[0] // block_size[1]))
-    # print(block_size)
-    dit_fft_cuda[number_of_blocks, block_size](output, stride)
+#   block_size = (int(max(128//signal_reshape.shape[0], 1)), int(signal_reshape.shape[0]))
+#   number_of_blocks = (int(signal_reshape.shape[1] // block_size[0]), int(signal_reshape.shape[0] // block_size[1]))
+#   print(block_size)
+#   print(number_of_blocks)
+#   for iteration_index in range(1, number_of_iterations):
+#     stride = int(2**iteration_index)
+#     # block_size = (int(max(128//signal_reshape.shape[0], 1)), int(signal_reshape.shape[0]))
+#     # number_of_blocks = (int(max((signal_reshape.shape[1]/stride) // block_size[0], 1)), int(signal_reshape.shape[0] // block_size[1]))
+#     # print(block_size)
+#     dit_fft_cuda[number_of_blocks, block_size](output, stride)
   
-  return output
+#   return output
 
-@cuda.jit("(complex128[:, :], int32)")
-def dit_fft_cuda(input, stride):
-  sample_index = cuda.blockIdx.x*cuda.blockDim.x + cuda.threadIdx.x
-  fft_index = cuda.blockIdx.y*cuda.blockDim.y + cuda.threadIdx.x
-  if fft_index < input.shape[0]:
-    if sample_index < input.shape[1]//stride:
-      for stride_index in range(input.shape[1]//stride//2):
-        p = input[fft_index, sample_index*stride + stride_index]
-        q = input[fft_index, sample_index*stride + stride_index + stride//2]*(math.cos(math.tau/(input.shape[1]//stride)*stride_index) - 1j*math.sin(math.tau/(input.shape[1]//stride)*stride_index))
-        input[fft_index, sample_index*stride + stride_index] = p + q
-        input[fft_index, sample_index*stride + stride_index + stride//2] = p - q
+# @cuda.jit("(complex128[:, :], int32)")
+# def dit_fft_cuda(input, stride):
+#   sample_index = cuda.blockIdx.x*cuda.blockDim.x + cuda.threadIdx.x
+#   fft_index = cuda.blockIdx.y*cuda.blockDim.y + cuda.threadIdx.x
+#   if fft_index < input.shape[0]:
+#     if sample_index < input.shape[1]//stride:
+#       for stride_index in range(input.shape[1]//stride//2):
+#         p = input[fft_index, sample_index*stride + stride_index]
+#         q = input[fft_index, sample_index*stride + stride_index + stride//2]*(math.cos(math.tau/(input.shape[1]//stride)*stride_index) - 1j*math.sin(math.tau/(input.shape[1]//stride)*stride_index))
+#         input[fft_index, sample_index*stride + stride_index] = p + q
+#         input[fft_index, sample_index*stride + stride_index + stride//2] = p - q
 
-def fft_cuda_test():
-  time = np.linspace(0, 1, 4096)
-  # signal = np.vstack([np.cos(math.tau*300*time), np.cos(math.tau*400*time)])
-  signal = np.vstack([np.sign(np.cos(math.tau*300*time))])
-  plt.figure()
-  plt.plot(signal[0, :])
-  plt.show()
-  print(signal.shape)
-  fft = np.abs(fft_cuda(signal))
-  plt.figure()
-  plt.plot(fft[0, :])
-  # plt.plot(fft[1, :])
-  plt.show()
+# def fft_cuda_test():
+#   time = np.linspace(0, 1, 4096)
+#   # signal = np.vstack([np.cos(math.tau*300*time), np.cos(math.tau*400*time)])
+#   signal = np.vstack([np.sign(np.cos(math.tau*300*time))])
+#   plt.figure()
+#   plt.plot(signal[0, :])
+#   plt.show()
+#   print(signal.shape)
+#   fft = np.abs(fft_cuda(signal))
+#   plt.figure()
+#   plt.plot(fft[0, :])
+#   # plt.plot(fft[1, :])
+#   plt.show()
 
-if __name__ == "__main__":
-  fft_cuda_test()
-# class Sepctrogram():
-#   def __init__(self, signal):
-#     self.signal = signal
+# if __name__ == "__main__":
+#   fft_cuda_test()
+# # class Sepctrogram():
+# #   def __init__(self, signal):
+# #     self.signal = signal
 
-#   @nb.njit
-#   def compute_stft(self):
-#     pass
+# #   @nb.njit
+# #   def compute_stft(self):
+# #     pass
   
-#   @nb.njit
-#   def compute_fft(self, signal):
-#     signal_reshape = np.zeros(2**math.ceil(math.log2(signal.size)))
-#     self.signal[0, signal.size - 1] = signal
-#     output = self.compute_dit_fft(signal, 0, signal_reshape.size, 1)
-#     return output
+# #   @nb.njit
+# #   def compute_fft(self, signal):
+# #     signal_reshape = np.zeros(2**math.ceil(math.log2(signal.size)))
+# #     self.signal[0, signal.size - 1] = signal
+# #     output = self.compute_dit_fft(signal, 0, signal_reshape.size, 1)
+# #     return output
   
-#   @nb.njit
-#   def compute_dit_fft(self, signal, start, number_of_samples, stride):
-#     output = np.empty(number_of_samples)
-#     if number_of_samples == 1:
-#       output[0] = np.array([signal[start]])
-#     else:
-#       for i in nb.prange(2):
-#         if i == 0:
-#           output_even = self.compute_dit_fft(signal, start, number_of_samples/2, stride*2)
-#         else:
-#           output_odd = self.compute_dit_fft(signal, start + stride, number_of_samples/2, stride*2)
-#       np.concatenate(output_even, output_odd)
-#       for sample_point in nb.prange(number_of_samples/2):
-#         p = output[sample_point]
-#         q = output[sample_point + number_of_samples/2]*math.exp(-1j*math.tau/number_of_samples*sample_point)
-#         output[sample_point] = p + q
-#         output[sample_point + number_of_samples/2] = p - q
-#     return output
+# #   @nb.njit
+# #   def compute_dit_fft(self, signal, start, number_of_samples, stride):
+# #     output = np.empty(number_of_samples)
+# #     if number_of_samples == 1:
+# #       output[0] = np.array([signal[start]])
+# #     else:
+# #       for i in nb.prange(2):
+# #         if i == 0:
+# #           output_even = self.compute_dit_fft(signal, start, number_of_samples/2, stride*2)
+# #         else:
+# #           output_odd = self.compute_dit_fft(signal, start + stride, number_of_samples/2, stride*2)
+# #       np.concatenate(output_even, output_odd)
+# #       for sample_point in nb.prange(number_of_samples/2):
+# #         p = output[sample_point]
+# #         q = output[sample_point + number_of_samples/2]*math.exp(-1j*math.tau/number_of_samples*sample_point)
+# #         output[sample_point] = p + q
+# #         output[sample_point + number_of_samples/2] = p - q
+# #     return output
 
 
 # class Spectrogram():

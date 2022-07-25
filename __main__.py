@@ -44,8 +44,8 @@ if __name__ == "__main__":
 
     # === Scaled protocol ===
     # experiment_time = "20220607T154609" # No signals, By_aux, Compressive
-    experiment_time = "20220517T111439" # One signal, By_aux, Compressive
-    # experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
+    # experiment_time = "20220517T111439" # One signal, By_aux, Compressive
+    experiment_time = "20220520T111524" # Two signals, By_aux, Compressive
 
     # experiment_time = "20220607T134852" # Single pulse, 60 shots
     # experiment_time = "20220607T144242" # Double pulse, 60 shots, u1 = 13, u2 = 223
@@ -187,64 +187,68 @@ if __name__ == "__main__":
     # # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
     # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
     # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-    # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 60)
-    # reconstruction.evaluate_fista_backtracking(
-    #   expected_amplitude = scaled.amplitude,
-    #   expected_frequency = scaled.frequency,
-    #   expected_error_measurement = 1.8,
-    #   norm_scale_factor_modifier = 1,
-    #   is_fast = True,
-    #   norm_scale_factor = 0.8387421955548435
-    # )
-    # reconstruction.plot(archive)
-
-
-    # === ===                 === ===
-    # === === Non compressive === ===
-    # === ===                 === ===
-    # ramsey_results = sim.ramsey.simulate_ramsey(
-    #   scaled,
+    # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 99)
+    # # reconstruction.evaluate_fista_backtracking(
+    # #   expected_amplitude = scaled.amplitude,
+    # #   expected_frequency = scaled.frequency,
+    # #   expected_error_measurement = 1.8,
+    # #   norm_scale_factor_modifier = 1,
+    # #   is_fast = True,
+    # #   norm_scale_factor = 0.8387421955548435
+    # # )
+    # reconstruction.evaluate_least_squares()
+    # reconstruction.plot(
     #   archive,
-    #   # lab_harmonics = lab_harmonics
-    #   line_noise_model,
-    #   signal = signal
+    #   signal_reconstruction
     # )
+
+
+    # # === ===                 === ===
+    # # === === Non compressive === ===
+    # # === ===                 === ===
+    # # ramsey_results = sim.ramsey.simulate_ramsey(
+    # #   scaled,
+    # #   archive,
+    # #   # lab_harmonics = lab_harmonics
+    # #   line_noise_model,
+    # #   signal = signal
+    # # )
+    # # ramsey_results.write_to_archive(archive)
+    # # ramsey_results.plot(archive)
+    # ramsey_results = arch.RamseyResults.new_from_archive_time(
+    #   archive,
+    #   # "20211202T124902" # Lab
+
+    #   # "20220523T124716" # No signals, By_aux, Ramsey
+    #   # "20220520T143240" # One signal, By_aux, Ramsey
+    #   "20220523T141012" # Two signals, By_aux, Ramsey
+
+    #   # "20220520T160357" # Repeated Ramsey calibration
+    # )
+    # # empty_results = arch.RamseyResults.new_from_archive_time(
+    # #   archive,
+    # #   # "20220113T201129" # Simulation 1
+    # #   # "20220201T132717" # Simulation 2
+    # #   # "20220202T135356" # Simulation 3
+    # #   "20220202T184548" # Simulation 4
+    # # )
+
+    # # ramsey_results.time = ramsey_results.time[0:-1:2]
+    # # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
+    # # # empty_results.time = empty_results.time[0:-1:2]
+    # # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
+
+    # # print(ramsey_results.time)
+    # # print(empty_results.time)
+    # # print(ramsey_results.amplitude)
+    # # print(empty_results.amplitude)
+
+    # # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
+    # # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
+    # ramsey_results = sim.ramsey.remove_dc(ramsey_results)
     # ramsey_results.write_to_archive(archive)
     # ramsey_results.plot(archive)
-    ramsey_results = arch.RamseyResults.new_from_archive_time(
-      archive,
-      # "20211202T124902" # Lab
-
-      "20220523T124716" # No signals, By_aux, Ramsey
-      # "20220520T143240" # One signal, By_aux, Ramsey
-      # "20220523T141012" # Two signals, By_aux, Ramsey
-
-      # "20220520T160357" # Repeated Ramsey calibration
-    )
-    # empty_results = arch.RamseyResults.new_from_archive_time(
-    #   archive,
-    #   # "20220113T201129" # Simulation 1
-    #   # "20220201T132717" # Simulation 2
-    #   # "20220202T135356" # Simulation 3
-    #   "20220202T184548" # Simulation 4
-    # )
-
-    # ramsey_results.time = ramsey_results.time[0:-1:2]
-    # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
-    # # empty_results.time = empty_results.time[0:-1:2]
-    # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
-
-    # print(ramsey_results.time)
-    # print(empty_results.time)
-    # print(ramsey_results.amplitude)
-    # print(empty_results.amplitude)
-
-    # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
-    # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
-    ramsey_results = sim.ramsey.remove_dc(ramsey_results)
-    ramsey_results.write_to_archive(archive)
-    ramsey_results.plot(archive)
-    ramsey_comparison_results = sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
+    # ramsey_comparison_results = sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
 
 
     # === ===                       === ===
@@ -276,11 +280,11 @@ if __name__ == "__main__":
         frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
         frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
       ),
-      sweep_parameters = (2, 10000, 10),
+      sweep_parameters = (2, 10000, 1),
       archive = archive,
       random_seeds = np.arange(10)*util.Seeds.metroid,
       evaluation_methods = [
-        "least_squares",
+        # "least_squares",
 
         "fista_backtracking",
         # "fista_adaptive",
@@ -300,14 +304,14 @@ if __name__ == "__main__":
       ],
       expected_amplitude = scaled.amplitude,
       expected_frequency = scaled.frequency,
-      expected_error_measurement = 9.45, #1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      expected_error_measurement = 1.8, #9.45, #1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
       norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
       frequency_line_noise = 50,
       rabi_frequency_readout = 2e3,
       frequency_cutoff_high = scaled.sweep[1],
       # units = "nT"
       units = "Hz",
-      ramsey_comparison_results = ramsey_comparison_results
+      ramsey_comparison_results = None #ramsey_comparison_results
     )
     # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
     # recon.run_reconstruction_norm_scale_factor_sweep(
