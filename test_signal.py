@@ -367,11 +367,11 @@ class TestSignal:
     self.signal_trace_time = signal_trace_time
     self.signal_trace_amplitude = signal_trace_amplitude
     if do_evaluate:
-      # self.get_amplitude()
-      self.time_properties.time_coarse = np.arange(self.time_properties.time_end_points[0], self.time_properties.time_end_points[1], self.time_properties.time_step_coarse)
+      self.get_amplitude()
+      # self.time_properties.time_coarse = np.arange(self.time_properties.time_end_points[0], self.time_properties.time_end_points[1], self.time_properties.time_step_coarse)
       if self.signal_trace_time is not None:
         self.amplitude[:self.signal_trace_amplitude[self.signal_trace_time >= self.time_properties.time_end_points[0]].size] = self.signal_trace_amplitude[self.signal_trace_time >= self.time_properties.time_end_points[0]]
-      # self.get_frequency_amplitude()
+      self.get_frequency_amplitude()
 
   def get_amplitude(self):
     """
