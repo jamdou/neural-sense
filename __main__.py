@@ -183,161 +183,161 @@ if __name__ == "__main__":
     experiment_results.write_to_archive(archive)
     experiment_results.plot(archive, signal_reconstruction, units = "nT")
 
-    # === Make reconstructions ===
-    # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
-    # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
-    reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
-    reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 60)
-    reconstruction.evaluate_fista_backtracking(
-      expected_amplitude = scaled.amplitude,
-      expected_frequency = scaled.frequency,
-      expected_error_measurement = 1.8,
-      norm_scale_factor_modifier = 1,
-      is_fast = True,
-      norm_scale_factor = 0.8387421955548435
-    )
-    reconstruction.plot(archive)
-
-
-    # # === ===                 === ===
-    # # === === Non compressive === ===
-    # # === ===                 === ===
-    # # ramsey_results = sim.ramsey.simulate_ramsey(
-    # #   scaled,
-    # #   archive,
-    # #   # lab_harmonics = lab_harmonics
-    # #   line_noise_model,
-    # #   signal = signal
-    # # )
-    # # ramsey_results.write_to_archive(archive)
-    # # ramsey_results.plot(archive)
-    # ramsey_results = arch.RamseyResults.new_from_archive_time(
-    #   archive,
-    #   # "20211202T124902" # Lab
-
-    #   # "20220523T124716" # No signals, By_aux, Ramsey
-    #   # "20220520T143240" # One signal, By_aux, Ramsey
-    #   "20220523T141012" # Two signals, By_aux, Ramsey
-
-    #   # "20220520T160357" # Repeated Ramsey calibration
+    # # === Make reconstructions ===
+    # # experiment_results = analysis.find_noise_size_from_rabi(experiment_results, scaled, archive)
+    # # experiment_results = analysis.add_shot_noise(experiment_results, scaled, archive, atom_count = 10e3, noise_modifier = 3)
+    # reconstruction = recon.Reconstruction(signal_reconstruction.time_properties)
+    # reconstruction.read_frequencies_from_experiment_results(experiment_results, number_of_samples = 60)
+    # reconstruction.evaluate_fista_backtracking(
+    #   expected_amplitude = scaled.amplitude,
+    #   expected_frequency = scaled.frequency,
+    #   expected_error_measurement = 1.8,
+    #   norm_scale_factor_modifier = 1,
+    #   is_fast = True,
+    #   norm_scale_factor = 0.8387421955548435
     # )
-    # # empty_results = arch.RamseyResults.new_from_archive_time(
-    # #   archive,
-    # #   # "20220113T201129" # Simulation 1
-    # #   # "20220201T132717" # Simulation 2
-    # #   # "20220202T135356" # Simulation 3
-    # #   "20220202T184548" # Simulation 4
-    # # )
+    # reconstruction.plot(archive)
 
-    # # ramsey_results.time = ramsey_results.time[0:-1:2]
-    # # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
-    # # # empty_results.time = empty_results.time[0:-1:2]
-    # # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
 
-    # # print(ramsey_results.time)
-    # # print(empty_results.time)
-    # # print(ramsey_results.amplitude)
-    # # print(empty_results.amplitude)
-
-    # # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
-    # # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
-    # ramsey_results = sim.ramsey.remove_dc(ramsey_results)
+    # === ===                 === ===
+    # === === Non compressive === ===
+    # === ===                 === ===
+    # ramsey_results = sim.ramsey.simulate_ramsey(
+    #   scaled,
+    #   archive,
+    #   # lab_harmonics = lab_harmonics
+    #   line_noise_model,
+    #   signal = signal
+    # )
     # ramsey_results.write_to_archive(archive)
     # ramsey_results.plot(archive)
-    # ramsey_comparison_results = sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
+    ramsey_results = arch.RamseyResults.new_from_archive_time(
+      archive,
+      # "20211202T124902" # Lab
+
+      "20220523T124716" # No signals, By_aux, Ramsey
+      # "20220520T143240" # One signal, By_aux, Ramsey
+      # "20220523T141012" # Two signals, By_aux, Ramsey
+
+      # "20220520T160357" # Repeated Ramsey calibration
+    )
+    # empty_results = arch.RamseyResults.new_from_archive_time(
+    #   archive,
+    #   # "20220113T201129" # Simulation 1
+    #   # "20220201T132717" # Simulation 2
+    #   # "20220202T135356" # Simulation 3
+    #   "20220202T184548" # Simulation 4
+    # )
+
+    # ramsey_results.time = ramsey_results.time[0:-1:2]
+    # ramsey_results.amplitude = ramsey_results.amplitude[0:-1:2]
+    # # empty_results.time = empty_results.time[0:-1:2]
+    # # empty_results.amplitude = empty_results.amplitude[0:-1:2]
+
+    # print(ramsey_results.time)
+    # print(empty_results.time)
+    # print(ramsey_results.amplitude)
+    # print(empty_results.amplitude)
+
+    # ramsey_results = sim.ramsey.remove_line_noise_bias(ramsey_results, empty_results)
+    # ramsey_results = sim.ramsey.mode_filter(ramsey_results)
+    ramsey_results = sim.ramsey.remove_dc(ramsey_results)
+    ramsey_results.write_to_archive(archive)
+    ramsey_results.plot(archive)
+    ramsey_comparison_results = sim.ramsey.compare_to_test_signal(ramsey_results, signal_reconstruction, archive)
 
 
-    # # === ===                       === ===
-    # # === === Sweep reconstructions === ===
-    # # === ===                       === ===
+    # === ===                       === ===
+    # === === Sweep reconstructions === ===
+    # === ===                       === ===
 
-    # # # experiment_results.frequency -= 100
-    # # experiment_results = analysis.reverse_polarity(experiment_results)
-    # # # experiment_results = analysis.arcsin_filter(experiment_results)
-    # # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
-    # # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
-    # # # experiment_results = analysis.mode_filter(experiment_results)
-    # # # experiment_results = analysis.whitening_filter(experiment_results)
-    # # # experiment_results = analysis.mode_filter(experiment_results)
+    # # experiment_results.frequency -= 100
+    # experiment_results = analysis.reverse_polarity(experiment_results)
+    # # experiment_results = analysis.arcsin_filter(experiment_results)
+    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15])), archive)
+    # # experiment_results = analysis.remove_line_noise_from_evaluation(experiment_results, scaled, arch.ExperimentResults.new_from_archive_time(archive, util.get_noise_evaluation(experiment_time[0:15])[0:15]), archive)
+    # # experiment_results = analysis.mode_filter(experiment_results)
+    # # experiment_results = analysis.whitening_filter(experiment_results)
+    # # experiment_results = analysis.mode_filter(experiment_results)
+    # archive_empty = arch.Archive(archive_path, "")
+    # archive_empty.open_archive_file("20220208T171729")
+    # experiment_results = analysis.analyse_readout_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20220208T171729")), archive = archive)
     # # archive_empty = arch.Archive(archive_path, "")
-    # # archive_empty.open_archive_file("20220208T171729")
-    # # experiment_results = analysis.analyse_readout_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20220208T171729")), archive = archive)
-    # # # archive_empty = arch.Archive(archive_path, "")
-    # # # archive_empty.open_archive_file("20211216T113507")
-    # # # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507")), archive = archive)
-    # # # experiment_results.write_to_archive(archive)
-    # # # experiment_results.plot(archive, signal_reconstruction)
+    # # archive_empty.open_archive_file("20211216T113507")
+    # # experiment_results = analysis.analyse_overall_noise(experiment_results = experiment_results, experiment_results_empty = analysis.reverse_polarity(arch.ExperimentResults.new_from_archive_time(archive_empty, "20211216T113507")), archive = archive)
+    # # experiment_results.write_to_archive(archive)
+    # # experiment_results.plot(archive, signal_reconstruction)
 
-    # # experiment_results = analysis.remove_dc_detuning(experiment_results, scaled, archive)
-    # recon.run_reconstruction_subsample_sweep(
+    # experiment_results = analysis.remove_dc_detuning(experiment_results, scaled, archive)
+    recon.run_reconstruction_subsample_sweep(
+      expected_signal = signal_reconstruction,
+      # experiment_results = experiment_results,
+      experiment_results = arch.ExperimentResults(
+        frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
+        frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
+      ),
+      sweep_parameters = (2, 10000, 10),
+      archive = archive,
+      random_seeds = np.arange(10)*util.Seeds.metroid,
+      evaluation_methods = [
+        "least_squares",
+
+        "fista_backtracking",
+        # "fista_adaptive",
+        # "fista_informed_least_squares",
+        # "fadaptive_informed_least_squares",
+
+        # "ista_backtracking",
+        # "ista_adaptive",
+        # "ista_informed_least_squares",
+        # "adaptive_informed_least_squares",
+        # "adaptive_frequency_fit"
+      ],
+      metrics = [
+        "rmse",
+        # "confusion_fixed",
+        "roc"
+      ],
+      expected_amplitude = scaled.amplitude,
+      expected_frequency = scaled.frequency,
+      expected_error_measurement = 9.45, #1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
+      norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+      frequency_line_noise = 50,
+      rabi_frequency_readout = 2e3,
+      frequency_cutoff_high = scaled.sweep[1],
+      # units = "nT"
+      units = "Hz",
+      ramsey_comparison_results = ramsey_comparison_results
+    )
+    # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
+    # recon.run_reconstruction_norm_scale_factor_sweep(
     #   expected_signal = signal_reconstruction,
-    #   # experiment_results = experiment_results,
-    #   experiment_results = arch.ExperimentResults(
-    #     frequency_amplitude = experiment_results.frequency_amplitude[experiment_results.frequency < scaled.sweep[1]],
-    #     frequency = experiment_results.frequency[experiment_results.frequency < scaled.sweep[1]]
-    #   ),
-    #   sweep_parameters = (2, 10000, 10),
+    #   experiment_results = experiment_results,
+    #   sweep_parameters = (0.001, 0.2, 25), #(0.01, 2, 50), #(1, 75, 100),
     #   archive = archive,
-    #   random_seeds = np.arange(10)*util.Seeds.metroid,
+    #   random_seeds = np.arange(1)*util.Seeds.metroid,
     #   evaluation_methods = [
-    #     "least_squares",
-
-    #     "fista_backtracking",
-    #     # "fista_adaptive",
+    #     # "fista_backtracking",
     #     # "fista_informed_least_squares",
-    #     # "fadaptive_informed_least_squares",
-
-    #     # "ista_backtracking",
-    #     # "ista_adaptive",
-    #     # "ista_informed_least_squares",
-    #     # "adaptive_informed_least_squares",
+    #     "fadaptive_informed_least_squares",
+    #     # "fista_adaptive"
     #     # "adaptive_frequency_fit"
-    #   ],
-    #   metrics = [
-    #     "rmse",
-    #     # "confusion_fixed",
-    #     "roc"
     #   ],
     #   expected_amplitude = scaled.amplitude,
     #   expected_frequency = scaled.frequency,
-    #   expected_error_measurement = 9.45, #1, #0.01, #0.667, #0.1, #5.18, #5.5, #3, #6, #4, #0.40, #0.25, #0.05, #0.2, #11.87,
-    #   norm_scale_factor_modifier = 1, #1/96, #1/64, #1/10,# 1/32, #0.125, #0.2, #0.025, #0.07, #0.11, #0.085, #0.1, #0.5, #1, #3, #0.001,
+    #   expected_error_measurement = 5, #0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
     #   frequency_line_noise = 50,
-    #   rabi_frequency_readout = 2e3,
-    #   frequency_cutoff_high = scaled.sweep[1],
-    #   # units = "nT"
-    #   units = "Hz",
-    #   ramsey_comparison_results = ramsey_comparison_results
+    #   rabi_frequency_readout = 20e3,
+    #   number_of_samples = 10000,
+    #   frequency_cutoff_low = 0,
+    #   # frequency_cutoff_low = 20e3,
+    #   frequency_cutoff_high = 25e3 - 1,
+    #   # frequency_cutoff_high = 12.5e3 - 1,
+    #   # frequency_cutoff_high = 10e3 - 1,
+    #   frequency_fit_step_size = 1e-1,
+    #   # number_of_samples = 50
+    #   units = "nT"
     # )
-    # # experiment_results = analysis.remove_line_noise_from_model(experiment_results, scaled, line_noise_model, archive)
-    # # recon.run_reconstruction_norm_scale_factor_sweep(
-    # #   expected_signal = signal_reconstruction,
-    # #   experiment_results = experiment_results,
-    # #   sweep_parameters = (0.001, 0.2, 25), #(0.01, 2, 50), #(1, 75, 100),
-    # #   archive = archive,
-    # #   random_seeds = np.arange(1)*util.Seeds.metroid,
-    # #   evaluation_methods = [
-    # #     # "fista_backtracking",
-    # #     # "fista_informed_least_squares",
-    # #     "fadaptive_informed_least_squares",
-    # #     # "fista_adaptive"
-    # #     # "adaptive_frequency_fit"
-    # #   ],
-    # #   expected_amplitude = scaled.amplitude,
-    # #   expected_frequency = scaled.frequency,
-    # #   expected_error_measurement = 5, #0.5, #0.2, #1, #0.4,#0.1, #6, #4,#0.40,#0.25,#0.05,#0.2,#11.87,
-    # #   frequency_line_noise = 50,
-    # #   rabi_frequency_readout = 20e3,
-    # #   number_of_samples = 10000,
-    # #   frequency_cutoff_low = 0,
-    # #   # frequency_cutoff_low = 20e3,
-    # #   frequency_cutoff_high = 25e3 - 1,
-    # #   # frequency_cutoff_high = 12.5e3 - 1,
-    # #   # frequency_cutoff_high = 10e3 - 1,
-    # #   frequency_fit_step_size = 1e-1,
-    # #   # number_of_samples = 50
-    # #   units = "nT"
-    # # )
 
     # === ===          === ===
     # === === Analysis === ===
@@ -470,21 +470,23 @@ if __name__ == "__main__":
     # # # # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210507T165913", "20210507T170105", "20210507T170256", "20210507T170456", "20210507T170646", "20210507T170822", "20210504T175150"], reference_name = "SciPy", is_external = False)
     # # # # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
-    # results_compilation = sim.cross_validate.ResultsCompilation.generate_inputs(number_of_experiments = 1000)
+    # results_compilation = sim.cross_validate.ResultsCompilation.generate_inputs(number_of_experiments = 10)
     # results_compilation.write_to_file(archive)
     # results_compilation.simulate(archive)
     # # results_compilation = sim.cross_validate.ResultsCompilation.read_simulations_from_archive_time(
     # #   archive,
-    # #   "20220707T144904"
+    # #   # "20220707T144904"
     # #   # "20220707T142432"
     # #   # "20220701T144056"
+    # #   "20220720T125417" # Test
+    # #   # "20220711T123323" # Full
     # # )
-    # results_compilation.reconstruct(archive, number_of_samples = 200)
+    # results_compilation.reconstruct(archive, number_of_samples = 10, metric = "rms")
     # # results_compilation.read_reconstructions_from_archive_time(
     # #   archive,
     # #   "20220711T114256"
     # # )
-    # results_compilation.cross_validate(archive, number_of_folds = 10)
+    # results_compilation.cross_validate(archive, number_of_folds = 5, metric = "rms")
 
     # === Clean up ===
     archive.close_archive_file()
