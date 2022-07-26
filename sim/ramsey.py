@@ -250,7 +250,7 @@ def mode_filter(results:arch.RamseyResults):
   results_modified = arch.RamseyResults(time = time, amplitude = amplitude_modified, archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, mode filter")
   return results_modified
 
-def remove_dc(results:arch.RamseyResults, do_remove_first_sample = False):
+def remove_dc(results:arch.RamseyResults, do_remove_first_sample = True):
   amplitude = results.amplitude.copy()
   time = results.time.copy()
   amplitude_modified = amplitude - np.mean(amplitude)

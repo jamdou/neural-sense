@@ -46,6 +46,7 @@ class PrettyTritty:
 C = PrettyTritty
 class Seeds:
   metroid = 19960806
+  reverse_metroid = 6081996
 
 class ScaledParameters():
   def __init__(self, scaled_frequency = 5000, scaled_density = 1/25, scaled_samples = 10, scaled_amplitude = 800, scaled_sweep = [2000, 7000], scaled_pulse_time_fraction = 0.2333333, scaled_time_step = None, scaled_time_end = None, scaled_pulse_time = None, scaled_frequency_step = None, scaled_stagger_constant = None, scaled_sample_frequencies = None):

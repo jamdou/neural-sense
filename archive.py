@@ -237,12 +237,12 @@ class Archive:
         archive_index += 1
       archive_index_text = f"_{archive_index}"
 
-    plt.title(title)
-    plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}_publication.pdf")
+    plt.suptitle(title)
+    plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}_publication.pdf", bbox_inches='tight', transparent=True)
     plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}_publication.png")
 
-    plt.title(f"{self.execution_time_string}\n{title}")
-    plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.pdf")
+    plt.suptitle(f"{self.execution_time_string}\n{title}")
+    plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.pdf", bbox_inches='tight', transparent=True)
     plt.savefig(f"{self.plot_path}{file_name}{archive_index_text}.png")
 
 class ExperimentResults:

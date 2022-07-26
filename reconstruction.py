@@ -1,6 +1,8 @@
+from statistics import stdev
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import math
 from numba import cuda
 import numba as nb
@@ -1308,7 +1310,9 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     stdevs_method_roc_amplitude = []
 
     roc_cutoff_max = np.sum(template_amplitude**2)*8
-    roc_cutoff_min = np.sum(template_amplitude**2)*1e-4
+    # roc_cutoff_max = np.sum(template_amplitude**2)*1e2
+    # roc_cutoff_min = np.sum(template_amplitude**2)*1e-4
+    roc_cutoff_min = np.sum(template_amplitude**2)*1e-30
     roc_resolution = 100
     roc_ground_truth = scipy.signal.correlate(expected_signal.amplitude, template_amplitude) >= matched_cutoff
 
@@ -1404,7 +1408,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
           roc_sensitivity = [1]
           roc_specificity = [0]
           roc_matched_filter_output = scipy.signal.correlate(amplitude, template_amplitude)
-          for roc_cutoff in np.geomspace(roc_cutoff_min, roc_cutoff_max, roc_resolution):
+          for roc_cutoff in (np.geomspace(roc_cutoff_min, roc_cutoff_max, roc_resolution) - 2*roc_cutoff_min):
             roc_decision = roc_matched_filter_output >= roc_cutoff
             if np.sum(roc_ground_truth) > 0:
               roc_sensitivity.append(np.sum(np.logical_and(roc_ground_truth, roc_decision))/np.sum(roc_ground_truth))
@@ -1415,8 +1419,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
             else:
               roc_specificity.append(1)
           roc_sensitivity.append(0)
-          roc_specificity.append(roc_specificity[-1])
-          roc_sensitivity[0] = roc_sensitivity[1]
+          # roc_specificity.append(roc_specificity[-1])
+          roc_specificity.append(1)
+          # roc_sensitivity[0] = roc_sensitivity[1]
+          roc_sensitivity[0] = 1
           roc_sensitivity.append(0)
           roc_specificity.append(0)
 
@@ -2051,6 +2057,126 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
     if archive:
       archive.write_plot(f"Sweeping the regularisation parameter used in reconstruction\n{evaluation_method_labels[evaluation_method]}, Residual", f"norm_scale_factor_{evaluation_method}_residual")
     plt.draw()
+
+def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archive_times, reconstruction_method = "fista_backtracking", metrics = ["2", "roc_auc"], labels = ["Single pulse signal", "Double pulse signal"], units = "Hz"):
+  if "Hz" in units:
+    unit_factor = 1
+  elif "T" in units:
+    unit_factor = 1/7e9
+  if "n" in units:
+    unit_factor *= 1e9
+  elif "μ" in units:
+    unit_factor *= 1e6
+  elif "m" in units:
+    unit_factor *= 1e3
+
+  first = True
+  errors_signal = []
+  stdevs_signal = []
+  for archive_time in archive_times:
+    archive_previous = Archive(archive.archive_path[:-25], "")
+    archive_previous.open_archive_file(archive_time)
+    if first:
+      archive_group = archive_previous.archive_file.require_group("reconstruction_sweeps/number_of_samples")
+      number_of_samples = np.asarray(archive_group["number_of_samples"])
+      first = False
+    archive_group = archive_previous.archive_file.require_group(f"reconstruction_sweeps/number_of_samples/{reconstruction_method}/")
+    errors_metric = []
+    stdevs_metric = []
+    for metric in metrics:
+      errors_metric.append(np.asarray(archive_group[f"error_{metric}"]))
+      stdevs_metric.append(np.asarray(archive_group[f"stdev_{metric}"]))
+    errors_signal.append(errors_metric)
+    stdevs_signal.append(stdevs_metric)
+
+  colours = ["m", "c"]
+  ylabel_map = {
+    "2" : f"RMSE ({units})",
+    "roc_auc" : f"ROC AUC (%)"
+  }
+  unit_factor_map = {
+    "2" : unit_factor,
+    "roc_auc" : 100
+  }
+  metric_label_map = {
+    "2" : "RMSE",
+    "roc_auc" : "Area under receiver operating characteristic"
+  }
+
+  # mpl.rcParams.update(
+  #   {
+  #     "font.size": 2*mpl.rcParams.get("font.size"),
+  #     "axes.linewidth": 2*mpl.rcParams.get("axes.linewidth")
+  #   }
+  # )
+  # plt.figure(figsize = [6.4/2, 4.8/2])
+  for metric_index, metric in enumerate(metrics):
+    plt.subplot(len(metrics), 1, len(metrics) - metric_index)
+    for signal_index, label in enumerate(labels):
+      error = errors_signal[signal_index][metric_index]
+      stdev = stdevs_signal[signal_index][metric_index]
+      plt.fill_between(number_of_samples, (error + stdev)*unit_factor_map[metric], (error - stdev)*unit_factor_map[metric], color = {colours[signal_index]}, alpha = 0.25)
+      plt.plot(number_of_samples, error*unit_factor_map[metric], f"{colours[signal_index]}-", label = label)
+    if metric_index == 0:
+      plt.xlabel("Number of samples used in reconstruction", size = 16)
+      # plt.legend()
+    else:
+      plt.gca().axes.xaxis.set_ticklabels([])
+    plt.ylabel(ylabel_map[metric], size = 16)
+    plt.ylim(bottom = 0, top = 1.2*np.max(error + stdev)*unit_factor_map[metric])
+    plt.xlim(left = 0, right = 100)
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
+  if archive:
+    archive.write_plot(f"", f"number_of_samples_comparison")
+  plt.draw()
+
+def plot_reconstruction_method_comparison(archive, results_objects, ground_truth, units = "nT"):
+  if "Hz" in units:
+    unit_factor = 1
+  elif "T" in units:
+    unit_factor = 1/7e9
+  if "n" in units:
+    unit_factor *= 1e9
+  elif "μ" in units:
+    unit_factor *= 1e6
+  elif "m" in units:
+    unit_factor *= 1e3
+
+  colour_map = ["r", "y", "c"]
+
+  for result_index, result_object in enumerate(results_objects):
+    plt.subplot(3, 2, result_index + 1)
+    if isinstance(result_object, Reconstruction):
+      time = result_object.time_properties.time_coarse = time
+      amplitude = result_object.amplitude
+    else:
+      time = result_object.time
+      amplitude = result_object.amplitude
+    if result_index < 4:
+      plt.gca().axes.xaxis.set_ticklabels([])
+    else:
+      plt.xlabel(f"Time (ms)", size = 16)
+    if math.fmod(result_index, 2) == 1:
+      plt.gca().axes.yaxis.set_ticklabels([])
+    if result_index == 2:
+      plt.ylabel(f"Magnetic field ({units})", size = 16)
+    plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "-k")
+    plt.plot(time/1e-3, amplitude*unit_factor, f"-{colour_map[math.floor(result_index/2)]}")
+    plt.xlim(left = 0, right = 5)
+    plt.ylim(top = 800*unit_factor, bottom = -800*unit_factor)
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
+    plt.text(0.25, 600*unit_factor, f"({chr(97 + result_index)})", size = 16)
+    plt.subplots_adjust(wspace = 0.05)
+  if archive:
+    archive.write_plot(f"", f"methods_comparison")
+  plt.show()
+
+
+
+
+
 #   def evaluate_ista_complete(self):
 #     """
 #     Run compressive sensing based on the Iterative Shrinkage Thresholding Algorithm (ISTA)
