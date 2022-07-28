@@ -2104,13 +2104,7 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     "roc_auc" : "Area under receiver operating characteristic"
   }
 
-  # mpl.rcParams.update(
-  #   {
-  #     "font.size": 2*mpl.rcParams.get("font.size"),
-  #     "axes.linewidth": 2*mpl.rcParams.get("axes.linewidth")
-  #   }
-  # )
-  # plt.figure(figsize = [6.4/2, 4.8/2])
+  plt.figure()
   for metric_index, metric in enumerate(metrics):
     plt.subplot(len(metrics), 1, len(metrics) - metric_index)
     for signal_index, label in enumerate(labels):
@@ -2145,24 +2139,27 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
     unit_factor *= 1e3
 
   colour_map = ["r", "y", "c"]
+  reorder_map = [0, 3, 1, 4, 2, 5]
 
-  plt.figure(figsize = [6.4, 4.8*2])
+  plt.figure(figsize = [(6.4 + 0.4)*2, 4.8])
   for result_index, result_object in enumerate(results_objects):
-    plt.subplot(3, 2, result_index + 1)
+    plt.subplot(2, 3, reorder_map[result_index] + 1)
     if isinstance(result_object, Reconstruction):
       time = result_object.time_properties.time_coarse
       amplitude = result_object.amplitude
     else:
       time = result_object.time
       amplitude = result_object.amplitude
-    if result_index < 4:
+    if reorder_map[result_index] < 3:
       plt.gca().axes.xaxis.set_ticklabels([])
     else:
       plt.xlabel(f"Time (ms)", size = 16)
-    if math.fmod(result_index, 2) == 1:
+    if math.fmod(reorder_map[result_index], 3) >= 1:
       plt.gca().axes.yaxis.set_ticklabels([])
-    if result_index == 2:
-      plt.ylabel(f"Magnetic field ({units})", size = 16)
+    else:
+      plt.ylabel(f"Magnetic\nfield ({units})", size = 16)
+    # if result_index == 0:
+      
     plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "-k")
     plt.plot(time/1e-3, amplitude*unit_factor, f"-{colour_map[math.floor(result_index/2)]}")
     plt.xlim(left = 0, right = 5)
@@ -2174,6 +2171,49 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
   if archive:
     archive.write_plot(f"", f"methods_comparison")
   plt.show()
+
+# def plot_reconstruction_method_comparison_abstract(archive, results_objects, ground_truth, units = "nT"):
+#   if "Hz" in units:
+#     unit_factor = 1
+#   elif "T" in units:
+#     unit_factor = 1/7e9
+#   if "n" in units:
+#     unit_factor *= 1e9
+#   elif "μ" in units:
+#     unit_factor *= 1e6
+#   elif "m" in units:
+#     unit_factor *= 1e3
+
+#   colour_map = ["r", "y", "c"]
+#   reorder_map = [0, 3, 1, 4, 2, 5]
+
+#   plt.figure(figsize = [(6.4 + 0.4)*2, 4.8/2])
+#   for result_index, result_object in enumerate(results_objects):
+#     plt.subplot(1, 3, reorder_map[result_index] + 1)
+#     if isinstance(result_object, Reconstruction):
+#       time = result_object.time_properties.time_coarse
+#       amplitude = result_object.amplitude
+#     else:
+#       time = result_object.time
+#       amplitude = result_object.amplitude
+#       plt.xlabel(f"Time (ms)", size = 16)
+#     if math.fmod(reorder_map[result_index], 3) >= 1:
+#       plt.gca().axes.yaxis.set_ticklabels([])
+#     else:
+#       plt.ylabel(f"Magnetic\nfield ({units})", size = 16)
+#     # if result_index == 0:
+      
+#     plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "-k")
+#     plt.plot(time/1e-3, amplitude*unit_factor, f"-{colour_map[math.floor(result_index/2)]}")
+#     plt.xlim(left = 0, right = 5)
+#     plt.ylim(top = 800*unit_factor, bottom = -800*unit_factor)
+#     plt.gca().spines["right"].set_visible(False)
+#     plt.gca().spines["top"].set_visible(False)
+#     plt.text(0.25, 600*unit_factor, f"({chr(97 + result_index)})", size = 16)
+#     plt.subplots_adjust(wspace = 0.05)
+#   if archive:
+#     archive.write_plot(f"", f"methods_comparison")
+#   plt.show()
 
 def plot_reconstruction_unknown(archive, results_objects, units = "nT"):
   if "Hz" in units:
