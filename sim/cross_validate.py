@@ -179,8 +179,8 @@ class ResultsCompilation:
       reconstruction.read_frequencies_directly(
         self.frequency,
         self.frequency_amplitudes[experiment_index, :],
-        # 60,
-        100,
+        60,
+        # 100,
         0, 20e3
       )
       error_experiment = []

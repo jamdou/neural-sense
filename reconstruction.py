@@ -1227,7 +1227,8 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
             # norm_scale_factor = 0.8387421955548435
             # norm_scale_factor = 1.291549665014884
             # norm_scale_factor = 3.313982602739096
-            norm_scale_factor = 1.123810254675881
+            # norm_scale_factor = 1.123810254675881
+            norm_scale_factor = 0.7488103857590022
           )
         elif evaluation_method == "ista_backtracking":
           reconstruction.evaluate_fista_backtracking(expected_amplitude = expected_amplitude, expected_frequency = expected_frequency, expected_error_measurement = expected_error_measurement, norm_scale_factor_modifier = norm_scale_factor_modifier, is_fast = True)
@@ -2145,6 +2146,7 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
 
   colour_map = ["r", "y", "c"]
 
+  plt.figure(figsize = [6.4, 4.8*2])
   for result_index, result_object in enumerate(results_objects):
     plt.subplot(3, 2, result_index + 1)
     if isinstance(result_object, Reconstruction):

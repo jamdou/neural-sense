@@ -299,7 +299,7 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 389, #1000,
+        scaled_amplitude = 1000, #389, #1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.732]
       )
@@ -309,7 +309,7 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 389, #1000,
+        scaled_amplitude = 1000, #389, #1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.254, 0.666]
       )
@@ -319,7 +319,7 @@ class ScaledParameters():
         scaled_frequency = 5000,
         scaled_density = 1/25,
         scaled_samples = 4,
-        scaled_amplitude = 389, #1000,
+        scaled_amplitude = 1000, #389, #1000,
         scaled_sweep = [100, 10000],
         scaled_pulse_time_fraction = [0.254, 0.666]
       )
