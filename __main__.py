@@ -383,9 +383,9 @@ if __name__ == "__main__":
     # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 
     # paper_plots.CompressivePaper.make_comparison(archive)
-    # paper_plots.CompressivePaper.make_metrics(archive)
+    paper_plots.CompressivePaper.make_metrics(archive)
     # paper_plots.CompressivePaper.make_unknown(archive)
-    paper_plots.Aip2022.make_abstract_plot(archive)
+    # paper_plots.Aip2022.make_abstract_plot(archive)
 
     
 

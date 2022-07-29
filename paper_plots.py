@@ -123,7 +123,11 @@ class CompressivePaper:
 
   @staticmethod
   def make_metrics(archive):
-    recon.plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, ["20220725T162532", "20220725T164434"])
+    recon.plot_reconstruction_number_of_samples_sweep_signal_comparison(
+      archive,
+      # ["20220725T162532", "20220725T164434"] # 360 Hz
+      ["20220728T111144", "20220728T120757"] # 1 kHz
+    )
 
 class Aip2022:
   @staticmethod

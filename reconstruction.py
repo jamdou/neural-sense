@@ -2126,6 +2126,24 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     archive.write_plot(f"", f"number_of_samples_comparison")
   plt.draw()
 
+  fig = plt.figure(figsize = [6.4, 4.8*3/4])
+  for signal_index, label in enumerate(labels):
+    error = errors_signal[signal_index][metric_index]
+    stdev = stdevs_signal[signal_index][metric_index]
+    plt.fill_between(number_of_samples, (error + stdev)*unit_factor_map[metric], (error - stdev)*unit_factor_map[metric], color = {colours[signal_index]}, alpha = 0.25)
+    plt.plot(number_of_samples, error*unit_factor_map[metric], f"{colours[signal_index]}-", label = label)
+  plt.xlabel("Number of samples used in reconstruction", size = 16)
+  plt.ylabel(ylabel_map[metric], size = 16)
+  plt.ylim(bottom = 0, top = 1.1*np.max(error + stdev)*unit_factor_map[metric])
+  plt.xlim(left = 0, right = 100)
+  plt.gca().spines["right"].set_visible(False)
+  plt.gca().spines["top"].set_visible(False)
+  fig.subplots_adjust(bottom=0.15)
+  # plt.text(5, 1.1*np.max(error + stdev)*unit_factor_map[metric], f"({chr(98 - metric_index)})", size = 16)
+  if archive:
+    archive.write_plot(f"", f"number_of_samples_comparison_auc")
+  plt.draw()
+
 def plot_reconstruction_method_comparison(archive, results_objects, ground_truth, units = "nT"):
   if "Hz" in units:
     unit_factor = 1
