@@ -204,6 +204,9 @@ class ResultsCompilation:
             #   error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude - self.amplitudes[experiment_index, :])**2)))
           else:
             error_experiment.append(np.sqrt(np.sum((reconstruction.amplitude)**2)))
+        elif metric == "support":
+          error_experiment.append(np.sum(np.logical_and(np.abs(reconstruction.amplitude) > 5, np.abs(self.amplitudes[experiment_index, :]) < 5) + 24*np.logical_and(np.abs(reconstruction.amplitude) < 5, np.abs(self.amplitudes[experiment_index, :]) > 5))/25)
+          # error_experiment.append(np.sum(np.logical_and(np.abs(reconstruction.amplitude) > 0, np.abs(self.amplitudes[experiment_index, :]) < 100)) + 25*np.sum(np.logical_and(np.abs(reconstruction.amplitude) < 0.7*np.abs(self.amplitudes[experiment_index, :]), np.abs(self.amplitudes[experiment_index, :]) > 100)))
       error_experiment = np.array(error_experiment)
       self.error_array.append(error_experiment)
       archive_group[f"{experiment_index}"] = error_experiment
@@ -283,6 +286,8 @@ class ResultsCompilation:
       plt.ylabel(f"Average RMSE for training set ({units})")
     elif metric == "scaled rms":
       plt.ylabel(f"Average noise RMS for training set ({units})")
+    elif metric == "support":
+      plt.ylabel(f"Weighted support error for training set")
     plt.legend(["Error curve for training", "Regularisation parameter determined from training set"])
     if archive:
       archive.write_plot(f"Cross validation:\nMinimising regularisation parameter", f"cross_validation_min")
