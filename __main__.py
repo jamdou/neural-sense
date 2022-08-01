@@ -382,7 +382,7 @@ if __name__ == "__main__":
 
     # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 
-    # paper_plots.CompressivePaper.make_comparison(archive)
+    paper_plots.CompressivePaper.make_comparison(archive)
     # paper_plots.CompressivePaper.make_metrics(archive)
     # paper_plots.CompressivePaper.make_unknown(archive)
     # paper_plots.Aip2022.make_abstract_plot(archive)
@@ -486,27 +486,27 @@ if __name__ == "__main__":
     # # # # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210507T165913", "20210507T170105", "20210507T170256", "20210507T170456", "20210507T170646", "20210507T170822", "20210504T175150"], reference_name = "SciPy", is_external = False)
     # # # # sim.benchmark.plot_benchmark_comparison(archive, ["20210423T181745", "20210422T091436", "20210422T090233"], ["ss", "sp", "sp (h)", "mm", "mm (h)"], "Comparison of alternative integration packages")
 
-    # results_compilation = sim.cross_validate.ResultsCompilation.generate_inputs(number_of_experiments = 10)
-    # results_compilation.write_to_file(archive)
-    # results_compilation.simulate(archive)
-    results_compilation = sim.cross_validate.ResultsCompilation.read_simulations_from_archive_time(
-      archive,
-      # "20220707T144904"
-      # "20220707T142432"
-      # "20220701T144056"
-      # "20220720T125417" # Test
-      # "20220711T123323" # Full 360
-      # "20220727T111014" # Full 1000
-      "20220729T121955" # support
-    )
-    results_compilation.reconstruct(archive, number_of_samples = 100 , metric = "taxi")
-    # results_compilation.read_reconstructions_from_archive_time(
+    # # results_compilation = sim.cross_validate.ResultsCompilation.generate_inputs(number_of_experiments = 10)
+    # # results_compilation.write_to_file(archive)
+    # # results_compilation.simulate(archive)
+    # results_compilation = sim.cross_validate.ResultsCompilation.read_simulations_from_archive_time(
     #   archive,
-    #   # "20220711T114256"
+    #   # "20220707T144904"
+    #   # "20220707T142432"
+    #   # "20220701T144056"
+    #   # "20220720T125417" # Test
+    #   # "20220711T123323" # Full 360
     #   # "20220727T111014" # Full 1000
-    #   "20220729T121955" # Support
+    #   "20220729T121955" # support
     # )
-    results_compilation.cross_validate(archive, number_of_folds = 5, metric = "taxi")
+    # results_compilation.reconstruct(archive, number_of_samples = 100 , metric = "taxi")
+    # # results_compilation.read_reconstructions_from_archive_time(
+    # #   archive,
+    # #   # "20220711T114256"
+    # #   # "20220727T111014" # Full 1000
+    # #   "20220729T121955" # Support
+    # # )
+    # results_compilation.cross_validate(archive, number_of_folds = 5, metric = "taxi")
 
     # === Clean up ===
     archive.close_archive_file()
