@@ -18,7 +18,7 @@ class PrettyTritty:
   k = "\033[30m"
 
   level = 0
-  level_max = 2
+  level_max = 1
 
   @classmethod
   def starting(cls, message:str):

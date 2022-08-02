@@ -496,17 +496,17 @@ if __name__ == "__main__":
       # "20220701T144056"
       # "20220720T125417" # Test
       # "20220711T123323" # Full 360
-      # "20220727T111014" # Full 1000
-      "20220729T121955" # support
+      "20220727T111014" # Full 1000
+      # "20220729T121955" # support
     )
-    results_compilation.reconstruct(archive, number_of_samples = 100 , metric = "taxi")
+    results_compilation.reconstruct(archive, number_of_samples = 200 , metric = "taxi")
     # results_compilation.read_reconstructions_from_archive_time(
     #   archive,
     #   # "20220711T114256"
     #   # "20220727T111014" # Full 1000
     #   "20220729T121955" # Support
     # )
-    results_compilation.cross_validate(archive, number_of_folds = 5, metric = "taxi")
+    results_compilation.cross_validate(archive, number_of_folds = 20, metric = "taxi")
 
     # === Clean up ===
     archive.close_archive_file()

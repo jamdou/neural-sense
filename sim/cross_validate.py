@@ -188,7 +188,7 @@ class ResultsCompilation:
         reconstruction.evaluate_fista_backtracking(
           expected_amplitude = 1000,#360.0,
           expected_frequency = 5000,
-          expected_error_measurement = 5,
+          expected_error_measurement = 10,
           norm_scale_factor_modifier = 1,
           is_fast = True,
           norm_scale_factor = norm_scale_factor_instance
@@ -215,10 +215,14 @@ class ResultsCompilation:
 
       wall_time_current = time.time() - wall_time_start
       wall_time_step = wall_time_current - wall_time_previous
+      previous_level = C.level_max
+      C.level_max = max(previous_level, 2)
       C.print(f"Time: {wall_time_current} s, Time step: {wall_time_step} s")
+      C.level_max = previous_level
 
     self.error_array = np.array(self.error_array)
     C.finished("cross validation reconstructions")
+    C.level_max = max(previous_level, 2)
 
   def read_reconstructions_from_archive_time(self, archive:arch.Archive, archive_time):
     archive_previous = arch.Archive(archive.archive_path[:-25], "")
