@@ -11,6 +11,7 @@ import scipy.optimize
 import scipy.signal
 import scipy.linalg
 import scipy.special
+from cmcrameri import cm
 
 import util
 from util import PrettyTritty as C
@@ -2090,7 +2091,7 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     errors_signal.append(errors_metric)
     stdevs_signal.append(stdevs_metric)
 
-  colours = ["m", "b"]
+  colours = [cm.lajolla(1/3), cm.lajolla(2/3)]
   ylabel_map = {
     "2" : f"RMSE ({units})",
     "roc_auc" : f"ROC AUC (%)"
@@ -2104,37 +2105,46 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     "roc_auc" : "Area under receiver operating characteristic"
   }
 
-  plt.figure()
-  for metric_index, metric in enumerate(metrics):
-    plt.subplot(len(metrics), 1, len(metrics) - metric_index)
-    for signal_index, label in enumerate(labels):
-      error = errors_signal[signal_index][metric_index]
-      stdev = stdevs_signal[signal_index][metric_index]
-      plt.fill_between(number_of_samples, (error + stdev)*unit_factor_map[metric], (error - stdev)*unit_factor_map[metric], color = {colours[signal_index]}, alpha = 0.25)
-      plt.plot(number_of_samples, error*unit_factor_map[metric], f"{colours[signal_index]}-", label = label)
-    if metric_index == 0:
-      plt.xlabel("Number of samples used in reconstruction", size = 16)
-    else:
-      plt.gca().axes.xaxis.set_ticklabels([])
-    plt.ylabel(ylabel_map[metric], size = 16)
-    plt.ylim(bottom = 0, top = 1.2*np.max(error + stdev)*unit_factor_map[metric])
-    plt.xlim(left = 0, right = 100)
-    plt.gca().spines["right"].set_visible(False)
-    plt.gca().spines["top"].set_visible(False)
-    plt.text(5, 1.1*np.max(error + stdev)*unit_factor_map[metric], f"({chr(98 - metric_index)})", size = 16)
-  if archive:
-    archive.write_plot(f"", f"number_of_samples_comparison")
-  plt.draw()
+  # plt.figure()
+  # for metric_index, metric in enumerate(metrics):
+  #   plt.subplot(len(metrics), 1, len(metrics) - metric_index)
+  #   for signal_index, label in enumerate(labels):
+  #     error = errors_signal[signal_index][metric_index]
+  #     stdev = stdevs_signal[signal_index][metric_index]
+  #     plt.fill_between(number_of_samples, (error + stdev)*unit_factor_map[metric], (error - stdev)*unit_factor_map[metric], color = colours[signal_index], alpha = 0.25)
+  #     plt.plot(number_of_samples, error*unit_factor_map[metric], f"-", color = colours[signal_index], label = label)
+  #   if metric_index == 0:
+  #     plt.xlabel("Number of samples used in reconstruction", size = 16)
+  #   else:
+  #     plt.gca().axes.xaxis.set_ticklabels([])
+  #   plt.ylabel(ylabel_map[metric], size = 16)
+  #   plt.ylim(bottom = 0, top = 1.2*np.max(error + stdev)*unit_factor_map[metric])
+  #   plt.xlim(left = 0, right = 100)
+  #   plt.gca().spines["right"].set_visible(False)
+  #   plt.gca().spines["top"].set_visible(False)
+  #   plt.text(5, 1.1*np.max(error + stdev)*unit_factor_map[metric], f"({chr(98 - metric_index)})", size = 16)
+  # if archive:
+  #   archive.write_plot(f"", f"number_of_samples_comparison")
+  # plt.draw()
 
+  metric_index = 1
   fig = plt.figure(figsize = [6.4, 4.8*3/4])
   for signal_index, label in enumerate(labels):
     error = errors_signal[signal_index][metric_index]
     stdev = stdevs_signal[signal_index][metric_index]
-    plt.fill_between(number_of_samples, (error + stdev)*unit_factor_map[metric], (error - stdev)*unit_factor_map[metric], color = {colours[signal_index]}, alpha = 0.25)
-    plt.plot(number_of_samples, error*unit_factor_map[metric], f"{colours[signal_index]}-", label = label)
+    plt.fill_between(number_of_samples, ((error + stdev)*(error + stdev < 1) + 1*(error + stdev >= 1))*unit_factor_map[metric], ((error - stdev)*(error + stdev < 1) + (1- 2*stdev)*(error + stdev >= 1))*unit_factor_map[metric], color = colours[signal_index], alpha = 0.05)
+  for signal_index, label in enumerate(labels):
+    error = errors_signal[signal_index][metric_index]
+    stdev = stdevs_signal[signal_index][metric_index]
+    plt.plot(number_of_samples, ((error + stdev)*(error + stdev < 1) + 1*(error + stdev >= 1))*unit_factor_map[metric], f"--", color = colours[signal_index])
+    plt.plot(number_of_samples, ((error - stdev)*(error + stdev < 1) + (1- 2*stdev)*(error + stdev >= 1))*unit_factor_map[metric], f"--", color = colours[signal_index])
+  for signal_index, label in enumerate(labels):
+    error = errors_signal[signal_index][metric_index]
+    stdev = stdevs_signal[signal_index][metric_index]
+    plt.plot(number_of_samples, error*unit_factor_map[metric], f"-", color = colours[signal_index], label = label)
   plt.xlabel("Number of samples used in reconstruction", size = 16)
   plt.ylabel(ylabel_map[metric], size = 16)
-  plt.ylim(bottom = 0, top = 1.1*np.max(error + stdev)*unit_factor_map[metric])
+  plt.ylim(bottom = 0, top = 1.1*np.max(error)*unit_factor_map[metric])
   plt.xlim(left = 0, right = 100)
   plt.gca().spines["right"].set_visible(False)
   plt.gca().spines["top"].set_visible(False)
@@ -2155,8 +2165,22 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
     unit_factor *= 1e6
   elif "m" in units:
     unit_factor *= 1e3
+  
+  def colour_cycle(cmap, amount):
+    def modified(y):
+      x = cmap(y)
+      if amount == 1:
+        return (x[1], x[2], x[0], x[3])
+      if amount == 2:
+        return (x[2], x[0], x[1], x[3])
+      return x
+    return modified
 
-  colour_map = ["r", "y", "c"]
+  # colour_map = [cm.lajolla(2/3), cm.lajolla(2/3), cm.lajolla(2/3)]
+  # colour_map = [cm.grayC, cm.bilbao, cm.lajolla]
+  # colour_map = [cm.bilbao, colour_cycle(cm.bilbao, 1), colour_cycle(cm.bilbao, 2)]
+  # colour_map = [cm.lajolla, cm.lajolla, cm.lajolla]
+  colour_map = [cm.lajolla, colour_cycle(cm.lajolla, 1), colour_cycle(cm.lajolla, 2)]
   reorder_map = [0, 3, 1, 4, 2, 5]
 
   plt.figure(figsize = [(6.4 + 0.4)*2, 4.8])
@@ -2178,8 +2202,15 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
       plt.ylabel(f"Magnetic\nfield ({units})", size = 16)
     # if result_index == 0:
       
-    plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "-k")
-    plt.plot(time/1e-3, amplitude*unit_factor, f"-{colour_map[math.floor(result_index/2)]}")
+    plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "--",
+      # color = cm.lajolla(1/3)
+      color = colour_map[math.floor(result_index/2)](1/3)
+    )
+    plt.plot(time/1e-3, amplitude*unit_factor, "-",
+      # f"-{colour_map[math.floor(result_index/2)]}"
+      # color = cm.lajolla(2/3)
+      color = colour_map[math.floor(result_index/2)](2/3)
+    )
     plt.xlim(left = 0, right = 5)
     plt.ylim(top = 800*unit_factor, bottom = -800*unit_factor)
     plt.gca().spines["right"].set_visible(False)
