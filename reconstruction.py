@@ -2238,7 +2238,7 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
     plt.subplots_adjust(wspace = 0.05)
   if archive:
     archive.write_plot(f"", f"methods_comparison")
-  plt.show()
+  plt.draw()
 
 # def plot_reconstruction_method_comparison_abstract(archive, results_objects, ground_truth, units = "nT"):
 #   if "Hz" in units:

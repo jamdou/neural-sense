@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from numba import cuda  # GPU code
 import colorama     # Colourful terminal
 colorama.init()
+from cmcrameri import cm
 
 # The different pieces that make up this sensing code
 import archive as arch        # Saving results and configurations
@@ -76,7 +77,56 @@ class CompressivePaper:
       norm_scale_factor = 1.0377456768938575#1.434744597683189#1.246014062993185#1.238443214398892#1.291549665014884#2.1544346900318834#0.7488103857590022
     )
 
-    recon.plot_reconstruction_method_comparison(archive, [ramsey_results_1, ramsey_results_2, reconstruction_dst_1, reconstruction_dst_2, reconstruction_fst_1, reconstruction_fst_2], [acquired_amplitude_1, acquired_amplitude_2])
+    # recon.plot_reconstruction_method_comparison(archive, [ramsey_results_1, ramsey_results_2, reconstruction_dst_1, reconstruction_dst_2, reconstruction_fst_1, reconstruction_fst_2], [acquired_amplitude_1, acquired_amplitude_2])
+
+    CompressivePaper.make_matrix(archive, acquired_time_1, acquired_amplitude_1, reconstruction_fst_2.frequency, reconstruction_fst_2.frequency_amplitude)
+
+  @staticmethod
+  def make_matrix(archive, time, amplitude, frequency, frequency_amplitude):
+    line_ratio = 2
+    plt.figure()
+    plt.imshow(amplitude[1:].reshape((99, 1)), cmap = cm.berlin, vmin = -np.max(np.abs(amplitude[1:])), vmax = np.max(np.abs(amplitude[1:])))
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["left"].set_visible(False)
+    plt.gca().spines["bottom"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
+    plt.xticks([])
+    plt.yticks([])
+    plt.gca().set_aspect(1/10)
+    plt.draw()
+
+    plt.figure()
+    lim = np.max(np.abs(frequency_amplitude))
+    frequency_amplitude_colour = []
+    for frequency_amplitude_instance in frequency_amplitude[0:16]:
+      frequency_amplitude_colour += [[list(cm.berlin(0.5*(1 + frequency_amplitude_instance/lim)))]]*line_ratio + [[[1.0, 1.0, 1.0, 1.0]]]
+    frequency_amplitude_colour = np.array(frequency_amplitude_colour)
+
+    plt.imshow(frequency_amplitude_colour)
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["left"].set_visible(False)
+    plt.gca().spines["bottom"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
+    plt.xticks([])
+    plt.yticks([])
+    plt.gca().set_aspect(1/((line_ratio + 1)))
+    plt.draw()
+
+    plt.figure()
+    frequency_colour = []
+    for frequency_instance in frequency[0:16]:
+      frequency_colour += [[list(cm.berlin(0.5*(1 + np.sin(math.tau*frequency_instance*time_instance)))) for time_instance in time[1:]]]*line_ratio + [[[1.0, 1.0, 1.0, 1.0]]*(time.size - 1)]
+    frequency_colour = np.array(frequency_colour)
+
+    plt.imshow(frequency_colour)
+    plt.gca().spines["right"].set_visible(False)
+    plt.gca().spines["left"].set_visible(False)
+    plt.gca().spines["bottom"].set_visible(False)
+    plt.gca().spines["top"].set_visible(False)
+    plt.xticks([])
+    plt.yticks([])
+    plt.gca().set_aspect(3/((line_ratio + 1)))
+    plt.draw()
 
   @staticmethod
   def make_unknown(archive):
