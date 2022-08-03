@@ -2155,6 +2155,7 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
   plt.draw()
 
 def plot_reconstruction_method_comparison(archive, results_objects, ground_truth, units = "nT"):
+  label_size = 14
   if "Hz" in units:
     unit_factor = 1
   elif "T" in units:
@@ -2171,21 +2172,32 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
       x = cmap(y)
       if amount == 1:
         return (x[1], x[2], x[0], x[3])
+        # return (min(x[1]/(0.2126/0.7152), 1), min(x[2]/(0.7152/0.0722), 1), min(x[0]/(0.0722/0.2126), 1), x[3])
       if amount == 2:
         return (x[2], x[0], x[1], x[3])
+        # return (min(x[2]/(0.2126/0.0722), 1), min(x[0]/(0.7152/0.2126), 1), min(x[1]/(0.0722/0.7152), 1), x[3])
       return x
     return modified
+
+  #  0.2126, + 0.7152, + 0.0722
 
   # colour_map = [cm.lajolla(2/3), cm.lajolla(2/3), cm.lajolla(2/3)]
   # colour_map = [cm.grayC, cm.bilbao, cm.lajolla]
   # colour_map = [cm.bilbao, colour_cycle(cm.bilbao, 1), colour_cycle(cm.bilbao, 2)]
   # colour_map = [cm.lajolla, cm.lajolla, cm.lajolla]
-  colour_map = [cm.lajolla, colour_cycle(cm.lajolla, 1), colour_cycle(cm.lajolla, 2)]
+  colour_map = [cm.bilbao, colour_cycle(cm.bilbao, 1), colour_cycle(cm.bilbao, 2)]
   reorder_map = [0, 3, 1, 4, 2, 5]
+  protocol_map = ["Ramsey", "Inverse DST", "Compressive retrieval"]
 
   plt.figure(figsize = [(6.4 + 0.4)*2, 4.8])
+  # plt.xlabel(f"Time (ms)", size = label_size, fontname = "Times New Roman")
+  # plt.ylabel(f"Magnetic field ({units})", size = label_size, fontname = "Times New Roman")
   for result_index, result_object in enumerate(results_objects):
     plt.subplot(2, 3, reorder_map[result_index] + 1)
+
+    plt.xticks(fontname = "Times New Roman")
+    plt.yticks(fontname = "Times New Roman")
+
     if isinstance(result_object, Reconstruction):
       time = result_object.time_properties.time_coarse
       amplitude = result_object.amplitude
@@ -2194,28 +2206,35 @@ def plot_reconstruction_method_comparison(archive, results_objects, ground_truth
       amplitude = result_object.amplitude
     if reorder_map[result_index] < 3:
       plt.gca().axes.xaxis.set_ticklabels([])
-    else:
-      plt.xlabel(f"Time (ms)", size = 16)
+      plt.gca().axes.xaxis.set_label_position("top") 
+      plt.xlabel(protocol_map[reorder_map[result_index]], size = label_size, fontname = "Times New Roman", color = colour_map[math.floor(result_index/2)](2/3))
+    # else:
+    if result_index == 3:
+      plt.xlabel(f"Time (ms)", size = label_size, fontname = "Times New Roman")
     if math.fmod(reorder_map[result_index], 3) >= 1:
       plt.gca().axes.yaxis.set_ticklabels([])
-    else:
-      plt.ylabel(f"Magnetic\nfield ({units})", size = 16)
+    # else:
+    if reorder_map[result_index] == 3:
+      plt.ylabel(f"                                           Magnetic field ({units})", size = label_size, fontname = "Times New Roman")
     # if result_index == 0:
-      
-    plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "--",
+    plt.plot(time/1e-3, ground_truth[int(math.fmod(result_index, 2))][1:]*unit_factor, "--k",
       # color = cm.lajolla(1/3)
-      color = colour_map[math.floor(result_index/2)](1/3)
+      # color = colour_map[math.floor(result_index/2)](1/3)
+      linewidth = 1,
+      alpha = 0.5
     )
     plt.plot(time/1e-3, amplitude*unit_factor, "-",
       # f"-{colour_map[math.floor(result_index/2)]}"
       # color = cm.lajolla(2/3)
-      color = colour_map[math.floor(result_index/2)](2/3)
+      # color = colour_map[math.floor(result_index/2)](2/3)
+      color = colour_map[math.floor(result_index/2)](2/3),
+      # linewidth = 3
     )
     plt.xlim(left = 0, right = 5)
     plt.ylim(top = 800*unit_factor, bottom = -800*unit_factor)
     plt.gca().spines["right"].set_visible(False)
     plt.gca().spines["top"].set_visible(False)
-    plt.text(0.25, 600*unit_factor, f"({chr(97 + result_index)})", size = 16)
+    plt.text(0.25, 600*unit_factor, f"({chr(97 + result_index)})", size = label_size, fontname = "Times New Roman")
     plt.subplots_adjust(wspace = 0.05)
   if archive:
     archive.write_plot(f"", f"methods_comparison")

@@ -49,7 +49,7 @@ class CompressivePaper:
       expected_error_measurement = 1.8,
       norm_scale_factor_modifier = 1,
       is_fast = True,
-      norm_scale_factor = 1.434744597683189#1.246014062993185#1.238443214398892#1.291549665014884#2.1544346900318834#0.7488103857590022
+      norm_scale_factor = 1.0377456768938575#1.434744597683189#1.246014062993185#1.238443214398892#1.291549665014884#2.1544346900318834#0.7488103857590022
     )
 
     acquired_signal_2 = test_signal.AcquiredSignal.new_from_experiment_time(archive, "20220520T111524")
@@ -73,7 +73,7 @@ class CompressivePaper:
       expected_error_measurement = 1.8,
       norm_scale_factor_modifier = 1,
       is_fast = True,
-      norm_scale_factor = 1.434744597683189#1.246014062993185#1.238443214398892#1.291549665014884#2.1544346900318834#0.7488103857590022
+      norm_scale_factor = 1.0377456768938575#1.434744597683189#1.246014062993185#1.238443214398892#1.291549665014884#2.1544346900318834#0.7488103857590022
     )
 
     recon.plot_reconstruction_method_comparison(archive, [ramsey_results_1, ramsey_results_2, reconstruction_dst_1, reconstruction_dst_2, reconstruction_fst_1, reconstruction_fst_2], [acquired_amplitude_1, acquired_amplitude_2])
