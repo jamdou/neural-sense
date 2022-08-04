@@ -79,27 +79,23 @@ class CompressivePaper:
 
     # recon.plot_reconstruction_method_comparison(archive, [ramsey_results_1, ramsey_results_2, reconstruction_dst_1, reconstruction_dst_2, reconstruction_fst_1, reconstruction_fst_2], [acquired_amplitude_1, acquired_amplitude_2])
 
-    CompressivePaper.make_matrix(archive, acquired_time_1, acquired_amplitude_1, reconstruction_fst_2.frequency, reconstruction_fst_2.frequency_amplitude)
+    CompressivePaper.make_matrix(archive, acquired_time_2, acquired_amplitude_2, reconstruction_fst_2.amplitude, reconstruction_fst_2.frequency, reconstruction_fst_2.frequency_amplitude)
 
   @staticmethod
-  def make_matrix(archive, time, amplitude, frequency, frequency_amplitude):
-    line_ratio = 2
-    plt.figure()
-    plt.imshow(amplitude[1:].reshape((99, 1)), cmap = cm.berlin, vmin = -np.max(np.abs(amplitude[1:])), vmax = np.max(np.abs(amplitude[1:])))
-    plt.gca().spines["right"].set_visible(False)
-    plt.gca().spines["left"].set_visible(False)
-    plt.gca().spines["bottom"].set_visible(False)
-    plt.gca().spines["top"].set_visible(False)
-    plt.xticks([])
-    plt.yticks([])
-    plt.gca().set_aspect(1/10)
-    plt.draw()
+  def make_matrix(archive, time, amplitude, amplitude_recover, frequency, frequency_amplitude):
+    line_ratio = 4
+    # borderline = [1.0, 1.0, 1.0, 1.0]
+    # borderline = [0.0, 0.0, 0.0, 1.0]
+    borderline = [0.0, 0.0, 0.0, 0.0]
+    borderline_true = [0.0, 0.0, 0.0, 1.0]
+    colour_map = cm.tokyo
 
     plt.figure()
     lim = np.max(np.abs(frequency_amplitude))
     frequency_amplitude_colour = []
+    frequency_amplitude_colour += [[borderline]]
     for frequency_amplitude_instance in frequency_amplitude[0:16]:
-      frequency_amplitude_colour += [[list(cm.berlin(0.5*(1 + frequency_amplitude_instance/lim)))]]*line_ratio + [[[1.0, 1.0, 1.0, 1.0]]]
+      frequency_amplitude_colour += [[list(colour_map(0.5*(1 + frequency_amplitude_instance/lim)))]]*line_ratio + [[borderline]]
     frequency_amplitude_colour = np.array(frequency_amplitude_colour)
 
     plt.imshow(frequency_amplitude_colour)
@@ -110,12 +106,16 @@ class CompressivePaper:
     plt.xticks([])
     plt.yticks([])
     plt.gca().set_aspect(1/((line_ratio + 1)))
+    plt.gca().set_facecolor(borderline_true)
+    if archive:
+      archive.write_plot(f"", f"matrix_frequency")
     plt.draw()
 
     plt.figure()
     frequency_colour = []
+    frequency_colour += [[borderline]*(time.size - 1)]
     for frequency_instance in frequency[0:16]:
-      frequency_colour += [[list(cm.berlin(0.5*(1 + np.sin(math.tau*frequency_instance*time_instance)))) for time_instance in time[1:]]]*line_ratio + [[[1.0, 1.0, 1.0, 1.0]]*(time.size - 1)]
+      frequency_colour += [[list(colour_map(0.5*(1 + np.sin(math.tau*frequency_instance*time_instance)))) for time_instance in time[1:]]]*line_ratio + [[borderline]*(time.size - 1)]
     frequency_colour = np.array(frequency_colour)
 
     plt.imshow(frequency_colour)
@@ -126,7 +126,47 @@ class CompressivePaper:
     plt.xticks([])
     plt.yticks([])
     plt.gca().set_aspect(3/((line_ratio + 1)))
+    plt.gca().set_facecolor(borderline_true)
+    if archive:
+      archive.write_plot(f"", f"matrix_matrix")
     plt.draw()
+
+    lim = np.max(np.abs(amplitude[1:]))
+
+    def plot_coloured_trace(tm, am, title):
+      plt.figure()
+      time_fine = np.linspace(0.05e-3, 4.95e-3, 1000)
+      amplitude_fine = np.interp(time_fine, tm, am)
+      # for time_instance, amplitude_instance, colour_instance in zip(time[1:], amplitude[1:], cm.berlin(0.5*(1 + amplitude[1:]/lim))):
+      for time_index in range(1, 1000):
+        plt.plot([time_fine[time_index - 1], time_fine[time_index]], [amplitude_fine[time_index - 1], amplitude_fine[time_index]], "-", c = colour_map(0.5*(1 + amplitude_fine[time_index - 1 + np.argmax([abs(amplitude_fine[time_index - 1]), abs(amplitude_fine[time_index])])]/lim)), linewidth = 2)
+      # plt.gca().set_facecolor(borderline_true)
+      plt.gca().spines["right"].set_visible(False)
+      plt.gca().spines["left"].set_visible(False)
+      plt.gca().spines["bottom"].set_visible(False)
+      plt.gca().spines["top"].set_visible(False)
+      plt.xticks([])
+      plt.yticks([])
+      if archive:
+        archive.write_plot(f"", f"matrix_time_plot_{title}")
+      plt.draw()
+
+      plt.figure()
+      plt.imshow(am.reshape((99, 1)), cmap = colour_map, vmin = -lim, vmax = lim)
+      plt.gca().spines["right"].set_visible(False)
+      plt.gca().spines["left"].set_visible(False)
+      plt.gca().spines["bottom"].set_visible(False)
+      plt.gca().spines["top"].set_visible(False)
+      plt.xticks([])
+      plt.yticks([])
+      plt.gca().set_aspect(1/5)
+      plt.gca().set_facecolor(borderline_true)
+      if archive:
+        archive.write_plot(f"", f"matrix_time_{title}")
+      plt.draw()
+
+    plot_coloured_trace(time[1:], amplitude[1:], "ground")
+    plot_coloured_trace(time[1:], amplitude_recover, "recovered")
 
   @staticmethod
   def make_unknown(archive):
