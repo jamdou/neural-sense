@@ -2060,7 +2060,7 @@ def run_reconstruction_norm_scale_factor_sweep(expected_signal:TestSignal, exper
       archive.write_plot(f"Sweeping the regularisation parameter used in reconstruction\n{evaluation_method_labels[evaluation_method]}, Residual", f"norm_scale_factor_{evaluation_method}_residual")
     plt.draw()
 
-def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archive_times, reconstruction_method = "fista_backtracking", metrics = ["2", "roc_auc"], labels = ["Single pulse signal", "Double pulse signal"], units = "Hz"):
+def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archive_times, reconstruction_method = "fista_backtracking", metrics = ["2", "roc_auc", "roc_sensitivity", "roc_specificity"], labels = ["Single pulse signal", "Double pulse signal"], units = "Hz"):
   if "Hz" in units:
     unit_factor = 1
   elif "T" in units:
@@ -2127,17 +2127,103 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
   #   archive.write_plot(f"", f"number_of_samples_comparison")
   # plt.draw()
 
+  error_sensitivity_1_pulse = errors_signal[0][2]
+  error_specificity_1_pulse = errors_signal[0][3]
+  error_sensitivity_2_pulse = errors_signal[1][2]
+  error_specificity_2_pulse = errors_signal[1][3]
+
+  stdev_sensitivity_1_pulse = stdevs_signal[0][2]
+  stdev_specificity_1_pulse = stdevs_signal[0][3]
+  stdev_sensitivity_2_pulse = stdevs_signal[1][2]
+  stdev_specificity_2_pulse = stdevs_signal[1][3]
+
+  subsample_index = 69 # => 30 samples
+  plt.figure()
+  plt.subplot(1, 2, 1)
+  specificity_boundary = []
+  sensitivity_boundary = []
+  for threshold_index in range(error_specificity_1_pulse.shape[1] - 1):
+    boundary = error_specificity_1_pulse[subsample_index, threshold_index] + stdev_specificity_1_pulse[subsample_index, threshold_index]
+    if boundary >= 1:
+      boundary = 1
+    if boundary - 2*stdev_specificity_1_pulse[subsample_index, threshold_index] <= 0:
+      boundary = 2*stdev_specificity_1_pulse[subsample_index, threshold_index]
+    specificity_boundary.append(boundary)
+
+    boundary = error_sensitivity_1_pulse[subsample_index, threshold_index] + stdev_sensitivity_1_pulse[subsample_index, threshold_index]
+    if boundary >= 1:
+      boundary = 1
+    if boundary - 2*stdev_sensitivity_1_pulse[subsample_index, threshold_index] <= 0:
+      boundary = 2*stdev_sensitivity_1_pulse[subsample_index, threshold_index]
+    sensitivity_boundary.append(boundary)
+  for threshold_index in range(error_specificity_1_pulse.shape[1] - 2, -1, -1):
+    boundary = error_specificity_1_pulse[subsample_index, threshold_index] - stdev_specificity_1_pulse[subsample_index, threshold_index]
+    if boundary <= 0:
+      boundary = 0
+    if boundary + 2*stdev_specificity_1_pulse[subsample_index, threshold_index] >= 1:
+      boundary = 1 - 2*stdev_specificity_1_pulse[subsample_index, threshold_index]
+    specificity_boundary.append(boundary)
+
+    boundary = error_sensitivity_1_pulse[subsample_index, threshold_index] - stdev_sensitivity_1_pulse[subsample_index, threshold_index]
+    if boundary <= 0:
+      boundary = 0
+    if boundary + 2*stdev_sensitivity_1_pulse[subsample_index, threshold_index] >= 1:
+      boundary = 1 - 2*stdev_sensitivity_1_pulse[subsample_index, threshold_index]
+    sensitivity_boundary.append(boundary)
+  specificity_boundary = np.array(specificity_boundary)
+  sensitivity_boundary = np.array(sensitivity_boundary)
+  plt.fill(1 - specificity_boundary, sensitivity_boundary, color = colours[0], alpha = 0.2)
+  plt.plot(1 - error_specificity_1_pulse[subsample_index, :-1], error_sensitivity_1_pulse[subsample_index, :-1], "-", color = colours[0])
+  # plt.fill_between(1 - error_specificity_1_pulse[subsample_index, :-1], error_sensitivity_1_pulse[subsample_index, :-1], "-", color = colours[0])
+  plt.subplot(1, 2, 2)
+  specificity_boundary = []
+  sensitivity_boundary = []
+  for threshold_index in range(error_specificity_2_pulse.shape[1] - 1):
+    boundary = error_specificity_2_pulse[subsample_index, threshold_index] + stdev_specificity_2_pulse[subsample_index, threshold_index]
+    if boundary >= 1:
+      boundary = 1
+    if boundary - 2*stdev_specificity_2_pulse[subsample_index, threshold_index] <= 0:
+      boundary = 2*stdev_specificity_2_pulse[subsample_index, threshold_index]
+    specificity_boundary.append(boundary)
+
+    boundary = error_sensitivity_2_pulse[subsample_index, threshold_index] + stdev_sensitivity_2_pulse[subsample_index, threshold_index]
+    if boundary >= 1:
+      boundary = 1
+    if boundary - 2*stdev_sensitivity_2_pulse[subsample_index, threshold_index] <= 0:
+      boundary = 2*stdev_sensitivity_2_pulse[subsample_index, threshold_index]
+    sensitivity_boundary.append(boundary)
+  for threshold_index in range(error_specificity_2_pulse.shape[1] - 2, -1, -1):
+    boundary = error_specificity_2_pulse[subsample_index, threshold_index] - stdev_specificity_2_pulse[subsample_index, threshold_index]
+    if boundary <= 0:
+      boundary = 0
+    if boundary + 2*stdev_specificity_2_pulse[subsample_index, threshold_index] >= 1:
+      boundary = 1 - 2*stdev_specificity_2_pulse[subsample_index, threshold_index]
+    specificity_boundary.append(boundary)
+
+    boundary = error_sensitivity_2_pulse[subsample_index, threshold_index] - stdev_sensitivity_2_pulse[subsample_index, threshold_index]
+    if boundary <= 0:
+      boundary = 0
+    if boundary + 2*stdev_sensitivity_2_pulse[subsample_index, threshold_index] >= 1:
+      boundary = 1 - 2*stdev_sensitivity_2_pulse[subsample_index, threshold_index]
+    sensitivity_boundary.append(boundary)
+  specificity_boundary = np.array(specificity_boundary)
+  sensitivity_boundary = np.array(sensitivity_boundary)
+  plt.fill(1 - specificity_boundary, sensitivity_boundary, color = colours[1], alpha = 0.2)
+  plt.plot(1 - error_specificity_2_pulse[subsample_index, :-1], error_sensitivity_2_pulse[subsample_index, :-1], "-", color = colours[1])
+  plt.draw()
+
   metric_index = 1
+  metric = "roc_auc"
   fig = plt.figure(figsize = [6.4, 4.8*3/4])
   for signal_index, label in enumerate(labels):
     error = errors_signal[signal_index][metric_index]
     stdev = stdevs_signal[signal_index][metric_index]
-    plt.fill_between(number_of_samples, ((error + stdev)*(error + stdev < 1) + 1*(error + stdev >= 1))*unit_factor_map[metric], ((error - stdev)*(error + stdev < 1) + (1- 2*stdev)*(error + stdev >= 1))*unit_factor_map[metric], color = colours[signal_index], alpha = 0.05)
+    plt.fill_between(number_of_samples, ((error + stdev)*(error + stdev < 1) + 1*(error + stdev >= 1))*unit_factor_map[metric], ((error - stdev)*(error + stdev < 1) + (1- 2*stdev)*(error + stdev >= 1))*unit_factor_map[metric], color = colours[signal_index], alpha = 0.2)
   for signal_index, label in enumerate(labels):
     error = errors_signal[signal_index][metric_index]
     stdev = stdevs_signal[signal_index][metric_index]
-    plt.plot(number_of_samples, ((error + stdev)*(error + stdev < 1) + 1*(error + stdev >= 1))*unit_factor_map[metric], f"--", color = colours[signal_index])
-    plt.plot(number_of_samples, ((error - stdev)*(error + stdev < 1) + (1- 2*stdev)*(error + stdev >= 1))*unit_factor_map[metric], f"--", color = colours[signal_index])
+    # plt.plot(number_of_samples, ((error + stdev)*(error + stdev < 1) + 1*(error + stdev >= 1))*unit_factor_map[metric], f"--", color = colours[signal_index])
+    # plt.plot(number_of_samples, ((error - stdev)*(error + stdev < 1) + (1- 2*stdev)*(error + stdev >= 1))*unit_factor_map[metric], f"--", color = colours[signal_index])
   for signal_index, label in enumerate(labels):
     error = errors_signal[signal_index][metric_index]
     stdev = stdevs_signal[signal_index][metric_index]
@@ -2295,24 +2381,27 @@ def plot_reconstruction_unknown(archive, results_objects, units = "nT"):
   elif "m" in units:
     unit_factor *= 1e3
 
-  colour_map = ["m", "b"]
-  plt.figure(figsize = [6.4, 4.8*(2/3)])
+  label_size = 14
+
+  # colour_map = ["m", "b"]
+  colour_map = [cm.lajolla(1/3), cm.lajolla(2/3)]
+  plt.figure(figsize = [6.4, 4.8*3/2])
   # plt.figure()
   for result_index, result_object in enumerate(results_objects):
-    plt.subplot(1, 2, result_index + 1)
+    plt.subplot(2, 1, result_index + 1)
     time = result_object.time_properties.time_coarse
     amplitude = result_object.amplitude
-    if result_index == 1:
-      plt.gca().axes.yaxis.set_ticklabels([])
+    if result_index == 0:
+      plt.gca().axes.xaxis.set_ticklabels([])
+      plt.ylabel(f"Magnetic field ({units})                                            ", size = label_size)
     else:
-      plt.ylabel(f"Magnetic field ({units})", size = 16)
-    plt.xlabel(f"Time (ms)", size = 16)
-    plt.plot(time/1e-3, amplitude*unit_factor, f"-{colour_map[result_index]}")
+      plt.xlabel(f"Time (ms)", size = label_size)
+    plt.plot(time/1e-3, amplitude*unit_factor, f"-", color = colour_map[result_index])
     plt.xlim(left = 0, right = 5)
     plt.ylim(top = 800*unit_factor, bottom = -800*unit_factor)
     plt.gca().spines["right"].set_visible(False)
     plt.gca().spines["top"].set_visible(False)
-    plt.text(0.25, 600*unit_factor, f"({chr(97 + result_index)})", size = 16)
+    plt.text(0.25, 600*unit_factor, f"({chr(97 + result_index)})", size = label_size)
     plt.subplots_adjust(wspace = 0.05, bottom = 0.2)
   if archive:
     archive.write_plot(f"", f"unknown_reconstructions")

@@ -221,7 +221,7 @@ class CompressivePaper:
       expected_error_measurement = 1.8,
       norm_scale_factor_modifier = 1,
       is_fast = True,
-      norm_scale_factor = 0.7488103857590022
+      norm_scale_factor = 1.0377456768938575
     )
 
     acquired_signal_u2 = test_signal.AcquiredSignal.new_from_experiment_time(archive, "20220607T144242")
@@ -238,7 +238,7 @@ class CompressivePaper:
       expected_error_measurement = 1.8,
       norm_scale_factor_modifier = 1,
       is_fast = True,
-      norm_scale_factor = 0.7488103857590022
+      norm_scale_factor = 1.0377456768938575
       )
 
     recon.plot_reconstruction_unknown(archive, [reconstruction_fst_u1, reconstruction_fst_u2])
