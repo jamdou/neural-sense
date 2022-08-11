@@ -2127,8 +2127,8 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
   #   archive.write_plot(f"", f"number_of_samples_comparison")
   # plt.draw()
 
-  subsample_index = 69 # => 30 samples
-  # subsample_index = 74 # => 25 samples
+  # subsample_index = 69 # => 30 samples
+  subsample_index = 79 # => 20 samples
   metric_index = 1
   metric = "roc_auc"
   fig = plt.figure(figsize = [6.4, 4.8*3/4])
@@ -2145,33 +2145,52 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     error = errors_signal[signal_index][metric_index]
     stdev = stdevs_signal[signal_index][metric_index]
     plt.plot(number_of_samples, error*unit_factor_map[metric], f"-", color = colours[signal_index], label = label)
-    plt.plot([number_of_samples[subsample_index]], [error[subsample_index]*unit_factor_map[metric]], f"s", color = colours[signal_index])
-  plt.xlabel("Number of samples used in reconstruction", size = 16)
-  plt.ylabel(ylabel_map[metric], size = 16)
+    if signal_index == 1:
+      plt.plot([number_of_samples[79]], [error[79]*unit_factor_map[metric]], f"s", color = colours[signal_index])
+      plt.plot([number_of_samples[79], 50], [error[79]*unit_factor_map[metric], 50], f"--", color = colours[signal_index])
+      plt.plot([number_of_samples[39]], [error[39]*unit_factor_map[metric]], f"s", color = colours[signal_index])
+      plt.plot([number_of_samples[39], 100], [error[39]*unit_factor_map[metric], 50], f"--", color = colours[signal_index])
+  plt.xlabel("Number of samples used in reconstruction", size = 14)
+  plt.ylabel(ylabel_map[metric], size = 14)
   plt.ylim(bottom = 0, top = 1.1*np.max(error)*unit_factor_map[metric])
   plt.xlim(left = 0, right = 100)
   plt.gca().spines["right"].set_visible(False)
   plt.gca().spines["top"].set_visible(False)
   fig.subplots_adjust(bottom=0.15)
   # plt.text(5, 1.1*np.max(error + stdev)*unit_factor_map[metric], f"({chr(98 - metric_index)})", size = 16)
-  if archive:
-    archive.write_plot(f"", f"number_of_samples_comparison_auc")
 
-  error_sensitivity_1_pulse = errors_signal[0][2]
-  error_specificity_1_pulse = errors_signal[0][3]
+  # error_sensitivity_1_pulse = errors_signal[0][2]
+  # error_specificity_1_pulse = errors_signal[0][3]
+  # error_sensitivity_2_pulse = errors_signal[1][2]
+  # error_specificity_2_pulse = errors_signal[1][3]
+
+  # stdev_sensitivity_1_pulse = stdevs_signal[0][2]
+  # stdev_specificity_1_pulse = stdevs_signal[0][3]
+  # stdev_sensitivity_2_pulse = stdevs_signal[1][2]
+  # stdev_specificity_2_pulse = stdevs_signal[1][3]
+
+  error_sensitivity_1_pulse = errors_signal[1][2]
+  error_specificity_1_pulse = errors_signal[1][3]
   error_sensitivity_2_pulse = errors_signal[1][2]
   error_specificity_2_pulse = errors_signal[1][3]
 
-  stdev_sensitivity_1_pulse = stdevs_signal[0][2]
-  stdev_specificity_1_pulse = stdevs_signal[0][3]
+  stdev_sensitivity_1_pulse = stdevs_signal[1][2]
+  stdev_specificity_1_pulse = stdevs_signal[1][3]
   stdev_sensitivity_2_pulse = stdevs_signal[1][2]
   stdev_specificity_2_pulse = stdevs_signal[1][3]
   
   # plt.figure()
-  ins = plt.gca().inset_axes([0.4, 0.2, 0.25, 0.5])
+  ins = plt.gca().inset_axes([0.45, 0.2, 0.25, 0.5])
+
+  ins.plot([0, 100, 100], [0, 0, 100], "k--", alpha = 0.5)
+  ins.text(40, 25, "AUC", size = 14, alpha = 0.5)
+
   # plt.subplot(1, 2, 1)
   specificity_boundary = []
   sensitivity_boundary = []
+
+  subsample_index = 79 # => 30 samples
+
   for threshold_index in range(error_specificity_1_pulse.shape[1] - 1):
     boundary = error_specificity_1_pulse[subsample_index, threshold_index] + stdev_specificity_1_pulse[subsample_index, threshold_index]
     if boundary >= 1:
@@ -2202,14 +2221,19 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     sensitivity_boundary.append(boundary)
   specificity_boundary = np.array(specificity_boundary)
   sensitivity_boundary = np.array(sensitivity_boundary)
-  ins.fill(100*(1 - specificity_boundary), 100*sensitivity_boundary, color = colours[0], alpha = 0.2)
-  ins.plot(100*(1 - error_specificity_1_pulse[subsample_index, :-1]), 100*error_sensitivity_1_pulse[subsample_index, :-1], "-", color = colours[0])
-  ins.set_xlabel("                                           Fallout (%)")
+  ins.fill(100*(1 - specificity_boundary), 100*sensitivity_boundary, color = colours[1], alpha = 0.2)
+  ins.plot(100*(1 - error_specificity_1_pulse[subsample_index, :-1]), 100*error_sensitivity_1_pulse[subsample_index, :-1], "-", color = colours[1])
+  ins.set_xlabel("                                   Fallout (%)")
   ins.set_ylabel("Recall (%)")
   ins.set_xlim([-10, 110])
   ins.set_ylim([-10, 110])
   
   ins = plt.gca().inset_axes([0.75, 0.2, 0.25, 0.5])
+
+  subsample_index = 39 # => 70 samples
+
+  ins.plot([0, 100, 100], [0, 0, 100], "k--", alpha = 0.5)
+  ins.text(30, 40, "AUC", size = 14, alpha = 0.5)
 
   specificity_boundary = []
   sensitivity_boundary = []
@@ -2250,7 +2274,11 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
   # ins.set_ylabel("Recall (%)")
   ins.set_xlim([-10, 110])
   ins.set_ylim([-10, 110])
+  ins.yaxis.set_ticklabels([])
   plt.draw()
+
+  if archive:
+    archive.write_plot(f"", f"number_of_samples_comparison_auc")
 
 def plot_reconstruction_method_comparison(archive, results_objects, ground_truth, units = "nT"):
   label_size = 14
