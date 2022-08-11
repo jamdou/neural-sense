@@ -2147,15 +2147,17 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     plt.plot(number_of_samples, error*unit_factor_map[metric], f"-", color = colours[signal_index], label = label)
     if signal_index == 1:
       plt.plot([number_of_samples[79]], [error[79]*unit_factor_map[metric]], f"s", color = colours[signal_index])
-      plt.plot([number_of_samples[79], 50], [error[79]*unit_factor_map[metric], 50], f"--", color = colours[signal_index])
+      plt.plot([number_of_samples[79], 45], [error[79]*unit_factor_map[metric], 45], f"--", color = colours[signal_index])
       plt.plot([number_of_samples[39]], [error[39]*unit_factor_map[metric]], f"s", color = colours[signal_index])
-      plt.plot([number_of_samples[39], 100], [error[39]*unit_factor_map[metric], 50], f"--", color = colours[signal_index])
-  plt.xlabel("Number of samples used in reconstruction", size = 14)
-  plt.ylabel(ylabel_map[metric], size = 14)
-  plt.ylim(bottom = 0, top = 1.1*np.max(error)*unit_factor_map[metric])
+      plt.plot([number_of_samples[39], 70], [error[39]*unit_factor_map[metric], 60], f"--", color = colours[signal_index])
+  plt.xlabel("Number of samples used in reconstruction", size = 14, fontname = "Times New Roman")
+  plt.ylabel(ylabel_map[metric], size = 14, fontname = "Times New Roman")
+  plt.ylim(bottom = 0, top = 103)#1.1*np.max(error)*unit_factor_map[metric])
   plt.xlim(left = 0, right = 100)
   plt.gca().spines["right"].set_visible(False)
   plt.gca().spines["top"].set_visible(False)
+  plt.xticks(fontname = "Times New Roman")
+  plt.yticks(fontname = "Times New Roman")
   fig.subplots_adjust(bottom=0.15)
   # plt.text(5, 1.1*np.max(error + stdev)*unit_factor_map[metric], f"({chr(98 - metric_index)})", size = 16)
 
@@ -2180,10 +2182,15 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
   stdev_specificity_2_pulse = stdevs_signal[1][3]
   
   # plt.figure()
-  ins = plt.gca().inset_axes([0.45, 0.2, 0.25, 0.5])
+  ins = plt.gca().inset_axes([0.4, 0.2, 0.25, 0.5])
 
-  ins.plot([0, 100, 100], [0, 0, 100], "k--", alpha = 0.5)
-  ins.text(40, 25, "AUC", size = 14, alpha = 0.5)
+  # ins.plot([0, 100, 100], [0, 0, 100], "k--", alpha = 0.5)
+  ins.text(40, 40, "AUC", size = 14, color = colours[1], fontname = "Times New Roman")
+  ins.spines["right"].set_visible(False)
+  ins.spines["top"].set_visible(False)
+
+  # ins.set_xticks([0, 50, 100], fontname = "Times New Roman")
+  # ins.set_yticks([0, 50, 100], fontname = "Times New Roman")
 
   # plt.subplot(1, 2, 1)
   specificity_boundary = []
@@ -2221,19 +2228,25 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     sensitivity_boundary.append(boundary)
   specificity_boundary = np.array(specificity_boundary)
   sensitivity_boundary = np.array(sensitivity_boundary)
-  ins.fill(100*(1 - specificity_boundary), 100*sensitivity_boundary, color = colours[1], alpha = 0.2)
+  # ins.fill(100*(1 - specificity_boundary), 100*sensitivity_boundary, color = colours[1], alpha = 0.2)
+  ins.fill(100*(1 - error_specificity_1_pulse[subsample_index, :]), 100*error_sensitivity_1_pulse[subsample_index, :], color = "k", alpha = 0.1)
   ins.plot(100*(1 - error_specificity_1_pulse[subsample_index, :-1]), 100*error_sensitivity_1_pulse[subsample_index, :-1], "-", color = colours[1])
-  ins.set_xlabel("                                   Fallout (%)")
-  ins.set_ylabel("Recall (%)")
-  ins.set_xlim([-10, 110])
-  ins.set_ylim([-10, 110])
+  ins.set_xlabel("                                             Fallout (%)", fontname = "Times New Roman")
+  ins.set_ylabel("Recall (%)", fontname = "Times New Roman")
+  ins.set_xlim([-10, 100])
+  ins.set_ylim([0, 103])
+  # ins.set_xticks([0, 50, 100], ["0", "50", "100"], fontproperties = "Times New Roman")
+  # ins.set_yticks([0, 50, 100], ["0", "50", "100"], fontproperties = "Times New Roman")
   
-  ins = plt.gca().inset_axes([0.75, 0.2, 0.25, 0.5])
+  ins = plt.gca().inset_axes([0.7, 0.2, 0.25, 0.5])
 
   subsample_index = 39 # => 70 samples
 
-  ins.plot([0, 100, 100], [0, 0, 100], "k--", alpha = 0.5)
-  ins.text(30, 40, "AUC", size = 14, alpha = 0.5)
+  # ins.plot([0, 100, 100], [0, 0, 100], "k--", alpha = 0.5)
+  ins.text(30, 40, "AUC", size = 14, color = colours[1], fontname = "Times New Roman")
+
+  # ins.set_xticks([0, 50, 100], fontname = "Times New Roman")
+  # ins.set_yticks([0, 50, 100], fontname = "Times New Roman")
 
   specificity_boundary = []
   sensitivity_boundary = []
@@ -2267,14 +2280,17 @@ def plot_reconstruction_number_of_samples_sweep_signal_comparison(archive, archi
     sensitivity_boundary.append(boundary)
   specificity_boundary = np.array(specificity_boundary)
   sensitivity_boundary = np.array(sensitivity_boundary)
-  ins.fill(100*(1 - specificity_boundary), 100*sensitivity_boundary, color = colours[1], alpha = 0.2)
+  # ins.fill(100*(1 - specificity_boundary), 100*sensitivity_boundary, color = colours[1], alpha = 0.2)
+  ins.fill(100*(1 - error_specificity_2_pulse[subsample_index, :]), 100*error_sensitivity_2_pulse[subsample_index, :], color = "k", alpha = 0.1)
   ins.plot(100*(1 - error_specificity_2_pulse[subsample_index, :-1]), 100*error_sensitivity_2_pulse[subsample_index, :-1], "-", color = colours[1])
 
   # ins.set_xlabel("Fallout (%)")
   # ins.set_ylabel("Recall (%)")
-  ins.set_xlim([-10, 110])
-  ins.set_ylim([-10, 110])
+  ins.set_xlim([-10, 100])
+  ins.set_ylim([0, 103])
   ins.yaxis.set_ticklabels([])
+  ins.spines["right"].set_visible(False)
+  ins.spines["top"].set_visible(False)
   plt.draw()
 
   if archive:
