@@ -383,9 +383,17 @@ if __name__ == "__main__":
     # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 
     # paper_plots.CompressivePaper.make_comparison(archive)
-    paper_plots.CompressivePaper.make_metrics(archive)
+    # paper_plots.CompressivePaper.make_metrics(archive)
     # paper_plots.CompressivePaper.make_unknown(archive)
     # paper_plots.Aip2022.make_abstract_plot(archive)
+
+    time = np.arange(0, 128)*(5e-3/128)
+    time_start = 4e-3
+    # amplitude = np.exp(-0.5*((time - time_start)/1e-4)**2)*np.sin(math.tau*5e3*(time - time_start))
+    # amplitude = np.sin(math.tau*5e3*(time - time_start))*(time > time_start)*(time < time_start + 1/5e3)
+    # amplitude = np.random.normal(size = time.size)
+    amplitude = np.sin(math.tau*5e2*(time - time_start))
+    util.wavelet_transform(time, amplitude)
 
     
 

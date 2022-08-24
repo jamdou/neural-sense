@@ -5,6 +5,8 @@ import numba.cuda as cuda
 import math
 import matplotlib.pyplot as plt
 import h5py
+import pywt
+from cmcrameri import cm
 
 import test_signal
 import archive as arch
@@ -529,6 +531,46 @@ def fit_frequency(frequency_dressing, spin, time_coarse, do_plot = False):
   shift_predict = math.sqrt(frequency_dressing**2 + (0.25*(frequency_dressing**2)/460e3)**2) - frequency_dressing
 
   return shift, shift_predict
+
+def wavelet_transform(time, amplitude):
+  wavelet_amplitude = amplitude.copy()
+  size = wavelet_amplitude.size
+  spectrogram_amplitude = np.empty((size, size))
+  for log_scale in range(1, int(np.log2(size))):
+    wavelet_amplitude_previous = wavelet_amplitude.copy()
+    scale = int(2**log_scale)
+    inv_scale = int(size/(scale))
+    for index in range(inv_scale):
+      wavelet_amplitude[index] = (wavelet_amplitude_previous[2*index] + wavelet_amplitude_previous[2*index + 1])/2
+      wavelet_amplitude[inv_scale + index] = (wavelet_amplitude_previous[2*index] - wavelet_amplitude_previous[2*index + 1])/2
+
+      spectrogram_amplitude[inv_scale:2*inv_scale, index*scale:(index + 1)*scale] = wavelet_amplitude[inv_scale + index]
+  spectrogram_amplitude[0, :] = wavelet_amplitude[0]
+
+  inverse_amplitude = wavelet_amplitude.copy()
+  for log_scale in range(int(np.log2(size) - 1), 0, -1):
+    inverse_amplitude_previous = inverse_amplitude.copy()
+    scale = int(2**log_scale)
+    inv_scale = int(size/(scale))
+    for index in range(inv_scale):
+      inverse_amplitude[2*index] = inverse_amplitude_previous[index] + inverse_amplitude_previous[inv_scale + index]
+      inverse_amplitude[2*index + 1] = inverse_amplitude_previous[index] - inverse_amplitude_previous[inv_scale + index]
+
+  plt.figure()
+  plt.plot(time, amplitude)
+  plt.plot(time, inverse_amplitude)
+  plt.draw()
+
+  plt.figure()
+  plt.plot(np.arange(time.size), wavelet_amplitude)
+  plt.draw()
+
+  plt.figure()
+  spectrogram_amplitude_max = np.max(np.abs(spectrogram_amplitude))
+  plt.imshow(spectrogram_amplitude, cmap = cm.roma, vmin = -spectrogram_amplitude_max, vmax = spectrogram_amplitude_max)
+  plt.draw()
+
+
 
 # def fft_cuda(signal):
 #   power_of_2_shape = int(2**math.ceil(math.log2(signal.shape[1])))

@@ -12,8 +12,8 @@ import subprocess
 import textwrap
 import gc
 
-import qutip
-from qutip.expect import expect
+# import qutip
+# from qutip.expect import expect
 
 import scipy.integrate
 import scipy.linalg
