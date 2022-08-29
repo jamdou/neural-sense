@@ -3,8 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal
 import spinsim
-from sim.manager import generate_interpolation_sampler
+from cmcrameri import cm
 
+from sim.manager import generate_interpolation_sampler
 import util
 from util import PrettyTritty as C
 import archive as arch
@@ -261,3 +262,58 @@ def remove_dc(results:arch.RamseyResults, do_remove_first_sample = True):
 
   results_modified = arch.RamseyResults(time = time, amplitude = amplitude_modified, archive_time = results.archive_time, experiment_type = f"{results.experiment_type}, removed dc")
   return results_modified
+
+class SweepingRamsey:
+  @staticmethod
+  def find_pi2_rate():
+    sweep_min = 600e3
+    sweep_max = 700e3
+    sweep_time = 5e-3
+    time_step = 1e-6
+
+    def get_field_sweep(time, parameters, field):
+      dressing_amplitude = parameters[0]
+      dressing_phase = 0.5*(sweep_max - sweep_min)*time**2/sweep_time + sweep_min*time
+      bias = 650e3
+
+      field[0] = math.tau*2*dressing_amplitude*math.cos(math.tau*dressing_phase)
+      field[2] = math.tau*bias
+
+    number_of_simulations = 200
+    simulator = spinsim.Simulator(get_field_sweep, spinsim.SpinQuantumNumber.ONE)
+    dressing_amplitudes = np.geomspace(100, 10e3, number_of_simulations)
+    final_spins = np.empty_like(dressing_amplitudes)
+    shape = (dressing_amplitudes.size, int(np.round(sweep_time/time_step)))
+    final_spinses = np.empty(shape = shape, dtype = np.float)
+
+    C.starting("simulations")
+    C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
+    for experiment_index, dressing_amplitude in enumerate(dressing_amplitudes):
+      result = simulator.evaluate(0, sweep_time, 1e-8, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [dressing_amplitude])
+      final_spins[experiment_index] = np.real(np.abs(result.state[-1, 0])**2 - np.abs(result.state[-1, 2])**2)
+      final_spinses[experiment_index, :] = result.spin[:, 2]
+      C.print(f"|{experiment_index:10d}|{100*(experiment_index + 1)/number_of_simulations:20.4f}|", end = "\r")
+    times = result.time
+    C.print("")
+    # final_spins = np.array(final_spins)
+    C.finished("simulations")
+
+    plt.figure()
+    plt.xlabel("Dressing amplitude (Hz)")
+    plt.ylabel("Final spin (hbar)")
+    plt.plot(dressing_amplitudes, final_spins, "x--k")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(final_spinses, cmap = cm.roma, vmin = -1, vmax = 1, aspect = 4000/number_of_simulations)
+    xtick_decimate = np.arange(0, sweep_time/time_step, int(np.round(sweep_time/time_step/5)), dtype = np.int)
+    print(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in times[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, number_of_simulations, int(np.round(number_of_simulations/5)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in dressing_amplitudes[ytick_decimate]])
+    plt.ylabel("Dressing amplitude (Hz) (log scale)")
+    plt.colorbar(label = "Expected spin z projection (hbar)")
+    plt.draw()
