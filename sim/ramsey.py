@@ -266,22 +266,38 @@ def remove_dc(results:arch.RamseyResults, do_remove_first_sample = True):
 class SweepingRamsey:
   @staticmethod
   def find_pi2_rate():
-    sweep_min = 600e3
-    sweep_max = 700e3
+    sweep_bandwidth = 500e3
+    sweep_mid = 650e3
+    sweep_min = sweep_mid - sweep_bandwidth/2
+    sweep_max = sweep_mid + sweep_bandwidth/2
+    # sweep_min = 600e3
+    # sweep_max = 700e3
     sweep_time = 5e-3
     time_step = 1e-6
+    sweep_rate = sweep_bandwidth/sweep_time
 
     def get_field_sweep(time, parameters, field):
       dressing_amplitude = parameters[0]
       dressing_phase = 0.5*(sweep_max - sweep_min)*time**2/sweep_time + sweep_min*time
       bias = 650e3
 
-      field[0] = math.tau*2*dressing_amplitude*math.cos(math.tau*dressing_phase)
+      field[0] = math.tau*2*dressing_amplitude*math.sin(math.tau*dressing_phase)
       field[2] = math.tau*bias
 
-    number_of_simulations = 200
+    # def get_field_sweep(time, parameters, field):
+    #     dressing_amplitude = parameters[0]
+    #     time_multiplier = dressing_amplitude/1000
+    #     dressing_phase = (0.5*(sweep_max - sweep_min)*time**2/sweep_time + sweep_min*time)
+    #     bias = 650e3
+
+    #     field[0] = math.tau*2*dressing_amplitude*math.sin(math.tau*dressing_phase)
+    #     field[2] = math.tau*bias
+
+    number_of_simulations = 10
     simulator = spinsim.Simulator(get_field_sweep, spinsim.SpinQuantumNumber.ONE)
-    dressing_amplitudes = np.geomspace(100, 10e3, number_of_simulations)
+    # dressing_amplitudes = np.geomspace(100, 10e3, number_of_simulations)
+    adiabaticity = np.linspace(0, 0.2, number_of_simulations)
+    dressing_amplitudes = np.sqrt(adiabaticity*sweep_rate)
     final_spins = np.empty_like(dressing_amplitudes)
     shape = (dressing_amplitudes.size, int(np.round(sweep_time/time_step)))
     final_spinses = np.empty(shape = shape, dtype = np.float)
@@ -289,11 +305,12 @@ class SweepingRamsey:
     C.starting("simulations")
     C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
     for experiment_index, dressing_amplitude in enumerate(dressing_amplitudes):
-      result = simulator.evaluate(0, sweep_time, 1e-8, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [dressing_amplitude])
+      result = simulator.evaluate(0, sweep_time, 1e-8, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [1.0*dressing_amplitude])
       final_spins[experiment_index] = np.real(np.abs(result.state[-1, 0])**2 - np.abs(result.state[-1, 2])**2)
       final_spinses[experiment_index, :] = result.spin[:, 2]
       C.print(f"|{experiment_index:10d}|{100*(experiment_index + 1)/number_of_simulations:20.4f}|", end = "\r")
     times = result.time
+    detuning = sweep_bandwidth*(times/sweep_time - 0.5)
     C.print("")
     # final_spins = np.array(final_spins)
     C.finished("simulations")
@@ -304,16 +321,131 @@ class SweepingRamsey:
     plt.plot(dressing_amplitudes, final_spins, "x--k")
     plt.draw()
 
+    # plt.figure()
+    # plt.imshow(final_spinses, cmap = cm.roma, vmin = -1, vmax = 1, aspect = 4000/number_of_simulations)
+    # xtick_decimate = np.arange(0, sweep_time/time_step, int(np.round(sweep_time/time_step/5)), dtype = np.int)
+    # print(xtick_decimate)
+    # plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    # plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in times[xtick_decimate]])
+    # plt.xlabel("Time (ms)")
+    # ytick_decimate = np.arange(0, number_of_simulations, int(np.round(number_of_simulations/5)), dtype = np.int)
+    # plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    # plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in dressing_amplitudes[ytick_decimate]])
+    # plt.ylabel("Dressing amplitude (Hz) (log scale)")
+    # plt.colorbar(label = "Expected spin z projection (hbar)")
+    # plt.draw()
+
     plt.figure()
     plt.imshow(final_spinses, cmap = cm.roma, vmin = -1, vmax = 1, aspect = 4000/number_of_simulations)
     xtick_decimate = np.arange(0, sweep_time/time_step, int(np.round(sweep_time/time_step/5)), dtype = np.int)
     print(xtick_decimate)
     plt.gca().axes.xaxis.set_ticks(xtick_decimate)
-    plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in times[xtick_decimate]])
-    plt.xlabel("Time (ms)")
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.0f}" for number in detuning[xtick_decimate]])
+    plt.xlabel("Detuning (Hz)")
     ytick_decimate = np.arange(0, number_of_simulations, int(np.round(number_of_simulations/5)), dtype = np.int)
     plt.gca().axes.yaxis.set_ticks(ytick_decimate)
-    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in dressing_amplitudes[ytick_decimate]])
-    plt.ylabel("Dressing amplitude (Hz) (log scale)")
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.3f}" for number in adiabaticity[ytick_decimate]])
+    plt.ylabel("Adiabaticity")
     plt.colorbar(label = "Expected spin z projection (hbar)")
+    plt.draw()
+
+  @staticmethod
+  def pulsed_ramsey():
+    # number_of_traps = 10
+    number_of_traps = 20
+    gradient_mid = 600e3
+    gradient_range = 500e3
+    amplitude_dressing = 5e3
+    duration_dressing = 1/(4*amplitude_dressing)
+    duration_experiment = 5e-3
+    duration_sample = 250e-6
+    # duration_sample = 100e-6
+    time_step = 50e-6
+
+    shape = (number_of_traps, int(np.round(duration_experiment/time_step)))
+    spin_map = np.empty(shape = shape, dtype = np.float)
+    trap_location = np.arange(number_of_traps)
+
+    gradient_min = gradient_mid - gradient_range/2
+    gradient_max = gradient_mid + gradient_range/2
+
+    gradient = trap_location*gradient_range/(number_of_traps - 1) + gradient_min
+
+    # scramble = np.random.permutation(number_of_traps)
+    # scramble = trap_location.copy()
+    scramble = np.mod(trap_location*7, 20)
+    # scramble = np.mod(trap_location*9, 20)
+    # print(scramble)
+
+    inverse_scramble = np.empty_like(scramble)
+    for index, scrambled_index in enumerate(scramble):
+      inverse_scramble[scrambled_index] = index
+
+    amplitude = np.empty_like(scramble, dtype = np.double)
+    time_samples = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*trap_location/(number_of_traps - 1)
+    
+    def get_field_pulsed(time, parameters, field):
+      trap_index = parameters[0]
+      trap_lerp = trap_index/(number_of_traps - 1)
+      bias = gradient_min + trap_lerp*gradient_range
+      
+      field[0] = 0
+
+      # time_sample = duration_experiment/2
+      # time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+      # if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+      #   field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*gradient_mid*time)
+      # time_pulse_readout = time_sample + duration_sample/2
+      # if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+      #   field[0] += math.tau*2*amplitude_dressing*math.sin(math.tau*gradient_mid*time)
+
+      for pulse_index, pulse_time_index in enumerate(scramble):
+        pulse_lerp = pulse_index/(number_of_traps - 1)
+        pulse_time_lerp = pulse_time_index/(number_of_traps - 1)
+
+        time_sample = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*pulse_time_lerp
+        time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+        dressing_frequency = gradient_min + pulse_lerp*gradient_range
+        if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+          field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
+        time_pulse_readout = time_sample + duration_sample/2
+        if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+          field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
+
+        # field[2] = math.tau*bias
+        # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
+        field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
+    
+    C.starting("simulations")
+    C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
+    simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE)
+    for trap in trap_location:
+      results = simulator.evaluate(0, duration_experiment, 1e-7, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap])
+      spin_map[trap, :] = results.spin[:, 2]
+      C.print(f"|{trap:10d}|{100*(trap + 1)/number_of_traps:20.4f}|", end = "\r")
+    time = results.time
+    C.print(f"")
+    C.finished("simulations")
+
+    plt.figure()
+    plt.imshow(spin_map, cmap = cm.roma, vmin = -1, vmax = 1, aspect = shape[1]/shape[0])
+    xtick_decimate = np.arange(0, duration_experiment/time_step, int(np.round(duration_experiment/time_step/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, number_of_traps, int(np.round(number_of_traps/5)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    # plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in trap_location[ytick_decimate]])
+    # plt.ylabel("Trap number")
+    plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
+    plt.ylabel("Gradient (kHz)")
+    plt.colorbar(label = "Expected spin z projection (hbar)")
+    plt.draw()
+
+    amplitude = spin_map[:, -1]/(duration_sample*math.tau)
+    amplitude = amplitude[inverse_scramble]
+    plt.figure()
+    plt.plot(time_samples*1000, amplitude)
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Amplitude (Hz)")
     plt.draw()

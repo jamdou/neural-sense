@@ -396,7 +396,8 @@ if __name__ == "__main__":
     # amplitude = np.sin(math.tau*5e2*(time - time_start))
     # util.wavelet_transform(time, amplitude)
 
-    sim.ramsey.SweepingRamsey.find_pi2_rate()
+    # sim.ramsey.SweepingRamsey.find_pi2_rate()
+    sim.ramsey.SweepingRamsey.pulsed_ramsey()
 
     # === ===                      === ===
     # === === Benchmarks and tests === ===
@@ -525,4 +526,5 @@ if __name__ == "__main__":
     archive.close_archive_file()
     cuda.profile_stop()
     cuda.close()
+    C.exit()
     plt.show()
