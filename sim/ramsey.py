@@ -353,9 +353,11 @@ class SweepingRamsey:
   def pulsed_ramsey():
     # number_of_traps = 10
     number_of_traps = 20
+    amplitude_dressing = 10e3
     gradient_mid = 600e3
     gradient_range = 500e3
-    amplitude_dressing = 5e3
+    fringe = 4
+    gradient_range = amplitude_dressing*np.sqrt(fringe**2 - 1)*(number_of_traps - 1)
     duration_dressing = 1/(4*amplitude_dressing)
     duration_experiment = 5e-3
     duration_sample = 250e-6
@@ -371,9 +373,9 @@ class SweepingRamsey:
 
     gradient = trap_location*gradient_range/(number_of_traps - 1) + gradient_min
 
-    # scramble = np.random.permutation(number_of_traps)
+    scramble = np.random.permutation(number_of_traps)
     # scramble = trap_location.copy()
-    scramble = np.mod(trap_location*7, 20)
+    # scramble = np.mod(trap_location*7, 20)
     # scramble = np.mod(trap_location*9, 20)
     # print(scramble)
 
@@ -412,9 +414,11 @@ class SweepingRamsey:
         if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
           field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
 
-        # field[2] = math.tau*bias
+        field[2] = math.tau*bias
         # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
-        field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
+        # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
+        field[1] = 0
+        field[3] = 0
     
     C.starting("simulations")
     C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
