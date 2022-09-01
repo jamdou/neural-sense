@@ -13,6 +13,11 @@ import archive as arch
 # from sim import manager
 
 class PrettyTritty:
+  import logging
+  logging.basicConfig()
+  logger = logging.Logger("c")
+  
+
   d = "\033[0m"
   r = "\033[31m"
   g = "\033[32m"
@@ -74,29 +79,60 @@ class PrettyTritty:
   @classmethod
   def starting(cls, message:str):
     tabs = cls.level*"  "
+    message = str(message)
     message = message.replace('\n', f'\n{tabs}')
     if cls.level < cls.level_max:
       print(f"{tabs}{cls.y}Starting {message}...{cls.d}")
+    cls.logger.info(f"{tabs}Starting {message}...")
     cls.level += 1
 
   @classmethod
   def finished(cls, message:str):
     cls.level = max(cls.level - 1, 0)
     tabs = cls.level*"  "
+    message = str(message)
     message = message.replace('\n', f'\n{tabs}')
     if cls.level < cls.level_max:
       print(f"{tabs}{cls.g}Finished {message}!{cls.d}")
+    cls.logger.info(f"{tabs}Finished {message}!")
 
   @classmethod
   def print(cls, message:str, end = "\n"):
     tabs = cls.level*"  "
+    message = str(message)
     message = message.replace('\n', f'\n{tabs}')
     if cls.level < cls.level_max:
       print(f"{tabs}{message}", end = end)
+    cls.logger.info(f"{tabs}{message}")
 
   @classmethod
   def exit(cls):
     print(cls.done)
+
+  @classmethod
+  def exception(cls, exception:Exception):
+    print(exception)
+    cls.logger.exception(str(exception))
+
+  @classmethod
+  def set_path_from_archive(cls, archive:arch):
+    cls.set_path(archive.archive_path)
+
+  @classmethod
+  def set_path(cls, path):
+    cls.path = path
+    # cls.logging.basicConfig(
+    #   filename = f"{path}c.log",
+    #   # filemode = 'a',
+    #   # format = '%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+    #   # datefmt = '%H:%M:%S',
+    #   # level = logging.DEBUG
+    # )
+    cls.logging_formatter = cls.logging.Formatter("%(asctime)s > %(message)s")
+    cls.logging_handler = cls.logging.FileHandler(f"{path}c.log")
+    cls.logging_handler.setFormatter(cls.logging_formatter)
+    cls.logger.addHandler(cls.logging_handler)
+
 
 C = PrettyTritty
 class Seeds:

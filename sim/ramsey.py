@@ -354,102 +354,115 @@ class SweepingRamsey:
     # number_of_traps = 10
     number_of_traps = 20
     amplitude_dressing = 10e3
-    gradient_mid = 600e3
-    gradient_range = 500e3
-    fringe = 4
-    gradient_range = amplitude_dressing*np.sqrt(fringe**2 - 1)*(number_of_traps - 1)
-    duration_dressing = 1/(4*amplitude_dressing)
-    duration_experiment = 5e-3
-    duration_sample = 250e-6
-    # duration_sample = 100e-6
-    time_step = 50e-6
+    fringes = np.arange(3.5, 7.5, 0.1)
+    errors = np.empty_like(fringes)
+    for fringe_index, fringe in enumerate(fringes):
+      gradient_mid = 600e3
+      gradient_range = 500e3
+      # fringe = 4.5
+      gradient_range = amplitude_dressing*np.sqrt(fringe**2 - 1)*(number_of_traps - 1)
+      duration_dressing = 1/(4*amplitude_dressing)
+      duration_experiment = 5e-3
+      duration_sample = 250e-6
+      # duration_sample = 100e-6
+      time_step = 50e-6
 
-    shape = (number_of_traps, int(np.round(duration_experiment/time_step)))
-    spin_map = np.empty(shape = shape, dtype = np.float)
-    trap_location = np.arange(number_of_traps)
+      shape = (number_of_traps, int(np.round(duration_experiment/time_step)))
+      spin_map = np.empty(shape = shape, dtype = np.float)
+      trap_location = np.arange(number_of_traps)
 
-    gradient_min = gradient_mid - gradient_range/2
-    gradient_max = gradient_mid + gradient_range/2
+      gradient_min = gradient_mid - gradient_range/2
+      gradient_max = gradient_mid + gradient_range/2
 
-    gradient = trap_location*gradient_range/(number_of_traps - 1) + gradient_min
+      gradient = trap_location*gradient_range/(number_of_traps - 1) + gradient_min
 
-    scramble = np.random.permutation(number_of_traps)
-    # scramble = trap_location.copy()
-    # scramble = np.mod(trap_location*7, 20)
-    # scramble = np.mod(trap_location*9, 20)
-    # print(scramble)
+      scramble = np.random.permutation(number_of_traps)
+      # scramble = trap_location.copy()
+      # scramble = np.mod(trap_location*7, 20)
+      # scramble = np.mod(trap_location*9, 20)
+      # print(scramble)
 
-    inverse_scramble = np.empty_like(scramble)
-    for index, scrambled_index in enumerate(scramble):
-      inverse_scramble[scrambled_index] = index
+      inverse_scramble = np.empty_like(scramble)
+      for index, scrambled_index in enumerate(scramble):
+        inverse_scramble[scrambled_index] = index
 
-    amplitude = np.empty_like(scramble, dtype = np.double)
-    time_samples = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*trap_location/(number_of_traps - 1)
-    
-    def get_field_pulsed(time, parameters, field):
-      trap_index = parameters[0]
-      trap_lerp = trap_index/(number_of_traps - 1)
-      bias = gradient_min + trap_lerp*gradient_range
+      amplitude = np.empty_like(scramble, dtype = np.double)
+      time_samples = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*trap_location/(number_of_traps - 1)
       
-      field[0] = 0
+      def get_field_pulsed(time, parameters, field):
+        trap_index = parameters[0]
+        trap_lerp = trap_index/(number_of_traps - 1)
+        bias = gradient_min + trap_lerp*gradient_range
+        
+        field[0] = 0
 
-      # time_sample = duration_experiment/2
-      # time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
-      # if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
-      #   field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*gradient_mid*time)
-      # time_pulse_readout = time_sample + duration_sample/2
-      # if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
-      #   field[0] += math.tau*2*amplitude_dressing*math.sin(math.tau*gradient_mid*time)
+        # time_sample = duration_experiment/2
+        # time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+        # if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+        #   field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*gradient_mid*time)
+        # time_pulse_readout = time_sample + duration_sample/2
+        # if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+        #   field[0] += math.tau*2*amplitude_dressing*math.sin(math.tau*gradient_mid*time)
 
-      for pulse_index, pulse_time_index in enumerate(scramble):
-        pulse_lerp = pulse_index/(number_of_traps - 1)
-        pulse_time_lerp = pulse_time_index/(number_of_traps - 1)
+        for pulse_index, pulse_time_index in enumerate(scramble):
+          pulse_lerp = pulse_index/(number_of_traps - 1)
+          pulse_time_lerp = pulse_time_index/(number_of_traps - 1)
 
-        time_sample = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*pulse_time_lerp
-        time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
-        dressing_frequency = gradient_min + pulse_lerp*gradient_range
-        if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
-          field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
-        time_pulse_readout = time_sample + duration_sample/2
-        if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
-          field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
+          time_sample = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*pulse_time_lerp
+          time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+          dressing_frequency = gradient_min + pulse_lerp*gradient_range
+          if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+            field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
+          time_pulse_readout = time_sample + duration_sample/2
+          if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+            field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
 
-        field[2] = math.tau*bias
-        # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
-        # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
-        field[1] = 0
-        field[3] = 0
-    
-    C.starting("simulations")
-    C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
-    simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE)
-    for trap in trap_location:
-      results = simulator.evaluate(0, duration_experiment, 1e-7, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap])
-      spin_map[trap, :] = results.spin[:, 2]
-      C.print(f"|{trap:10d}|{100*(trap + 1)/number_of_traps:20.4f}|", end = "\r")
-    time = results.time
-    C.print(f"")
-    C.finished("simulations")
+          field[2] = math.tau*bias
+          # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
+          # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
+          field[1] = 0
+          field[3] = 0
+      
+      C.starting("simulations")
+      C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
+      simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE, spinsim.Device.CPU)
+      for trap in trap_location:
+        results = simulator.evaluate(0, duration_experiment, 1e-7, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap])
+        spin_map[trap, :] = results.spin[:, 2]
+        C.print(f"|{trap:10d}|{100*(trap + 1)/number_of_traps:20.4f}|", end = "\r")
+      time = results.time
+      C.print(f"")
+      C.finished("simulations")
 
+      amplitude = spin_map[:, -1]/(duration_sample*math.tau)
+      amplitude = amplitude[inverse_scramble]
+
+      errors[fringe_index] = np.sqrt(np.mean(amplitude**2))
     plt.figure()
-    plt.imshow(spin_map, cmap = cm.roma, vmin = -1, vmax = 1, aspect = shape[1]/shape[0])
-    xtick_decimate = np.arange(0, duration_experiment/time_step, int(np.round(duration_experiment/time_step/5)), dtype = np.int)
-    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
-    plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in time[xtick_decimate]])
-    plt.xlabel("Time (ms)")
-    ytick_decimate = np.arange(0, number_of_traps, int(np.round(number_of_traps/5)), dtype = np.int)
-    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
-    # plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in trap_location[ytick_decimate]])
-    # plt.ylabel("Trap number")
-    plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
-    plt.ylabel("Gradient (kHz)")
-    plt.colorbar(label = "Expected spin z projection (hbar)")
-    plt.draw()
+    plt.plot(fringes, errors, "k.-")
+    plt.xlabel("Fringe parameter")
+    plt.ylabel("RMSE (Hz)")
+    plt.show()
 
-    amplitude = spin_map[:, -1]/(duration_sample*math.tau)
-    amplitude = amplitude[inverse_scramble]
-    plt.figure()
-    plt.plot(time_samples*1000, amplitude)
-    plt.xlabel("Time (ms)")
-    plt.ylabel("Amplitude (Hz)")
-    plt.draw()
+    # plt.figure()
+    # plt.imshow(spin_map, cmap = cm.roma, vmin = -1, vmax = 1, aspect = shape[1]/shape[0])
+    # xtick_decimate = np.arange(0, duration_experiment/time_step, int(np.round(duration_experiment/time_step/5)), dtype = np.int)
+    # plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    # plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in time[xtick_decimate]])
+    # plt.xlabel("Time (ms)")
+    # ytick_decimate = np.arange(0, number_of_traps, int(np.round(number_of_traps/5)), dtype = np.int)
+    # plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    # # plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in trap_location[ytick_decimate]])
+    # # plt.ylabel("Trap number")
+    # plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
+    # plt.ylabel("Gradient (kHz)")
+    # plt.colorbar(label = "Expected spin z projection (hbar)")
+    # plt.draw()
+
+    # amplitude = spin_map[:, -1]/(duration_sample*math.tau)
+    # amplitude = amplitude[inverse_scramble]
+    # plt.figure()
+    # plt.plot(time_samples*1000, amplitude)
+    # plt.xlabel("Time (ms)")
+    # plt.ylabel("Amplitude (Hz)")
+    # plt.draw()
