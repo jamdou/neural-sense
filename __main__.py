@@ -399,7 +399,7 @@ if __name__ == "__main__":
       # util.wavelet_transform(time, amplitude)
 
       # sim.ramsey.SweepingRamsey.find_pi2_rate()
-      sim.ramsey.SweepingRamsey.pulsed_ramsey()
+      sim.ramsey.SweepingRamsey.pulsed_ramsey(archive)
 
       # === ===                      === ===
       # === === Benchmarks and tests === ===

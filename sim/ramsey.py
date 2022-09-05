@@ -350,84 +350,144 @@ class SweepingRamsey:
     plt.draw()
 
   @staticmethod
-  def pulsed_ramsey():
+  def pulsed_ramsey(archive:arch.Archive = None):
     # number_of_traps = 10
     number_of_traps = 20
     amplitude_dressing = 10e3
-    fringes = np.arange(3.5, 7.5, 0.1)
+    duration_dressing = 1/(4*amplitude_dressing)
+    duration_experiment = 5e-3
+    duration_sample = 250e-6
+    fringes = np.arange(1.5, 10, 0.01)
     errors = np.empty_like(fringes)
+    trap_location = np.arange(number_of_traps)
+
+    # scramble = np.random.permutation(number_of_traps)
+    scramble = trap_location.copy()
+    # scramble = np.mod(trap_location*7, 20)
+    # scramble = np.mod(trap_location*9, 20)
+    # print(scramble)
+
+    inverse_scramble = np.empty_like(scramble)
+    for index, scrambled_index in enumerate(scramble):
+      inverse_scramble[scrambled_index] = index
+
+    def get_field_pulsed(time, parameters, field):
+      trap_index = parameters[0]
+      gradient_min_sim = parameters[1]
+      gradient_range_sim = parameters[2]
+
+      trap_lerp = trap_index/(number_of_traps - 1)
+      bias = gradient_min_sim + trap_lerp*gradient_range_sim
+      
+      field[0] = 0
+
+      # time_sample = duration_experiment/2
+      # time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+      # if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+      #   field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*gradient_mid*time)
+      # time_pulse_readout = time_sample + duration_sample/2
+      # if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+      #   field[0] += math.tau*2*amplitude_dressing*math.sin(math.tau*gradient_mid*time)
+
+      for pulse_index, pulse_time_index in enumerate(scramble):
+        pulse_lerp = pulse_index/(number_of_traps - 1)
+        pulse_time_lerp = pulse_time_index/(number_of_traps - 1)
+
+        time_sample = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*pulse_time_lerp
+        time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+        dressing_frequency = gradient_min_sim + pulse_lerp*gradient_range_sim
+        if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+          field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
+        time_pulse_readout = time_sample + duration_sample/2
+        if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+          field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
+
+        field[2] = math.tau*bias
+        # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
+        # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
+        field[1] = 0
+        field[3] = 0
+    
+    # simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE, spinsim.Device.CPU)
+    simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE)
+
     for fringe_index, fringe in enumerate(fringes):
       gradient_mid = 600e3
       gradient_range = 500e3
       # fringe = 4.5
       gradient_range = amplitude_dressing*np.sqrt(fringe**2 - 1)*(number_of_traps - 1)
-      duration_dressing = 1/(4*amplitude_dressing)
-      duration_experiment = 5e-3
-      duration_sample = 250e-6
+      # duration_dressing = 1/(4*amplitude_dressing)
+      # duration_experiment = 5e-3
+      # duration_sample = 250e-6
       # duration_sample = 100e-6
-      time_step = 50e-6
+      # time_step = 50e-6
+      time_step = 1e-7
+      
 
       shape = (number_of_traps, int(np.round(duration_experiment/time_step)))
       spin_map = np.empty(shape = shape, dtype = np.float)
-      trap_location = np.arange(number_of_traps)
+      # trap_location = np.arange(number_of_traps)
 
       gradient_min = gradient_mid - gradient_range/2
       gradient_max = gradient_mid + gradient_range/2
 
       gradient = trap_location*gradient_range/(number_of_traps - 1) + gradient_min
 
-      scramble = np.random.permutation(number_of_traps)
-      # scramble = trap_location.copy()
-      # scramble = np.mod(trap_location*7, 20)
-      # scramble = np.mod(trap_location*9, 20)
-      # print(scramble)
+      # scramble = np.random.permutation(number_of_traps)
+      # # scramble = trap_location.copy()
+      # # scramble = np.mod(trap_location*7, 20)
+      # # scramble = np.mod(trap_location*9, 20)
+      # # print(scramble)
 
-      inverse_scramble = np.empty_like(scramble)
-      for index, scrambled_index in enumerate(scramble):
-        inverse_scramble[scrambled_index] = index
+      # inverse_scramble = np.empty_like(scramble)
+      # for index, scrambled_index in enumerate(scramble):
+      #   inverse_scramble[scrambled_index] = index
 
       amplitude = np.empty_like(scramble, dtype = np.double)
       time_samples = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*trap_location/(number_of_traps - 1)
       
-      def get_field_pulsed(time, parameters, field):
-        trap_index = parameters[0]
-        trap_lerp = trap_index/(number_of_traps - 1)
-        bias = gradient_min + trap_lerp*gradient_range
+      # def get_field_pulsed(time, parameters, field):
+      #   trap_index = parameters[0]
+      #   gradient_min_sim = parameters[1]
+      #   gradient_range_sim = parameters[2]
+
+      #   trap_lerp = trap_index/(number_of_traps - 1)
+      #   bias = gradient_min_sim + trap_lerp*gradient_range_sim
         
-        field[0] = 0
+      #   field[0] = 0
 
-        # time_sample = duration_experiment/2
-        # time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
-        # if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
-        #   field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*gradient_mid*time)
-        # time_pulse_readout = time_sample + duration_sample/2
-        # if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
-        #   field[0] += math.tau*2*amplitude_dressing*math.sin(math.tau*gradient_mid*time)
+      #   # time_sample = duration_experiment/2
+      #   # time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+      #   # if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+      #   #   field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*gradient_mid*time)
+      #   # time_pulse_readout = time_sample + duration_sample/2
+      #   # if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+      #   #   field[0] += math.tau*2*amplitude_dressing*math.sin(math.tau*gradient_mid*time)
 
-        for pulse_index, pulse_time_index in enumerate(scramble):
-          pulse_lerp = pulse_index/(number_of_traps - 1)
-          pulse_time_lerp = pulse_time_index/(number_of_traps - 1)
+      #   for pulse_index, pulse_time_index in enumerate(scramble):
+      #     pulse_lerp = pulse_index/(number_of_traps - 1)
+      #     pulse_time_lerp = pulse_time_index/(number_of_traps - 1)
 
-          time_sample = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*pulse_time_lerp
-          time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
-          dressing_frequency = gradient_min + pulse_lerp*gradient_range
-          if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
-            field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
-          time_pulse_readout = time_sample + duration_sample/2
-          if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
-            field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
+      #     time_sample = duration_sample/2 + duration_dressing + (duration_experiment - 3*(duration_sample/2 + duration_dressing))*pulse_time_lerp
+      #     time_pulse_preparation = time_sample - duration_sample/2 - duration_dressing
+      #     dressing_frequency = gradient_min_sim + pulse_lerp*gradient_range_sim
+      #     if time > time_pulse_preparation and time <= time_pulse_preparation + duration_dressing:
+      #       field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
+      #     time_pulse_readout = time_sample + duration_sample/2
+      #     if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+      #       field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
 
-          field[2] = math.tau*bias
-          # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
-          # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
-          field[1] = 0
-          field[3] = 0
+      #     field[2] = math.tau*bias
+      #     # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time/duration_experiment)
+      #     # field[2] = math.tau*bias + math.tau*500*math.sin(math.tau*time*50)
+      #     field[1] = 0
+      #     field[3] = 0
       
       C.starting("simulations")
       C.print(f"|{'Index':>10s}|{'Completion (%)':>20s}|")
-      simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE, spinsim.Device.CPU)
+      # simulator = spinsim.Simulator(get_field_pulsed, spinsim.SpinQuantumNumber.ONE, spinsim.Device.CPU)
       for trap in trap_location:
-        results = simulator.evaluate(0, duration_experiment, 1e-7, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap])
+        results = simulator.evaluate(0, duration_experiment, 1e-7, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap, gradient_min, gradient_range])
         spin_map[trap, :] = results.spin[:, 2]
         C.print(f"|{trap:10d}|{100*(trap + 1)/number_of_traps:20.4f}|", end = "\r")
       time = results.time
@@ -439,9 +499,12 @@ class SweepingRamsey:
 
       errors[fringe_index] = np.sqrt(np.mean(amplitude**2))
     plt.figure()
-    plt.plot(fringes, errors, "k.-")
+    plt.plot(fringes, errors, "k.")
+    plt.ylim([0, 600])
     plt.xlabel("Fringe parameter")
     plt.ylabel("RMSE (Hz)")
+    if archive:
+      archive.write_plot("Avoiding fringes", "mu_ra_fringe")
     plt.show()
 
     # plt.figure()
