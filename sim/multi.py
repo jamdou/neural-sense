@@ -23,10 +23,11 @@ class MultiAnalysis:
 
       field_x = 0
       for dressing_index in range(number_of_traps):
-        if single_shot or abs(dressing_index -  trap_index) < 0.1:
+        # if single_shot != (abs(dressing_index -  trap_index) < 0.1):
+        if single_shot or (abs(dressing_index -  trap_index) < 0.1):
           dressing     = dressings[dressing_index]
           frequency_rf = gradient_mid + gradient_span*(dressing_index/(number_of_traps - 1) - 0.5)
-          field_x     += 2*math.tau*dressing*math.cos(math.tau*frequency_rf*time)
+          field_x     += 2*dressing*math.cos(math.tau*frequency_rf*time)
 
       field[0] = math.tau*field_x
       field[1] = 0
@@ -36,12 +37,14 @@ class MultiAnalysis:
     simulator = spinsim.Simulator(get_field_multi, spinsim.SpinQuantumNumber.ONE)
 
     gradient_mid  = 1000e3
-    gradient_span = 1200e3
+    # gradient_span = 1200e3
+    gradient_span = 100e3
 
     experiment_duration = 250e-6 #5e-3 #500e-6 #5e-3
     time_step           = 1e-6
 
-    frequencies = np.arange(1000, 10e3, 1000)/5
+    # frequencies = np.arange(1000, 10e3, 1000)/2.5
+    frequencies = np.array([30e3]*2)
     parameters  = [0, frequencies.size, gradient_mid, gradient_span, 1] + [frequency for frequency in frequencies]
 
     shape = (frequencies.size, int(experiment_duration/time_step))
@@ -58,6 +61,10 @@ class MultiAnalysis:
       parameters[4]                    = 1
       result                           = simulator.evaluate(0, experiment_duration, 1e-7, 1e-6, spinsim.SpinQuantumNumber.ONE.minus_z, parameters)
       spins_single_shot[trap_index, :] = result.spin[:, 2]
+
+      # spins_multi_shot[trap_index, :] = np.sin(math.tau*68e3*result.time)
+      # spins_multi_shot[trap_index, :] = np.cos(math.tau*frequencies[trap_index]*result.time)*np.sin(frequencies[trap_index]*np.cos(math.tau*gradient_span*result.time))
+      spins_multi_shot[trap_index, :] = np.cos(math.tau*frequencies[trap_index]*(result.time + (1/(math.tau*gradient_span))*np.cos(math.tau*gradient_span*result.time)))
     time = result.time
     # frequency_dct = 1/(2*(time[1] - time[0]))*np.arange(time.size)
     frequency_dct = spf.fftfreq(time.size, d = time[1] - time[0])
@@ -77,13 +84,14 @@ class MultiAnalysis:
     figure_shape = [4.8*(aspect - 0.5), 4.8]
     interpolation = "none"
 
+    label_steps_y = min(5, shape[0])
     plt.figure(figsize = figure_shape)
     plt.imshow(spins_multi_shot, cmap = cm.roma, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
     xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
     plt.gca().axes.xaxis.set_ticks(xtick_decimate)
     plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in time[xtick_decimate]])
     plt.xlabel("Time (ms)")
-    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/5)), dtype = np.int)
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
     plt.gca().axes.yaxis.set_ticks(ytick_decimate)
     plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
     plt.ylabel("Gradient (kHz)")
@@ -99,7 +107,7 @@ class MultiAnalysis:
     plt.gca().axes.xaxis.set_ticks(xtick_decimate)
     plt.gca().axes.xaxis.set_ticklabels([f"{number/1000:.2f}" for number in frequency_dct[xtick_decimate]])
     plt.xlabel("Frequency (kHz)")
-    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/5)), dtype = np.int)
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
     plt.gca().axes.yaxis.set_ticks(ytick_decimate)
     plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
     plt.ylabel("Gradient (kHz)")
@@ -115,7 +123,7 @@ class MultiAnalysis:
     plt.gca().axes.xaxis.set_ticks(xtick_decimate)
     plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in time[xtick_decimate]])
     plt.xlabel("Time (ms)")
-    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/5)), dtype = np.int)
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
     plt.gca().axes.yaxis.set_ticks(ytick_decimate)
     plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
     plt.ylabel("Gradient (kHz)")
@@ -131,7 +139,7 @@ class MultiAnalysis:
     plt.gca().axes.xaxis.set_ticks(xtick_decimate)
     plt.gca().axes.xaxis.set_ticklabels([f"{number/1000:.2f}" for number in frequency_dct[xtick_decimate]])
     plt.xlabel("Frequency (kHz)")
-    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/5)), dtype = np.int)
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
     plt.gca().axes.yaxis.set_ticks(ytick_decimate)
     plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
     plt.ylabel("Gradient (kHz)")
