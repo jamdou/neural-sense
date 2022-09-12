@@ -180,3 +180,215 @@ class MultiAnalysis:
     # if archive:
     #   archive.write_plot("Single - multi DCT", "mu_dr_bleed_difference_dct")
     # plt.draw()
+
+  @staticmethod
+  def visualise_dynamical_decoupling(archive = None):
+    number_of_pulses_max = 256  
+    time_sample_points   = 1024
+
+    time              = np.arange(time_sample_points)/time_sample_points
+    shape             = (number_of_pulses_max, time_sample_points)
+    numbers_of_pulses = np.arange(1, number_of_pulses_max + 1)
+
+    flip_udd   = np.ones(shape)
+    flip_cpmg  = np.ones(shape)
+    flip_spwm  = np.ones(shape)
+    flip_spwmu = np.zeros(shape)
+    flip_ideal = np.sin(20*math.tau*time)*np.ones(shape)
+
+    for experiment_index, number_of_pulses in enumerate(numbers_of_pulses):
+      pulse_indices   = np.arange(1, number_of_pulses + 1)
+      pulse_fractions = (pulse_indices - 0.5)/number_of_pulses
+      for pulse_fraction in pulse_fractions:
+        flip_cpmg[experiment_index, time >= pulse_fraction] *= -1
+
+      pulse_fractions = np.sin(math.pi*pulse_indices/(2*number_of_pulses + 2))**2
+      for pulse_fraction in pulse_fractions:
+        flip_udd[experiment_index, time >= pulse_fraction] *= -1
+
+      sine = np.sin(20*math.tau*time)
+
+      triangle = np.arcsin(np.sin(math.tau*(number_of_pulses + 1)*time/2))
+      flip_spwm[experiment_index, sine < triangle]  = -1
+
+      triangle = np.arcsin(np.sin(math.tau*(number_of_pulses)*time/4))
+      flip_spwmu[experiment_index, np.logical_and(sine > 0, sine > triangle)] = 1
+      flip_spwmu[experiment_index, np.logical_and(sine < 0, sine < triangle)] = -1
+      # flip_spwmu[experiment_index, :] = triangle
+      # flip_spwmu[experiment_index, :] *= np.sign(sine)
+
+    flip_fft_udd   = np.abs(spf.fft(flip_udd))
+    flip_fft_udd   /= np.max(flip_fft_udd)
+    flip_fft_cpmg  = np.abs(spf.fft(flip_cpmg))
+    flip_fft_cpmg  /= np.max(flip_fft_cpmg)
+    flip_fft_spwm  = np.abs(spf.fft(flip_spwm))
+    flip_fft_spwm  /= np.max(flip_fft_spwm)
+    flip_fft_spwmu = np.abs(spf.fft(flip_spwmu))
+    flip_fft_spwmu /= np.max(flip_fft_spwmu)
+    flip_fft_ideal  = np.abs(spf.fft(flip_ideal))
+    flip_fft_ideal  /= np.max(flip_fft_ideal)
+
+    aspect        = 1
+    interpolation = "bilinear"
+    label_steps_y = min(number_of_pulses_max, 5)
+
+    plt.figure()
+    plt.imshow(flip_udd, cmap = cm.hawaii, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Uhrig dynamical decoupling", "mu_dd_udd")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_cpmg, cmap = cm.hawaii, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("CPMG", "mu_dd_cpmg")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_spwm, cmap = cm.hawaii, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Sinusoidal pulse width modulation", "mu_dd_spwm")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_spwmu, cmap = cm.hawaii, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Sinusoidal pulse width modulation (unipolar)", "mu_dd_spwmu")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_ideal, cmap = cm.hawaii, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Ideal signal", "mu_dd_ideal")
+    plt.draw()
+
+
+    plt.figure()
+    plt.imshow(flip_fft_udd, cmap = cm.tokyo, vmin = 0, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Frequency (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Uhrig dynamical decoupling (FFT)", "mu_dd_fft_udd")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_fft_cpmg, cmap = cm.tokyo, vmin = 0, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Frequency (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("CPMG (FFT)", "mu_dd_fft_cpmg")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_fft_spwm, cmap = cm.tokyo, vmin = 0, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Frequency (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Sinusoidal pulse width modulation (FFT)", "mu_dd_fft_spwm")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_fft_spwmu, cmap = cm.tokyo, vmin = 0, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Frequency (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Sinusoidal pulse width modulation (unipolar) (FFT)", "mu_dd_fft_spwmu")
+    plt.draw()
+
+    plt.figure()
+    plt.imshow(flip_fft_ideal, cmap = cm.tokyo, vmin = 0, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Frequency (au)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.0f}" for number in numbers_of_pulses[ytick_decimate]])
+    plt.ylabel("Number of pulses")
+    plt.colorbar(label = "Sign of expected Fy")
+    # plt.subplots_adjust(left = 0.07, right = 0.99, bottom = 0.1, top = 0.9)
+    if archive:
+      archive.write_plot("Ideal signal (FFT)", "mu_dd_fft_ideal")
+    plt.draw()

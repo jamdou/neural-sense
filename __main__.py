@@ -400,7 +400,8 @@ if __name__ == "__main__":
 
       # sim.ramsey.SweepingRamsey.find_pi2_rate()
       # sim.ramsey.SweepingRamsey.pulsed_ramsey(archive)
-      sim.multi.MultiAnalysis.avoiding_dressing(archive)
+      # sim.multi.MultiAnalysis.avoiding_dressing(archive)
+      sim.multi.MultiAnalysis.visualise_dynamical_decoupling(archive)
 
       # === ===                      === ===
       # === === Benchmarks and tests === ===
