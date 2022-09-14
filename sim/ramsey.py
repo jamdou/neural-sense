@@ -357,7 +357,7 @@ class SweepingRamsey:
     duration_dressing = 1/(4*amplitude_dressing)
     duration_experiment = 5e-3
     duration_sample = 250e-6
-    fringes = np.arange(1.5, 10, 0.01)
+    fringes = np.arange(0.5, 10, 0.01)
     errors = np.empty_like(fringes)
     trap_location = np.arange(number_of_traps)
 
@@ -400,6 +400,7 @@ class SweepingRamsey:
           field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time)
         time_pulse_readout = time_sample + duration_sample/2
         if time > time_pulse_readout and time <= time_pulse_readout + duration_dressing:
+          # field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
           field[0] += math.tau*2*amplitude_dressing*math.cos(math.tau*dressing_frequency*time + math.pi/2)
 
         field[2] = math.tau*bias
@@ -415,7 +416,8 @@ class SweepingRamsey:
       gradient_mid = 600e3
       gradient_range = 500e3
       # fringe = 4.5
-      gradient_range = amplitude_dressing*np.sqrt(fringe**2 - 1)*(number_of_traps - 1)
+      # gradient_range = amplitude_dressing*np.sqrt(16*(fringe**2) - 1)*(number_of_traps - 1)
+      gradient_range = amplitude_dressing*np.sqrt(4*(fringe**2) - 1)*(number_of_traps - 1)
       # duration_dressing = 1/(4*amplitude_dressing)
       # duration_experiment = 5e-3
       # duration_sample = 250e-6
