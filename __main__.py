@@ -402,6 +402,7 @@ if __name__ == "__main__":
       sim.ramsey.SweepingRamsey.pulsed_ramsey(archive)
       # sim.multi.MultiAnalysis.avoiding_dressing(archive)
       # sim.multi.MultiAnalysis.visualise_dynamical_decoupling(archive)
+      # sim.multi.MultiAnalysis.difference_addressing(archive)
 
       # === ===                      === ===
       # === === Benchmarks and tests === ===

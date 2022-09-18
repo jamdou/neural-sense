@@ -392,3 +392,68 @@ class MultiAnalysis:
     if archive:
       archive.write_plot("Ideal signal (FFT)", "mu_dd_fft_ideal")
     plt.draw()
+
+  @staticmethod
+  def difference_addressing(archive = None):
+    number_of_traps = 2
+    experiment_duration = 5e-3
+    time_step = 1e-5
+    shape = [number_of_traps, int(math.floor(experiment_duration/time_step))]
+    trap_separation = 20e3
+    pulse_amplitude = 10*(math.sqrt(3)/2)*trap_separation
+    # pulse_duration = 4*math.asin(math.pi/(4*math.sqrt(3)))/(math.tau*trap_separation)
+    # pulse_duration = 1/(2*pulse_amplitude)
+    pulse_duration = math.asin(math.pi*trap_separation/(8*pulse_amplitude))*4/(math.tau*trap_separation)
+    pulse_time = 2.5e-3
+    gradient_centre = 650e3
+    gradient = gradient_centre + (np.arange(number_of_traps) - (number_of_traps - 1)/2)*trap_separation
+
+    def get_field_difference(time, parameters, field):
+      trap_index = parameters[0]
+
+      field[1] = 0
+      field[3] = 0
+      
+      bias = gradient_centre + (trap_index - (number_of_traps - 1)/2)*trap_separation
+      field[2] = math.tau*bias
+
+      field[0] = 0
+      for pulse_index in range(number_of_traps + 1):
+        radio_frequency = gradient_centre + (pulse_index - (number_of_traps)/2)*trap_separation
+        # radio_phase = trap_separation*pulse_duration/2
+        if time > pulse_time - pulse_duration/2 and time < pulse_time + pulse_duration/2:
+          field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
+          # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
+          # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*time)
+      # for pulse_index in range(number_of_traps):
+      #   radio_frequency = gradient_centre + (pulse_index - (number_of_traps - 1)/2)*trap_separation
+      #   if time > pulse_time - pulse_duration/2 and time < pulse_time + pulse_duration/2:
+      #     field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
+
+    simulator = spinsim.Simulator(get_field_difference, spinsim.SpinQuantumNumber.ONE)
+    spin_map = np.empty(shape)
+
+    for trap_index in range(number_of_traps):
+      result = simulator.evaluate(0, experiment_duration, time_step/50, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap_index])
+      spin_map[trap_index, :] = result.spin[:, 2]
+
+    time = result.time
+
+    aspect = 1
+    label_steps_y = min(5, shape[0])
+    interpolation = "none"
+
+    plt.figure()
+    plt.imshow(spin_map, cmap = cm.roma, vmin = -1, vmax = 1, aspect = shape[1]/shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, shape[1], int(np.round(shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in time[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, shape[0], int(np.round(shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number/1000:.0f}" for number in gradient[ytick_decimate]])
+    plt.ylabel("Gradient (kHz)")
+    plt.colorbar(label = "Expected spin z projection (hbar)")
+    if archive:
+      archive.write_plot("Difference addressing", "mu_da_time")
+    plt.draw()
