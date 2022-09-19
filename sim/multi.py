@@ -395,21 +395,36 @@ class MultiAnalysis:
 
   @staticmethod
   def difference_addressing(archive = None):
-    number_of_traps = 2
+    number_of_traps = 50
     experiment_duration = 5e-3
     time_step = 1e-5
     shape = [number_of_traps, int(math.floor(experiment_duration/time_step))]
-    trap_separation = 20e3
-    pulse_amplitude = 10*(math.sqrt(3)/2)*trap_separation
+    trap_separation = 2e3
+    pulse_amplitude = (math.sqrt(3)/2)*trap_separation
+    # pulse_amplitude = (math.sqrt(3/5)/2)*trap_separation
+    # pulse_amplitude = trap_separation
     # pulse_duration = 4*math.asin(math.pi/(4*math.sqrt(3)))/(math.tau*trap_separation)
     # pulse_duration = 1/(2*pulse_amplitude)
     pulse_duration = math.asin(math.pi*trap_separation/(8*pulse_amplitude))*4/(math.tau*trap_separation)
-    pulse_time = 2.5e-3
+    # pulse_duration = 2*math.sqrt(3)*math.asin(math.pi*math.sqrt(3)/16)/(math.tau*trap_separation)
+    pulse_time = experiment_duration/4
     gradient_centre = 650e3
     gradient = gradient_centre + (np.arange(number_of_traps) - (number_of_traps - 1)/2)*trap_separation
 
+    flips = 0*np.fmod(np.arange(number_of_traps), 2)
+    # flips[5] = 1
+    flips[int(3*number_of_traps/4):] = 1
+    # flips[15:] = 0
+    flips_integrated = flips.copy()
+    for flip_index in range(flips.size - 1):
+      flips_integrated[flip_index + 1] = flips_integrated[flip_index] == flips[flip_index + 1]
+    
+    # flips_integrated = np.fmod(np.cumsum(flips), 2)
+    C.print(flips_integrated)
+
     def get_field_difference(time, parameters, field):
       trap_index = parameters[0]
+      flips_integrated = parameters[1:]
 
       field[1] = 0
       field[3] = 0
@@ -420,21 +435,36 @@ class MultiAnalysis:
       field[0] = 0
       for pulse_index in range(number_of_traps + 1):
         radio_frequency = gradient_centre + (pulse_index - (number_of_traps)/2)*trap_separation
+        radio_frequency_low = radio_frequency - (number_of_traps)*trap_separation
         # radio_phase = trap_separation*pulse_duration/2
-        if time > pulse_time - pulse_duration/2 and time < pulse_time + pulse_duration/2:
-          field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
-          # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
-          # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*time)
-      # for pulse_index in range(number_of_traps):
-      #   radio_frequency = gradient_centre + (pulse_index - (number_of_traps - 1)/2)*trap_separation
-      #   if time > pulse_time - pulse_duration/2 and time < pulse_time + pulse_duration/2:
-      #     field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
+        for pulse_time_index in range(1, 4):
+          if time > pulse_time_index*pulse_time - pulse_duration/2 and time < pulse_time_index*pulse_time + pulse_duration/2:
+            # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
+            # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
+            # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*time)
+            # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - (pulse_time - pulse_duration/2)) + pulse_index*trap_separation*pulse_duration/2))
+            # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*time + pulse_index*(trap_separation*pulse_duration/2 + 1/2)))
+            # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - (pulse_time - pulse_duration/2))))
+            # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - (pulse_time - pulse_duration/2)) + pulse_index*(1/2)))
+            flip_integrated = 1
+            if pulse_index > 0:
+              flip_integrated = flips_integrated[pulse_index - 1]
+            field[0] += ((-1)**flip_integrated)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - (pulse_time - pulse_duration/2)) + pulse_index*pulse_time*trap_separation*(pulse_time_index - 1)))
+            # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency_low*(time - (pulse_time - pulse_duration/2)) - (pulse_index - number_of_traps)*pulse_time*trap_separation*(pulse_time_index - 1)))
+            # if pulse_index > 0:
+            #   field[0] += -((-1)**flip_integrated)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency_low*(time - (pulse_time - pulse_duration/2)) - pulse_index*pulse_time*trap_separation*(pulse_time_index - 1)))
+            # field[0] += ((-1)**flip_integrated)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - pulse_time) + pulse_index*trap_separation*(pulse_time*(pulse_time_index - 1) + pulse_duration/2)))
+        # for pulse_index in range(number_of_traps):
+        #   radio_frequency = gradient_centre + (pulse_index - (number_of_traps - 1)/2)*trap_separation
+        #   if time > pulse_time - pulse_duration/2 and time < pulse_time + pulse_duration/2:
+        #     field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
 
     simulator = spinsim.Simulator(get_field_difference, spinsim.SpinQuantumNumber.ONE)
     spin_map = np.empty(shape)
-
+    parameters = [0] + [flip_integrated for flip_integrated in flips_integrated]
     for trap_index in range(number_of_traps):
-      result = simulator.evaluate(0, experiment_duration, time_step/50, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, [trap_index])
+      parameters[0] = trap_index
+      result = simulator.evaluate(0, experiment_duration, time_step/50, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, parameters)
       spin_map[trap_index, :] = result.spin[:, 2]
 
     time = result.time

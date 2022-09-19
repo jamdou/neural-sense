@@ -399,10 +399,10 @@ if __name__ == "__main__":
       # util.wavelet_transform(time, amplitude)
 
       # sim.ramsey.SweepingRamsey.find_pi2_rate()
-      sim.ramsey.SweepingRamsey.pulsed_ramsey(archive)
+      # sim.ramsey.SweepingRamsey.pulsed_ramsey(archive)
       # sim.multi.MultiAnalysis.avoiding_dressing(archive)
       # sim.multi.MultiAnalysis.visualise_dynamical_decoupling(archive)
-      # sim.multi.MultiAnalysis.difference_addressing(archive)
+      sim.multi.MultiAnalysis.difference_addressing(archive)
 
       # === ===                      === ===
       # === === Benchmarks and tests === ===
