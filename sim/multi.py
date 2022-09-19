@@ -413,6 +413,7 @@ class MultiAnalysis:
 
     flips = 0*np.fmod(np.arange(number_of_traps), 2)
     # flips[5] = 1
+    flips[12] = 1
     flips[int(3*number_of_traps/4):] = 1
     # flips[15:] = 0
     flips_integrated = flips.copy()
@@ -437,7 +438,7 @@ class MultiAnalysis:
         radio_frequency = gradient_centre + (pulse_index - (number_of_traps)/2)*trap_separation
         radio_frequency_low = radio_frequency - (number_of_traps)*trap_separation
         # radio_phase = trap_separation*pulse_duration/2
-        for pulse_time_index in range(1, 4):
+        for pulse_time_index in range(1, 2):
           if time > pulse_time_index*pulse_time - pulse_duration/2 and time < pulse_time_index*pulse_time + pulse_duration/2:
             # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
             # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
