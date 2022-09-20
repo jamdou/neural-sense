@@ -395,11 +395,11 @@ class MultiAnalysis:
 
   @staticmethod
   def difference_addressing(archive = None):
-    number_of_traps = 50
+    number_of_traps = 2
     experiment_duration = 5e-3
     time_step = 1e-5
     shape = [number_of_traps, int(math.floor(experiment_duration/time_step))]
-    trap_separation = 2e3
+    trap_separation = 20e3
     pulse_amplitude = (math.sqrt(3)/2)*trap_separation
     # pulse_amplitude = (math.sqrt(3/5)/2)*trap_separation
     # pulse_amplitude = trap_separation
@@ -407,14 +407,14 @@ class MultiAnalysis:
     # pulse_duration = 1/(2*pulse_amplitude)
     pulse_duration = math.asin(math.pi*trap_separation/(8*pulse_amplitude))*4/(math.tau*trap_separation)
     # pulse_duration = 2*math.sqrt(3)*math.asin(math.pi*math.sqrt(3)/16)/(math.tau*trap_separation)
-    pulse_time = experiment_duration/4
+    pulse_time = experiment_duration/16
     gradient_centre = 650e3
     gradient = gradient_centre + (np.arange(number_of_traps) - (number_of_traps - 1)/2)*trap_separation
 
     flips = 0*np.fmod(np.arange(number_of_traps), 2)
     # flips[5] = 1
-    flips[12] = 1
-    flips[int(3*number_of_traps/4):] = 1
+    # flips[12] = 1
+    # flips[int(3*number_of_traps/4):] = 1
     # flips[15:] = 0
     flips_integrated = flips.copy()
     for flip_index in range(flips.size - 1):
@@ -438,7 +438,7 @@ class MultiAnalysis:
         radio_frequency = gradient_centre + (pulse_index - (number_of_traps)/2)*trap_separation
         radio_frequency_low = radio_frequency - (number_of_traps)*trap_separation
         # radio_phase = trap_separation*pulse_duration/2
-        for pulse_time_index in range(1, 2):
+        for pulse_time_index in range(1, 16):
           if time > pulse_time_index*pulse_time - pulse_duration/2 and time < pulse_time_index*pulse_time + pulse_duration/2:
             # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
             # field[0] += math.tau*2*pulse_amplitude*math.cos(math.tau*radio_frequency*(time - pulse_time))
@@ -450,7 +450,7 @@ class MultiAnalysis:
             flip_integrated = 1
             if pulse_index > 0:
               flip_integrated = flips_integrated[pulse_index - 1]
-            field[0] += ((-1)**flip_integrated)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - (pulse_time - pulse_duration/2)) + pulse_index*pulse_time*trap_separation*(pulse_time_index - 1)))
+            field[0] += ((-1)**(flip_integrated + pulse_time_index))*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency*(time - (pulse_time - pulse_duration/2)) - pulse_time*trap_separation*pulse_index*(pulse_time_index - 1)))
             # field[0] += ((-1)**pulse_index)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency_low*(time - (pulse_time - pulse_duration/2)) - (pulse_index - number_of_traps)*pulse_time*trap_separation*(pulse_time_index - 1)))
             # if pulse_index > 0:
             #   field[0] += -((-1)**flip_integrated)*math.tau*2*pulse_amplitude*math.cos(math.tau*(radio_frequency_low*(time - (pulse_time - pulse_duration/2)) - pulse_index*pulse_time*trap_separation*(pulse_time_index - 1)))
