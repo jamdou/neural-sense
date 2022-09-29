@@ -2,6 +2,7 @@ import math
 import numpy as np
 import scipy.fftpack as spf
 import matplotlib.pyplot as plt
+import matplotlib.colors as mplc
 import spinsim
 from cmcrameri import cm
 
@@ -488,3 +489,35 @@ class MultiAnalysis:
     if archive:
       archive.write_plot("Difference addressing", "mu_da_time")
     plt.draw()
+
+  @staticmethod
+  def continuous_multi(archive = None):
+    def get_field(time, parameters, field):
+      field[0] = 0
+      field[1] = 0
+      field[3] = 0
+
+      position = parameters[0]
+      magnetic_centre = parameters[1]
+      magnetic_gradient = parameters[2]
+
+      magnetic_bias = magnetic_centre + magnetic_gradient*position
+      field[2] = math.tau*magnetic_bias
+      
+      pulse_amplitude = parameters[3]
+      experiment_duration = parameters[4]
+      pulse_duration = 1/(4*pulse_amplitude)
+
+      pulse_time = experiment_duration/2
+      if time > pulse_time - pulse_duration and time < pulse_time:
+        field[0] = 2*math.tau*math.cos(math.tau*magnetic_centre*time)
+
+    experiment_separation = 10e-3
+    space_step = 100e-6
+    experiment_duration = 5e-3
+    time_step = 5e-6
+    atom_trace_size = (int(experiment_separation/space_step), int(experiment_duration/time_step))
+    atom_trace = np.empty(atom_trace_size)
+
+    magnetic_centre = 600e3
+    magnetic_gradient = 100e3/experiment_separation
