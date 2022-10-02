@@ -508,16 +508,81 @@ class MultiAnalysis:
       experiment_duration = parameters[4]
       pulse_duration = 1/(4*pulse_amplitude)
 
-      pulse_time = experiment_duration/2
+      pulse_time = experiment_duration/9
       if time > pulse_time - pulse_duration and time < pulse_time:
-        field[0] = 2*math.tau*math.cos(math.tau*magnetic_centre*time)
+        field[0] = 2*math.tau*pulse_amplitude*math.cos(math.tau*magnetic_centre*time)
+
+      pulse_time += 1200e-6
+      if time > pulse_time and time < pulse_time + 2*pulse_duration:
+        field[0] = -2*math.tau*pulse_amplitude*math.cos(math.tau*magnetic_centre*time)
+
+      pulse_time += 1200e-6 + 2*pulse_duration
+      if time > pulse_time and time < pulse_time + pulse_duration:
+        field[0] = 2*math.tau*pulse_amplitude*math.cos(math.tau*magnetic_centre*time)
 
     experiment_separation = 10e-3
-    space_step = 100e-6
+    position_step = 10e-6
+    positions = np.arange(-experiment_separation/2, experiment_separation/2, position_step)
+
     experiment_duration = 5e-3
-    time_step = 5e-6
-    atom_trace_size = (int(experiment_separation/space_step), int(experiment_duration/time_step))
-    atom_trace = np.empty(atom_trace_size)
+    time_step = 5e-7
+    times = np.arange(0, experiment_duration, time_step)
+
+    atom_trace_shape = (int(round(experiment_separation/position_step)), int(round(experiment_duration/time_step)), 3)
+    atom_trace = np.zeros(atom_trace_shape)
 
     magnetic_centre = 600e3
     magnetic_gradient = 100e3/experiment_separation
+
+    pulse_amplitude = 5e3
+
+    number_of_traps = 9
+    trap_radius = 200e-6
+    trap_separation = 1e-3
+    trap_positions = (np.arange(number_of_traps) - (number_of_traps - 1)/2)*trap_separation
+    trap_mask = np.zeros_like(positions)
+    
+    for trap_position in trap_positions:
+      trap_mask += np.exp(-0.5*((positions - trap_position)/trap_radius)**2)
+    trap_mask_min = 0.01
+
+    # plt.figure()
+    # plt.plot(positions/1e-3, trap_mask, "k-")
+    # plt.xlabel("Position (mm)")
+    # plt.ylabel("Trap depth (au)")
+    # plt.draw()
+    simulator = spinsim.Simulator(get_field, spinsim.SpinQuantumNumber.ONE)
+    parameters = np.array([0, magnetic_centre, magnetic_gradient, pulse_amplitude, experiment_duration])
+    for position_index in range(positions.size):
+      if trap_mask[position_index] > trap_mask_min:
+        # spin = 2*times/experiment_duration - 1
+        parameters[0] = positions[position_index]
+        results = simulator.evaluate(0, experiment_duration, time_step/3, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, parameters)
+        spin = results.spin[:, 2]
+      else:
+        spin = np.zeros_like(times)
+      atom_trace[position_index, :, 0] = np.cos(math.tau*(spin + 1)/4)
+      atom_trace[position_index, :, 1] = np.cos(math.tau*(spin - 1)/4)
+    
+
+    atom_trace[:, :, 2] = 1
+    # atom_trace *= np.reshape(trap_mask, (atom_trace_shape[0], 1, 1))
+
+    aspect = 1
+    label_steps_y = min(5, atom_trace_shape[0])
+    interpolation = "none"
+
+    plt.figure()
+    plt.imshow(atom_trace, aspect = atom_trace_shape[1]/atom_trace_shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, atom_trace_shape[1], int(np.round(atom_trace_shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{1000*number:.2f}" for number in times[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, atom_trace_shape[0], int(np.round(atom_trace_shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{1000*number:.0f}" for number in positions[ytick_decimate]])
+    plt.ylabel("Position (mm)")
+    if archive:
+      archive.write_plot("Continuous multi-trap", "mu_co_trace")
+    plt.draw()
+
