@@ -601,7 +601,7 @@ class MultiAnalysis:
 
     # atom_trace[:, :, 1] = 1
     # atom_trace *= np.reshape(trap_mask, (atom_trace_shape[0], 1, 1))
-    colourbar_x = np.linspace(1, -1, 50)
+    colourbar_x = np.linspace(1, -1, 49)
     colourbar = np.empty((colourbar_x.size, 1, 3))
     colourbar[:, 0, :] = apply_colour_map(colourbar_x)
 
