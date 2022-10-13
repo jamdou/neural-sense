@@ -1,3 +1,4 @@
+from random import shuffle
 import numpy as np
 import scipy.optimize
 import math
@@ -917,3 +918,16 @@ def arcsin_filter(experiment_results:arch.ExperimentResults, measurement_duratio
     archive_time = experiment_results.archive_time,
     experiment_type = f"{experiment_results.experiment_type}, arcsin filter"
   )
+
+def is_ramsey_this_noisy():
+  time = np.arange(0, 5e-3, 50e-6)
+  shuffle = np.linspace(-200, 200, time.size)
+  C.print(shuffle)
+  np.random.shuffle(shuffle)
+  C.print(shuffle)
+  amplitude = (shuffle + 120*np.random.normal(size = time.shape) + 700*np.sin(math.tau*5e3*(time - 2e-3))*(time > 2e-3)*(time < 2e-3 + 1/5e3))/7
+  plt.figure()
+  plt.plot(time/1e-3, amplitude)
+  plt.xlabel("Time (ms)")
+  plt.ylabel("Amplitude (nT)")
+  plt.draw()

@@ -384,6 +384,8 @@ if __name__ == "__main__":
 
       # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 
+      analysis.is_ramsey_this_noisy()
+
       # paper_plots.CompressivePaper.make_comparison(archive)
       # paper_plots.CompressivePaper.make_metrics(archive)
       # paper_plots.CompressivePaper.make_unknown(archive)
@@ -403,7 +405,7 @@ if __name__ == "__main__":
       # sim.multi.MultiAnalysis.avoiding_dressing(archive)
       # sim.multi.MultiAnalysis.visualise_dynamical_decoupling(archive)
       # sim.multi.MultiAnalysis.difference_addressing(archive)
-      sim.multi.MultiAnalysis.continuous_multi(archive)
+      # sim.multi.MultiAnalysis.continuous_multi(archive)
 
       # === ===                      === ===
       # === === Benchmarks and tests === ===
