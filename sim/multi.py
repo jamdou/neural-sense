@@ -667,3 +667,189 @@ class MultiAnalysis:
       archive.write_plot("Continuous multi-trap", "mu_co_trace_mask")
     plt.draw()
 
+  @staticmethod
+  def continuous_multi_radio(archive = None):
+    def get_field(time, parameters, field):
+      field[0] = 0
+      field[1] = 0
+      field[3] = 0
+
+      position = parameters[0]
+      radio_centre = parameters[1]
+      radio_gradient = parameters[2]
+
+      magnetic_bias = parameters[3]
+      field[2] = math.tau*magnetic_bias
+
+      radio_bias = radio_centre + radio_gradient*position
+      field[0] += 2*math.tau*radio_bias*math.sin(math.tau*magnetic_bias*time)
+
+
+    experiment_separation = 1e-3
+    position_step = 1e-6
+    positions = np.arange(-experiment_separation/2, experiment_separation/2, position_step)
+
+    experiment_duration = 5e-3
+    time_step = 5e-7
+    times = np.arange(0, experiment_duration, time_step)
+
+    atom_trace_shape = (positions.size, times.size, 3)
+    atom_trace = np.zeros(atom_trace_shape)
+    atom_difference_trace = np.zeros(atom_trace_shape)
+
+    radio_centre = 5e3
+    radio_gradient = 10e3/1e-2#11e3/1e-2
+
+    magnetic_bias = 600e3
+
+    number_of_traps = 9
+    trap_radius = 10e-6
+    trap_separation = 100e-6
+    trap_positions = (np.arange(number_of_traps) - (number_of_traps - 1)/2)*trap_separation
+    trap_mask = np.zeros_like(positions)
+    
+    for trap_position in trap_positions:
+      trap_mask += np.exp(-0.5*((positions - trap_position)/trap_radius)**2)
+    trap_mask_min = 0.2
+
+    # plt.figure()
+    # plt.plot(positions/1e-3, trap_mask, "k-")
+    # plt.xlabel("Position (mm)")
+    # plt.ylabel("Trap depth (au)")
+    # plt.draw()
+    def apply_colour_map(spin):
+      return np.array(
+        [
+          np.cos(math.tau*(spin - 1)/8),
+          np.cos(math.tau*(spin    )/8),
+          np.cos(math.tau*(spin + 1)/8)
+        ]
+      ).T
+    simulator = spinsim.Simulator(get_field, spinsim.SpinQuantumNumber.ONE)
+    parameters = np.array([0, radio_centre, radio_gradient, magnetic_bias])
+    spin_hold = None
+    C.starting("Simulations")
+    C.print(f"|{'Index':7s}|{'Progress (%)':12s}|{'Position (um)':13s}|")
+    for position_index in range(positions.size):
+      parameters[0] = positions[position_index]
+      results = simulator.evaluate(0, experiment_duration, time_step/3, time_step, spinsim.SpinQuantumNumber.ONE.minus_z, parameters)
+      spin = results.spin[:, 2]
+      if trap_mask[position_index] > trap_mask_min:
+        # spin = results.spin[:, 2]
+        if spin_hold is None:
+          spin_difference = np.zeros_like(times)
+          spin_hold = spin.copy()
+        else:
+          spin_difference = results.spin[:, 2] - spin_hold
+      else:
+        spin_difference = np.zeros_like(times)
+        spin_hold = None
+        # spin = np.zeros_like(times)
+        # spin_difference = np.zeros_like(times)
+      # atom_trace[position_index, :, 2] = np.cos(math.tau*(spin + 1)/4)
+      # atom_trace[position_index, :, 0] = np.cos(math.tau*(spin - 1)/4)
+      atom_trace[position_index, :, :] = apply_colour_map(spin)
+      atom_difference_trace[position_index, :, :] = apply_colour_map(spin_difference)
+      C.print(f"|{position_index:7d}|{100*(position_index + 1)/positions.size:12.4f}|{positions[position_index]/1e-6:13.4f}|", end = "\r")
+    C.print("")
+    C.finished("Simulations")
+    
+
+    # atom_trace[:, :, 1] = 1
+    # atom_trace *= np.reshape(trap_mask, (atom_trace_shape[0], 1, 1))
+    colourbar_x = np.linspace(1, -1, 49)
+    colourbar = np.empty((colourbar_x.size, 1, 3))
+    colourbar[:, 0, :] = apply_colour_map(colourbar_x)
+
+    aspect = 1
+    label_steps_y = min(5, atom_trace_shape[0])
+    interpolation = "bilinear"
+
+    plt.figure(figsize = [8, 4.8])
+    plt.subplot(1, 2, 1)
+    plt.imshow(atom_trace, aspect = atom_trace_shape[1]/atom_trace_shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, atom_trace_shape[1], int(np.round(atom_trace_shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number/1e-3:.2f}" for number in times[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, atom_trace_shape[0], int(np.round(atom_trace_shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number/1e-6:.0f}" for number in positions[ytick_decimate]])
+    plt.ylabel("Position (um)")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(colourbar, aspect = 1/5, interpolation = "bilinear")
+    plt.gca().axes.xaxis.set_ticks([])
+    plt.gca().axes.xaxis.set_ticklabels([])
+    plt.xlabel("Colourbar")
+    ctick_decimate = np.arange(0, colourbar_x.size, int(np.round(colourbar_x.size/6)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ctick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.2f}" for number in colourbar_x[ctick_decimate]])
+    plt.ylabel("Expected spin projection (hbar)")
+
+    plt.tight_layout()
+
+    if archive:
+      archive.write_plot("Continuous multi-trap", "mu_cr_trace")
+    plt.draw()
+
+    atom_trace *= np.reshape(trap_mask, (atom_trace_shape[0], 1, 1))
+
+    plt.figure(figsize = [8, 4.8])
+    plt.subplot(1, 2, 1)
+    plt.imshow(atom_trace, aspect = atom_trace_shape[1]/atom_trace_shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, atom_trace_shape[1], int(np.round(atom_trace_shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number/1e-3:.2f}" for number in times[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, atom_trace_shape[0], int(np.round(atom_trace_shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number/1e-6:.0f}" for number in positions[ytick_decimate]])
+    plt.ylabel("Position (um)")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(colourbar, aspect = 1/5, interpolation = "bilinear")
+    plt.gca().axes.xaxis.set_ticks([])
+    plt.gca().axes.xaxis.set_ticklabels([])
+    plt.xlabel("Colourbar")
+    ctick_decimate = np.arange(0, colourbar_x.size, int(np.round(colourbar_x.size/6)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ctick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.2f}" for number in colourbar_x[ctick_decimate]])
+    plt.ylabel("Expected spin projection (hbar)")
+
+    plt.tight_layout()
+    
+    if archive:
+      archive.write_plot("Continuous multi-trap", "mu_cr_trace_mask")
+    plt.draw()
+
+    atom_difference_trace *= np.reshape(trap_mask, (atom_trace_shape[0], 1, 1))
+
+    plt.figure(figsize = [8, 4.8])
+    plt.subplot(1, 2, 1)
+    plt.imshow(atom_difference_trace, aspect = atom_trace_shape[1]/atom_trace_shape[0]/aspect, interpolation = interpolation)
+    xtick_decimate = np.arange(0, atom_trace_shape[1], int(np.round(atom_trace_shape[1]/5)), dtype = np.int)
+    plt.gca().axes.xaxis.set_ticks(xtick_decimate)
+    plt.gca().axes.xaxis.set_ticklabels([f"{number/1e-3:.2f}" for number in times[xtick_decimate]])
+    plt.xlabel("Time (ms)")
+    ytick_decimate = np.arange(0, atom_trace_shape[0], int(np.round(atom_trace_shape[0]/label_steps_y)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ytick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number/1e-6:.0f}" for number in positions[ytick_decimate]])
+    plt.ylabel("Position (um)")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(colourbar, aspect = 1/5, interpolation = "bilinear")
+    plt.gca().axes.xaxis.set_ticks([])
+    plt.gca().axes.xaxis.set_ticklabels([])
+    plt.xlabel("Colourbar")
+    ctick_decimate = np.arange(0, colourbar_x.size, int(np.round(colourbar_x.size/6)), dtype = np.int)
+    plt.gca().axes.yaxis.set_ticks(ctick_decimate)
+    plt.gca().axes.yaxis.set_ticklabels([f"{number:.2f}" for number in colourbar_x[ctick_decimate]])
+    plt.ylabel("Expected spin projection (hbar)")
+
+    plt.tight_layout()
+    
+    if archive:
+      archive.write_plot("Continuous multi-trap (difference)", "mu_cr_trace_difference")
+    plt.draw()
+

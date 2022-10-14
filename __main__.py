@@ -406,6 +406,7 @@ if __name__ == "__main__":
       # sim.multi.MultiAnalysis.visualise_dynamical_decoupling(archive)
       # sim.multi.MultiAnalysis.difference_addressing(archive)
       # sim.multi.MultiAnalysis.continuous_multi(archive)
+      sim.multi.MultiAnalysis.continuous_multi_radio(archive)
 
       # === ===                      === ===
       # === === Benchmarks and tests === ===
