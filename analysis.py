@@ -925,7 +925,7 @@ def is_ramsey_this_noisy():
   C.print(shuffle)
   np.random.shuffle(shuffle)
   C.print(shuffle)
-  amplitude = (shuffle + 120*np.random.normal(size = time.shape) + 700*np.sin(math.tau*5e3*(time - 2e-3))*(time > 2e-3)*(time < 2e-3 + 1/5e3))/7
+  amplitude = (shuffle + 200*np.random.normal(size = time.shape) + 700*np.sin(math.tau*5e3*(time - 2e-3))*(time > 2e-3)*(time < 2e-3 + 1/5e3))/7
   plt.figure()
   plt.plot(time/1e-3, amplitude)
   plt.xlabel("Time (ms)")

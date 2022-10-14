@@ -384,7 +384,7 @@ if __name__ == "__main__":
 
       # analysis.remove_dc_detuning(experiment_results, scaled, archive)
 
-      analysis.is_ramsey_this_noisy()
+      # analysis.is_ramsey_this_noisy()
 
       # paper_plots.CompressivePaper.make_comparison(archive)
       # paper_plots.CompressivePaper.make_metrics(archive)
@@ -482,13 +482,13 @@ if __name__ == "__main__":
       # # === Spinsim Benchmark ===
       # frequency = np.asarray([1000], dtype = np.float64)
       # sim.benchmark.new_benchmark_true_external_spinsim(archive, frequency, time_step_fines, device = spinsim.Device.CPU)
-      # # sim.benchmark.new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties)
-      # # sim.benchmark.new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties, device = spinsim.Device.CPU)
-      # # sim.benchmark.new_benchmark_true_external_internal_spinsim(archive, frequency, time_step_fines)
-      # # sim.benchmark.new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_properties)
-      # # sim.benchmark.new_benchmark_internal_trotter_spinsim(signal, frequency, time_step_fines, state_properties)
-      # # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fines, state_properties)
-      # # sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
+      # sim.benchmark.new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties)
+      # sim.benchmark.new_benchmark_external_spinsim(archive, signal, frequency, time_step_fines, state_properties, device = spinsim.Device.CPU)
+      # sim.benchmark.new_benchmark_true_external_internal_spinsim(archive, frequency, time_step_fines)
+      # sim.benchmark.new_benchmark_internal_spinsim(signal, frequency, time_step_fines, state_properties)
+      # sim.benchmark.new_benchmark_internal_trotter_spinsim(signal, frequency, time_step_fines, state_properties)
+      # sim.benchmark.new_benchmark_time_step_fine(archive, signal, frequency, time_step_fines, state_properties)
+      # sim.benchmark.new_benchmark_spinsim(archive, signal, frequency, time_step_fines, state_properties)
 
       # # === Comparison ===
       # # sim.benchmark.new_benchmark_external_evaluation(archive, ["20210720T145449", "20210720T150101", "20210617T163718", "20210507T140423", "20210618T090427", "20210507T124849"], reference_name = "SciPy", title = "Comparison to alternative software")

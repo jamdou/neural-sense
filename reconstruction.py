@@ -17,7 +17,6 @@ import util
 from util import PrettyTritty as C
 from archive import *
 from test_signal import *
-from sim.ramsey import RamseyComparisonResults
 
 class Reconstruction():
   """
@@ -1170,7 +1169,7 @@ def subtract_constant(amplitude, constant):
   if time_index < amplitude.size:
     amplitude[time_index] -= constant
 
-def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None, frequency_fit_step_size = 1, units = "Hz",ramsey_comparison_results:RamseyComparisonResults = None, metrics = ["rmse"]):
+def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_results:ExperimentResults, sweep_parameters = (30, 10000, 10), archive:Archive = None, frequency_cutoff_low = 0, frequency_cutoff_high = 100000, random_seeds = [util.Seeds.metroid], evaluation_methods = [], expected_amplitude = None, expected_frequency = None, expected_error_measurement = None, rabi_frequency_readout = None, frequency_line_noise = None, norm_scale_factor_modifier = None, frequency_fit_step_size = 1, units = "Hz",ramsey_comparison_results = None, metrics = ["rmse"]):
   reconstruction = Reconstruction(expected_signal.time_properties)
 
   random_seeds = np.array(random_seeds)

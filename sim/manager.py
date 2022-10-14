@@ -245,9 +245,11 @@ class SourceProperties:
     # Construct the signal from the dressing information and pulse description.
     if signal:
       self.add_dressing(signal, bias_amplitude, signal_reconstruction = signal_reconstruction)
-      if signal.signal_trace_time is None:
+      if hasattr(signal, "signal_trace_time"):
         for neural_pulse in signal.neural_pulses:
           self.add_neural_pulse(neural_pulse)
+          self.signal_trace_time = None
+          self.signal_trace_amplitude = None
           # self.add_neural_pulse(neural_pulse.time_start, neural_pulse.amplitude, neural_pulse.frequency)
       else:
         self.signal_trace_time = signal.signal_trace_time
