@@ -31,7 +31,8 @@ if __name__ == "__main__":
         signal = test_signal.TestSignal(
             [test_signal.NeuralPulse(0.02333333, 10.0, 1000), test_signal.NeuralPulse(0.0444444444, 10.0, 1000)],
             [],
-            time_properties
+            time_properties,
+            do_evaluate = False
         )
         signal.write_to_file(archive.archive_file)
 
