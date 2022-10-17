@@ -710,7 +710,7 @@ class MultiAnalysis:
     
     for trap_position in trap_positions:
       trap_mask += np.exp(-0.5*((positions - trap_position)/trap_radius)**2)
-    trap_mask_min = 0.2
+    trap_mask_min = math.exp(-1)
 
     # plt.figure()
     # plt.plot(positions/1e-3, trap_mask, "k-")
