@@ -1312,8 +1312,9 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
 
     roc_cutoff_max = np.sum(template_amplitude**2)*8
     # roc_cutoff_max = np.sum(template_amplitude**2)*1e2
-    # roc_cutoff_min = np.sum(template_amplitude**2)*1e-4
-    roc_cutoff_min = np.sum(template_amplitude**2)*1e-30
+    roc_cutoff_min = np.sum(template_amplitude**2)*1e-4
+    # roc_cutoff_min = np.sum(template_amplitude**2)*1e-30
+    # roc_resolution = 100
     roc_resolution = 100
     roc_ground_truth = scipy.signal.correlate(expected_signal.amplitude, template_amplitude) >= matched_cutoff
 
@@ -1409,8 +1410,10 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
           roc_sensitivity = [1]
           roc_specificity = [0]
           roc_matched_filter_output = scipy.signal.correlate(amplitude, template_amplitude)
-          for roc_cutoff in (np.geomspace(roc_cutoff_min, roc_cutoff_max, roc_resolution) - 2*roc_cutoff_min):
+          # for roc_cutoff in (np.geomspace(roc_cutoff_min, roc_cutoff_max, roc_resolution) - 2*roc_cutoff_min):
+          for roc_cutoff in (np.min(roc_matched_filter_output) + np.geomspace(roc_cutoff_min, roc_cutoff_max, roc_resolution) - roc_cutoff_min):
             roc_decision = roc_matched_filter_output >= roc_cutoff
+            # roc_decision = roc_matched_filter_output > roc_cutoff
             if np.sum(roc_ground_truth) > 0:
               roc_sensitivity.append(np.sum(np.logical_and(roc_ground_truth, roc_decision))/np.sum(roc_ground_truth))
             else:
