@@ -248,7 +248,8 @@ class CompressivePaper:
     recon.plot_reconstruction_number_of_samples_sweep_signal_comparison(
       archive,
       # ["20220725T162532", "20220725T164434"] # 360 Hz
-      ["20220728T111144", "20220728T120757"] # 1 kHz
+      # ["20220728T111144", "20220728T120757"] # 1 kHz
+      ["20221102T094403", "20221102T094043"]
     )
 
 class Aip2022:

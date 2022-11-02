@@ -1315,7 +1315,7 @@ def run_reconstruction_subsample_sweep(expected_signal:TestSignal, experiment_re
     roc_cutoff_min = np.sum(template_amplitude**2)*1e-4
     # roc_cutoff_min = np.sum(template_amplitude**2)*1e-30
     # roc_resolution = 100
-    roc_resolution = 100
+    roc_resolution = 1000
     roc_ground_truth = scipy.signal.correlate(expected_signal.amplitude, template_amplitude) >= matched_cutoff
 
   for evaluation_method_index, evaluation_method in enumerate(evaluation_methods):
