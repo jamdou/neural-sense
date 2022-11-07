@@ -910,6 +910,54 @@ class Reconstruction():
 
     C.finished("reconstruction (FISTA)")
 
+  def evaluate_fista_gradient(self, expected_amplitude = 995.5, expected_frequency = 5025, expected_error_measurement = 11.87, backtrack_scale = 0.9, norm_scale_factor_modifier = 2.0, is_fast = False, norm_scale_factor = None):
+    
+    # Define transforms
+    time_mesh, frequency_mesh = np.meshgrid(self.time_properties.time_coarse, self.frequency)
+    fourier_mesh = math.tau*time_mesh*frequency_mesh
+    dst_matrix = self.time_properties.time_step_coarse/self.time_properties.time_end_points[1]*np.sin(fourier_mesh)
+    frequency_derivative = math.tau*time_mesh*self.time_properties.time_step_coarse/self.time_properties.time_end_points[1]*np.cos(fourier_mesh)
+    gradient_derivative = frequency_mesh*frequency_derivative
+
+    fourier_mesh, time_mesh, frequency_mesh = None, None, None
+
+    # Define problem space
+    amplitude = np.zeros_like(self.time_properties.time_coarse)
+    frequency_shift = 0
+    gradient_shift = 0
+    bias_shift = 0
+
+    frequency_amplitude = self.frequency_amplitude.copy()
+    gradient_step = 1
+
+    # Define regularisation
+    sparse_regularisation = norm_scale_factor
+    if sparse_regularisation == None:
+      sparse_regularisation = 1
+    sparse_regularisation *= norm_scale_factor_modifier
+
+    frequency_regularisation  = (1/40)**4
+    gradient_regularisation   = (1/0.5)**2
+    bias_regularisation       = (1/100)**2
+
+    # Loop
+    for index in range(1000):
+      C.print(index)
+      matrix = dst_matrix + frequency_shift*frequency_derivative + gradient_shift*gradient_derivative
+      error = matrix@(amplitude + bias_shift) - frequency_amplitude
+      amplitude_temp = amplitude - gradient_step*2*error.T@matrix
+      amplitude_temp = (amplitude_temp - gradient_step*sparse_regularisation*np.sign(amplitude_temp))*(np.abs(amplitude_temp) > gradient_step*sparse_regularisation)
+      frequency_shift -= 1e-2*gradient_step*2*(error.T@frequency_derivative@amplitude + frequency_regularisation*frequency_shift)
+      gradient_shift -= 1e-9*gradient_step*2*(error.T@gradient_derivative@amplitude - gradient_regularisation*gradient_shift)
+      bias_shift -= 1e-5*gradient_step*2*(np.sum(error.T@matrix) + bias_regularisation*bias_shift)
+      amplitude = amplitude_temp
+      C.print(np.max(np.abs(amplitude)))
+
+    C.print(f"Frequency shift: {frequency_shift}")
+    C.print(f"Gradient shift: {gradient_shift}")
+    C.print(f"Bias shift: {bias_shift}")
+    self.amplitude = amplitude
+
   def evaluate_coherence(self):
     # C.starting("sensing coherence evaluation")
     coherence_size = int(self.time_properties.time_coarse.size*(self.time_properties.time_coarse.size - 1)/2)
